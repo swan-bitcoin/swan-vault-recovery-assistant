@@ -2,8 +2,8 @@
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "Node16", // TanStack Router needs this
+    "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true
   },
   "include": ["vite.config.ts"]
