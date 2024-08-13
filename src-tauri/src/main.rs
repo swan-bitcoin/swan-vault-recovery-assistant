@@ -1,19 +1,26 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use bdk::bitcoin::secp256k1::Secp256k1;
-use bdk::bitcoin::Network;
-use bdk::database::MemoryDatabase;
-use bdk::descriptor::{ExtendedDescriptor, IntoWalletDescriptor};
-use std::sync::{Arc, Mutex};
+// tauri and other framework imports
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use specta_typescript::Typescript;
 use tauri::State;
 
+// std rust imports
+use std::sync::{Arc, Mutex};
+
+// bdk and bitcoin imports
+use bdk::bitcoin::secp256k1::Secp256k1;
+use bdk::bitcoin::Network;
 use bdk::blockchain::ElectrumBlockchain;
+use bdk::database::MemoryDatabase;
+use bdk::descriptor::{ExtendedDescriptor, IntoWalletDescriptor};
 use bdk::electrum_client::Client;
 use bdk::SyncOptions;
 use bdk::{self, wallet};
 
-#[derive(Default, serde::Serialize)]
+#[derive(Default, Serialize, Deserialize, Type)]
 enum DescriptorResponse {
     #[default]
     None,
@@ -29,12 +36,14 @@ struct AppState {
 }
 
 #[tauri::command]
+#[specta::specta]
 fn reset(state: State<Mutex<AppState>>) {
     let mut state = state.lock().unwrap();
     state.wallet = None;
 }
 
 #[tauri::command]
+#[specta::specta]
 fn verify_descriptor(descriptor: String) -> Result<DescriptorResponse, String> {
     let secp = Secp256k1::new();
 
@@ -58,6 +67,7 @@ fn verify_descriptor(descriptor: String) -> Result<DescriptorResponse, String> {
 }
 
 #[tauri::command]
+#[specta::specta]
 fn set_wallet(
     state: State<Mutex<AppState>>,
     receive: String,
@@ -100,8 +110,9 @@ fn set_wallet(
 }
 
 #[tauri::command]
+#[specta::specta]
 fn fetch_balance(state: State<Mutex<AppState>>) -> Result<String, String> {
-    let mut state = state.lock().unwrap();
+    let state = state.lock().unwrap();
 
     let network = state.network.as_ref().ok_or("No network set")?.to_owned();
     let wallet = state.wallet.as_ref().ok_or("No wallet set")?;
@@ -135,14 +146,28 @@ fn main() {
     let app_state: Mutex<AppState> = Mutex::new(AppState::default());
     // let app_state = AppState::default();
 
-    tauri::Builder::default()
-        .manage(app_state)
-        .invoke_handler(tauri::generate_handler![
+    let specta_builder =
+        tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
             fetch_balance,
             reset,
             set_wallet,
             verify_descriptor
-        ])
+        ]);
+
+    #[cfg(debug_assertions)] // <- Only export on non-release builds
+    specta_builder
+        .export(Typescript::default(), "../src/bindings.ts")
+        .expect("Failed to export typescript bindings");
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .manage(app_state)
+        .invoke_handler(specta_builder.invoke_handler())
+        .setup(move |app| {
+            // This is also required if you want to use events
+            specta_builder.mount_events(app);
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
