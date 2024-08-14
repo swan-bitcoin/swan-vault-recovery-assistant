@@ -1,0 +1,20 @@
+{
+  "backgroundOpacity": false,
+  "accentColor": false,
+  "backdropBlur": false,
+  "backdropBrightness": false,
+  "backdropContrast": false,
+  "backdropGrayscale": false,
+  "backdropHueRotate": false,
+  "backdropInvert": false,
+  "backdropSaturate": false,
+  "backdropSepia": false,
+  "blur": false,
+  "borderOpacity": false,
+  "boxShadow": false,
+  "boxShadowColor": false,
+  "dropShadow": false,
+  "forcedColorAdjust": false,
+  "gradientColorStops": false,
+  "hueRotate": false
+}
