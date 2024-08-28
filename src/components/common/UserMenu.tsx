@@ -17,7 +17,7 @@ export const UserMenu = () => {
     <DropdownMenu>
       <DropdownMenuTrigger
         asChild
-        className="border-primary bg-diamond-hands-blue-100 hover:bg-diamond-hands-blue-200 rounded-5 border mr-3"
+        className="border-primary bg-cool-base-200 hover:bg-cool-base-300 rounded-5 border mr-3"
       >
         <Button variant="outline">Open</Button>
       </DropdownMenuTrigger>

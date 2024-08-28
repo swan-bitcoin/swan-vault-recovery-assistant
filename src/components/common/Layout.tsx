@@ -4,7 +4,7 @@ import { SideNavigation } from './SideNavigation'
 
 export const Layout = ({ children }: { children: ReactNode }) => {
   return (
-    <div className="bg-neutral-base-0 flex min-h-dvh border-primary w-full">
+    <div className="bg-cool-base-100 flex min-h-dvh w-full">
       <AppHeader />
       <div className="relative flex min-h-full min-w-full">
         <div className="border-primary fixed bottom-0 top-10 w-[250px] border-r p-4">
