@@ -1,5 +1,5 @@
-import theme from './src/design/theme.json'
-import corePlugins from './src/design/corePlugins.json'
+import theme from './src/styles/theme.json'
+import corePlugins from './src/styles/corePlugins.json'
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
