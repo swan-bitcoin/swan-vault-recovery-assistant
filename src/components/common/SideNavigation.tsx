@@ -1,5 +1,5 @@
 import { Link, LinkProps, RegisteredRouter } from '@tanstack/react-router'
-import clsx from 'clsx';
+import clsx from 'clsx'
 
 const NavigationListItem = ({ label, path }: { label: string; path: LinkProps<RegisteredRouter>['to'] }) => {
   return (
