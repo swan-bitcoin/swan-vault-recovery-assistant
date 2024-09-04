@@ -1,10 +1,13 @@
 import { Outlet } from '@tanstack/react-router'
-import { Layout } from './components'
+import { Layout } from './components/templates/Layout'
+import { ThemeProvider } from './context'
 
 export const App = () => {
   return (
-    <Layout>
-      <Outlet />
-    </Layout>
+    <ThemeProvider>
+      <Layout>
+        <Outlet />
+      </Layout>
+    </ThemeProvider>
   )
 }
