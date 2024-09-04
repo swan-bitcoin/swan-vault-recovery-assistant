@@ -3,7 +3,6 @@
 
 /** user-defined commands **/
 
-// @ts-nocheck
 
 export const commands = {
 async fetchBalance() : Promise<Result<string, string>> {
