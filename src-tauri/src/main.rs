@@ -156,7 +156,7 @@ fn main() {
 
     #[cfg(debug_assertions)] // <- Only export on non-release builds
     specta_builder
-        .export(Typescript::default(), "../src/bindings.ts")
+        .export(Typescript::default(), "../src/bindings.gen.ts")
         .expect("Failed to export typescript bindings");
 
     tauri::Builder::default()
