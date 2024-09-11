@@ -1,3 +1,6 @@
 export * from './AppHeader'
 export * from './SideNavigation'
 export * from './ThemeMenu'
+export * from './DescriptorForm'
+export * from './ElectrumServerForm'
+export * from './GetStartedSuccess'

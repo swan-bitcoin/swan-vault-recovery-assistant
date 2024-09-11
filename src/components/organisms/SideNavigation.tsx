@@ -30,6 +30,7 @@ export const SideNavigation = () => {
   return (
     <ul className="ml-4 mt-4">
       <NavigationListItem label="Home" path="/" />
+      <NavigationListItem label="Get Started" path="/start" />
       <NavigationListItem label="About" path="/about" />
     </ul>
   )

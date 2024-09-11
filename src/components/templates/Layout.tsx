@@ -9,7 +9,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
         <div className="fixed bottom-0 top-10 w-[250px] border-r border-primary p-4">
           <SideNavigation />
         </div>
-           {/* Main Content */}
+        {/* Main Content */}
         <div className="ml-[250px] flex-1 flex-grow pt-10">{children}</div>
       </div>
     </div>
