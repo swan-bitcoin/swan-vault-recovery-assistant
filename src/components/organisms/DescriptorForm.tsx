@@ -16,7 +16,7 @@ export const DescriptorForm = () => {
   })
 
   const handleTestMachineClick = () => {
-    getStartedActorRef.send({ type: 'descriptor.done' })
+    getStartedActorRef.send({ type: 'NEXT' })
   }
 
   return (
@@ -47,11 +47,11 @@ export const DescriptorForm = () => {
           </div>
         </form>
       </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={form.reset}>
+      <CardFooter className="flex justify-between gap-2">
+        <Button variant="destructive" onClick={form.reset}>
           Reset
         </Button>
-        <Button variant={'ghost'} onClick={handleTestMachineClick}>
+        <Button variant="secondary" onClick={handleTestMachineClick}>
           Testing
         </Button>
         <form.Subscribe

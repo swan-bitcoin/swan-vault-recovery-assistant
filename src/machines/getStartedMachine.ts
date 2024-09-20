@@ -1,44 +1,54 @@
-import { setup } from 'xstate'
+import { setup, assign } from 'xstate'
+
+const initialContext = {
+  someValue: 21, // TODO: for developing
+}
 
 export const getStartedMachine = setup({
   types: {
+    context: {} as { someValue: number },
     events: {} as
       | {
-          type: 'descriptor.done'
+          type: 'NEXT'
         }
       | {
-          type: 'electrum.done'
-        }
-      | {
-          type: 'something.done'
+          type: 'RESET'
         },
   },
   actions: {
-    log: () => {
-      console.log('hi from the log action in state electrumServerConfig!')
-    },
+    resetContext: assign(() => {
+      return { ...initialContext }
+    }),
   },
 }).createMachine({
   id: 'getStarted',
+  context: initialContext,
   initial: 'descriptorInput',
+  // TODO: Remove, just for developing
   entry: () => {
     const randomNumber = Math.floor(Math.random() * 1000)
     console.log(`Machine instantiated with random Number: ${randomNumber}`)
   },
+  on: {
+    RESET: {
+      target: '.descriptorInput',
+      actions: 'resetContext',
+    },
+  },
   states: {
     descriptorInput: {
       on: {
-        'descriptor.done': 'electrumServerConfig',
+        NEXT: 'electrumServerConfig',
       },
     },
     electrumServerConfig: {
       on: {
-        'electrum.done': 'somethingElse',
+        NEXT: 'somethingElse',
       },
     },
     somethingElse: {
       on: {
-        'something.done': 'success',
+        NEXT: 'success',
       },
     },
     success: {},

@@ -5,13 +5,13 @@ export const ElectrumServerForm = () => {
   const getStartedActorRef = GetStartedMachineContext.useActorRef()
 
   const handleTestMachineClick = () => {
-    getStartedActorRef.send({ type: 'electrum.done' })
+    getStartedActorRef.send({ type: 'NEXT' })
   }
 
   return (
     <>
       <div>Configure your Electrum Server</div>
-      <Button variant={'ghost'} onClick={handleTestMachineClick}>
+      <Button variant="secondary" onClick={handleTestMachineClick}>
         Testing
       </Button>
     </>

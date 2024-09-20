@@ -5,13 +5,13 @@ export const Placeholder = () => {
   const getStartedActorRef = GetStartedMachineContext.useActorRef()
 
   const handleTestMachineClick = () => {
-    getStartedActorRef.send({ type: 'something.done' })
+    getStartedActorRef.send({ type: 'NEXT' })
   }
 
   return (
     <>
       <div>Configure something else</div>
-      <Button variant={'ghost'} onClick={handleTestMachineClick}>
+      <Button variant="secondary" onClick={handleTestMachineClick}>
         Testing
       </Button>
     </>
