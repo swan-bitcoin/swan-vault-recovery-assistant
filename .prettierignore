@@ -1,0 +1,11 @@
+node_modules
+# Backend
+src-tauri
+# Auto-generated
+src/bindings.ts
+src/components/ui
+src/lib/utils.ts
+components.json
+pnpm-lock.yaml
+# Semi-auto generated
+tailwind.config.js

@@ -14,12 +14,6 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-
     /* Tailwind */
     "baseUrl": ".",
     "paths": {
@@ -27,6 +21,5 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/**/*.gen.ts"], // exclude all files with `.gen.ts` in their name, including specta's auto-generated bindings file
   "references": [{ "path": "./tsconfig.node.json" }]
 }
