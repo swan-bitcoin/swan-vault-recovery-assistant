@@ -1,3 +1,5 @@
+# Apply prettier to staged files
+./node_modules/.bin/nano-staged 
+
 pnpm typecheck
 pnpm lint
-pnpm format
