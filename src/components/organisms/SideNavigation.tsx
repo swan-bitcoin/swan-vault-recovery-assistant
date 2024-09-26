@@ -4,19 +4,11 @@ import clsx from 'clsx'
 const NavigationListItem = ({ label, path }: { label: string; path: LinkProps<RegisteredRouter>['to'] }) => {
   return (
     <li>
-      <Link
-        to={path}
-        className="mb-3 flex items-center text-base font-medium text-foreground hover:underline"
-      >
+      <Link to={path} className="mb-3 flex items-center text-base font-medium text-foreground hover:underline">
         {({ isActive }) => (
           <>
             <div className="bg-muted flex h-7 w-7 items-center justify-center rounded-full">
-              <div
-                className={clsx(
-                  'h-2 w-2 rounded-full',
-                  isActive ? 'bg-primary' : 'bg-muted-foreground'
-                )}
-              />
+              <div className={clsx('h-2 w-2 rounded-full', isActive ? 'bg-primary' : 'bg-muted-foreground')} />
             </div>
             <span className="ml-2">{label}</span>
           </>
