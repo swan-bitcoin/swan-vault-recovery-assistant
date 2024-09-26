@@ -27,7 +27,7 @@ export const GetStarted = () => {
         <BreadcrumbList>
           {breadcrumbSteps.map((step, index) => (
             <>
-              <BreadcrumbItem>
+              <BreadcrumbItem key={index}>
                 {index === activeStep ? <BreadcrumbPage>{step.label}</BreadcrumbPage> : <>{step.label}</>}
               </BreadcrumbItem>
               {index < breadcrumbSteps.length - 1 ? <BreadcrumbSeparator /> : null}
