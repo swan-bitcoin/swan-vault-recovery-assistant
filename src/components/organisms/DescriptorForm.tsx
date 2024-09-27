@@ -1,27 +1,24 @@
-import { commands } from '@/bindings'
 import { GetStartedMachineContext } from '@/context'
+import { useSetWalletMutation } from '@/hooks'
 import { FieldApi, useForm } from '@tanstack/react-form'
 import { zodValidator } from '@tanstack/zod-form-adapter'
 import { z } from 'zod'
 import { Alert, AlertDescription } from '../ui/alert'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui/card'
+import { FormMutationError } from '../ui/form-mutation-error'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { MultiStateButton } from '../ui/multi-state-button'
-import { useState } from 'react'
-
-// TODO: Remove
-async function simulateDelay(ms?: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms || 800))
-}
+import { SubmitButton } from '../ui/submit-button'
+import { commands } from '@/bindings'
+import { simulateDelay } from '@/helpers'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const FieldInfo = ({ field }: { field: FieldApi<any, any, any, any> }) => {
   const { isTouched, errors } = field.state.meta
 
   return (
-    <div className="mt-2">
+    <div className="m-2">
       {isTouched && errors.length > 0 ? (
         <Alert variant="destructive" className="flex justify-center p-1">
           <AlertDescription>{errors.join(', ')}</AlertDescription>
@@ -33,11 +30,7 @@ const FieldInfo = ({ field }: { field: FieldApi<any, any, any, any> }) => {
 
 export const DescriptorForm = () => {
   const getStartedActorRef = GetStartedMachineContext.useActorRef()
-  // TODO: Use a react query mutation for this!
-  const [isSuccess, setIsSuccess] = useState(false)
-  const [isError, setIsError] = useState(false)
-
-  console.log('isSuccess', isSuccess)
+  const mutation = useSetWalletMutation()
 
   const form = useForm({
     validatorAdapter: zodValidator(),
@@ -46,16 +39,12 @@ export const DescriptorForm = () => {
       changeDescriptor: '',
     },
     onSubmit: async ({ value }) => {
-      const { receiveDescriptor, changeDescriptor } = value
-      await simulateDelay(2000)
-      const result = await commands.setWallet(receiveDescriptor, changeDescriptor)
-      if (result.status !== 'ok') {
-        setIsError(true)
-        return
-      }
-      setIsSuccess(true)
-      await simulateDelay(4000)
-      getStartedActorRef.send({ type: 'NEXT' })
+      mutation.mutate(value, {
+        onSuccess: async () => {
+          await simulateDelay(1200) // to show the success button
+          getStartedActorRef.send({ type: 'NEXT' })
+        },
+      })
     },
   })
 
@@ -84,7 +73,6 @@ export const DescriptorForm = () => {
               onChange: z.string().min(1, 'Field is required'),
               onChangeAsyncDebounceMs: 1000,
               onChangeAsync: async ({ value }) => {
-                console.log('running validation ...')
                 const result = await commands.verifyDescriptor(value)
                 if (result.status !== 'ok') {
                   return 'Invalid descriptor'
@@ -102,7 +90,13 @@ export const DescriptorForm = () => {
                   id={field.name}
                   type="text"
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value)
+                    // This makes the mutation error disappear upon re-entry of input
+                    if (mutation.error) {
+                      mutation.reset()
+                    }
+                  }}
                   placeholder="wsh(multi ... /0/*))# ..."
                 />
                 <FieldInfo field={field} />
@@ -132,30 +126,32 @@ export const DescriptorForm = () => {
                   id={field.name}
                   type="text"
                   value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
+                  onChange={(e) => {
+                    field.handleChange(e.target.value)
+                    if (mutation.error) {
+                      mutation.reset()
+                    }
+                  }}
                   placeholder="wsh(multi ... /1/*))# ..."
                 />
                 <FieldInfo field={field} />
               </>
             )}
           />
+          <FormMutationError mutation={mutation} />
         </CardContent>
         <CardFooter className="flex justify-between gap-2">
           <Button variant="secondary" onClick={handleTestMachineClick}>
             Testing
           </Button>
-          <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting, state.isSubmitted]}>
-            {([canSubmit, isSubmitting]) => {
+          <form.Subscribe selector={(state) => [state.canSubmit]}>
+            {([canSubmit]) => {
               return (
-                <MultiStateButton
-                  type="submit"
-                  isLoading={isSubmitting}
-                  disabled={!canSubmit}
-                  isSuccess={isSuccess}
-                  isError={isError}
-                >
-                  Submit
-                </MultiStateButton>
+                <>
+                  <SubmitButton type="submit" mutation={mutation} disabled={!canSubmit}>
+                    Submit
+                  </SubmitButton>
+                </>
               )
             }}
           </form.Subscribe>
