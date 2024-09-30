@@ -111,7 +111,7 @@ fn set_wallet(
 
 #[tauri::command]
 #[specta::specta]
-fn fetch_balance(state: State<Mutex<AppState>>) -> Result<String, String> {
+async fn fetch_balance(state: State<'_, Mutex<AppState>>) -> Result<String, String> {
     let state = state.lock().unwrap();
 
     let network = state.network.as_ref().ok_or("No network set")?.to_owned();
@@ -122,23 +122,20 @@ fn fetch_balance(state: State<Mutex<AppState>>) -> Result<String, String> {
         Network::Bitcoin => "blockstream.info:110",
         _ => return Err("Unsupported network".to_string()),
     };
-
     let client = Client::new(connection).unwrap();
     let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
-    wallet.sync(&blockchain, SyncOptions::default()).unwrap();
-    let balance = wallet.get_balance().unwrap();
-    let transactions = wallet.list_transactions(false).unwrap();
 
-    Ok(format!(
-        "This {} wallet has a confirmed balance of {} satoshis with {} transactions",
-        if network == Network::Testnet {
-            "testnet"
-        } else {
-            "mainnet"
-        },
-        balance.confirmed,
-        transactions.len()
-    ))
+    // Execute blocking wallet sync and balance retrieval in a separate thread context.
+    tokio::task::block_in_place(|| {
+        wallet
+            .sync(&blockchain, SyncOptions::default())
+            .map_err(|e| e.to_string())?;
+
+        let balance = wallet.get_balance().map_err(|e| e.to_string())?;
+
+        // TODO: Return the bdk::Balance struct instead of just the confirmed balance string
+        Ok(balance.confirmed.to_string())
+    })
 }
 
 fn main() {
