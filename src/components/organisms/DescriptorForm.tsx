@@ -147,11 +147,9 @@ export const DescriptorForm = () => {
           <form.Subscribe selector={(state) => [state.canSubmit]}>
             {([canSubmit]) => {
               return (
-                <>
-                  <SubmitButton type="submit" mutation={mutation} disabled={!canSubmit}>
-                    Submit
-                  </SubmitButton>
-                </>
+                <SubmitButton type="submit" mutation={mutation} disabled={!canSubmit}>
+                  Submit
+                </SubmitButton>
               )
             }}
           </form.Subscribe>

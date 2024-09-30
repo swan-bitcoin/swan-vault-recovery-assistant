@@ -12,6 +12,7 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as StartImport } from './routes/start'
+import { Route as BalanceImport } from './routes/balance'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 
@@ -19,6 +20,11 @@ import { Route as IndexImport } from './routes/index'
 
 const StartRoute = StartImport.update({
   path: '/start',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const BalanceRoute = BalanceImport.update({
+  path: '/balance',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -50,6 +56,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutImport
       parentRoute: typeof rootRoute
     }
+    '/balance': {
+      id: '/balance'
+      path: '/balance'
+      fullPath: '/balance'
+      preLoaderRoute: typeof BalanceImport
+      parentRoute: typeof rootRoute
+    }
     '/start': {
       id: '/start'
       path: '/start'
@@ -65,6 +78,7 @@ declare module '@tanstack/react-router' {
 export const routeTree = rootRoute.addChildren({
   IndexRoute,
   AboutRoute,
+  BalanceRoute,
   StartRoute,
 })
 
@@ -78,6 +92,7 @@ export const routeTree = rootRoute.addChildren({
       "children": [
         "/",
         "/about",
+        "/balance",
         "/start"
       ]
     },
@@ -86,6 +101,9 @@ export const routeTree = rootRoute.addChildren({
     },
     "/about": {
       "filePath": "about.tsx"
+    },
+    "/balance": {
+      "filePath": "balance.tsx"
     },
     "/start": {
       "filePath": "start.tsx"

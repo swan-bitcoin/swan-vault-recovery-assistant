@@ -2,6 +2,7 @@ import { GetStartedMachineContext } from '@/context'
 import { DescriptorForm, ElectrumServerForm, GetStartedSuccess } from '../organisms'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '../ui/breadcrumb'
 import { Placeholder } from '../organisms/Placeholder'
+import React from 'react'
 
 export const GetStarted = () => {
   const currentState = GetStartedMachineContext.useSelector((snapshot) => snapshot.value)
@@ -26,12 +27,12 @@ export const GetStarted = () => {
       <Breadcrumb>
         <BreadcrumbList>
           {breadcrumbSteps.map((step, index) => (
-            <>
+            <React.Fragment key={step.label}>
               <BreadcrumbItem key={index}>
                 {index === activeStep ? <BreadcrumbPage>{step.label}</BreadcrumbPage> : <>{step.label}</>}
               </BreadcrumbItem>
               {index < breadcrumbSteps.length - 1 ? <BreadcrumbSeparator /> : null}
-            </>
+            </React.Fragment>
           ))}
         </BreadcrumbList>
       </Breadcrumb>
