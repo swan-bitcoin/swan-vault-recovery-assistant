@@ -106,7 +106,7 @@ export const DescriptorForm = () => {
                   }}
                 />
                 <Label className="text-muted-foreground text-xs">
-                  This is required. A multisig change descriptor typically starts with <code>wsh(multi(...))</code> and ends
+                  This is required. A multisig receive descriptor typically starts with <code>wsh(multi(...))</code> and ends
                   with <code>/0/*</code> and a checksum.
                 </Label>
                 <FieldInfo field={field} />
