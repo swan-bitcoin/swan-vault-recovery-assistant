@@ -61,7 +61,7 @@ export const DescriptorForm = () => {
         form.handleSubmit()
       }}
     >
-      <Card>
+      <Card className="max-w-lg mx-auto">
         <CardHeader>
           <CardTitle>Wallet Info</CardTitle>
           <CardDescription>Enter your descriptors below</CardDescription>
@@ -97,25 +97,17 @@ export const DescriptorForm = () => {
                       mutation.reset()
                     }
                   }}
-                  placeholder="wsh(multi ... /0/*))# ..."
                 />
+                <Label className="text-muted-foreground text-xs">
+                  This is required. A multisig change descriptor typically starts with <code>wsh(multi(...))</code> and ends
+                  with <code>/0/*</code> and a checksum.
+                </Label>
                 <FieldInfo field={field} />
               </>
             )}
           />
           <form.Field
             name="changeDescriptor"
-            validators={{
-              onChange: z.string().min(1, 'Field is required'),
-              onChangeAsyncDebounceMs: 1000,
-              onChangeAsync: async ({ value }) => {
-                const result = await commands.verifyDescriptor(value)
-                if (result.status !== 'ok') {
-                  return 'Invalid descriptor'
-                }
-                return undefined // No errors
-              },
-            }}
             children={(field) => (
               <>
                 <Label className="text-foreground mb-2" htmlFor={field.name}>
@@ -132,8 +124,11 @@ export const DescriptorForm = () => {
                       mutation.reset()
                     }
                   }}
-                  placeholder="wsh(multi ... /1/*))# ..."
                 />
+                <Label className="text-muted-foreground text-xs">
+                  This is optional. A multisig change descriptor typically starts with <code>wsh(multi(...))</code> and ends
+                  with <code>/1/*</code> and a checksum.
+                </Label>
                 <FieldInfo field={field} />
               </>
             )}
