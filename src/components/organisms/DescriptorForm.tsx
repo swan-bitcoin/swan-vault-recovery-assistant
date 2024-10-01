@@ -1,4 +1,6 @@
+import { commands } from '@/bindings'
 import { GetStartedMachineContext } from '@/context'
+import { simulateDelay } from '@/helpers'
 import { useSetWalletMutation } from '@/hooks'
 import { FieldApi, useForm } from '@tanstack/react-form'
 import { zodValidator } from '@tanstack/zod-form-adapter'
@@ -10,11 +12,16 @@ import { FormMutationError } from '../ui/form-mutation-error'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { SubmitButton } from '../ui/submit-button'
-import { commands } from '@/bindings'
-import { simulateDelay } from '@/helpers'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const FieldInfo = ({ field }: { field: FieldApi<any, any, any, any> }) => {
+type FormValues = {
+  receiveDescriptor: string
+  changeDescriptor: string
+}
+
+type ValidatorType = ReturnType<typeof zodValidator>
+
+// We don't use a field validator, hence the third type is "undefined"
+const FieldInfo = ({ field }: { field: FieldApi<FormValues, keyof FormValues, undefined, ValidatorType> }) => {
   const { isTouched, errors } = field.state.meta
 
   return (
@@ -32,7 +39,7 @@ export const DescriptorForm = () => {
   const getStartedActorRef = GetStartedMachineContext.useActorRef()
   const mutation = useSetWalletMutation()
 
-  const form = useForm({
+  const form = useForm<FormValues, ValidatorType>({
     validatorAdapter: zodValidator(),
     defaultValues: {
       receiveDescriptor: '',
