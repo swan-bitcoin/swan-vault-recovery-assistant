@@ -1,8 +1,8 @@
 [package]
 name = "tempura"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "The world's simplest graphical bitcoin tool"
+authors = ["turkycat", "moneymanolis"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -18,8 +18,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
-tauri = { version = "2.0.0", features = [] }
-tauri-plugin-shell = "2.0.0"
+bdk = "0.29.0"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
+specta = "=2.0.0-rc.20"
+specta-typescript = "0.0.7"
+tauri = { version = "2.0.0", features = [] }
+tauri-plugin-shell = "2.0.0"
+tokio = { version = "1.40.0", features = ["full"] }

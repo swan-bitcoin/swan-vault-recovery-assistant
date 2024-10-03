@@ -1,22 +1,41 @@
 import { invoke } from "@tauri-apps/api/core";
 
-let greetInputEl: HTMLInputElement | null;
-let greetMsgEl: HTMLElement | null;
+let descriptorInput: HTMLInputElement | null;
+let balanceMessage: HTMLElement | null;
 
-async function greet() {
-  if (greetMsgEl && greetInputEl) {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    greetMsgEl.textContent = await invoke("greet", {
-      name: greetInputEl.value,
+async function setWallet() {
+  if (balanceMessage && descriptorInput) {
+    console.log(descriptorInput.value);
+    await invoke("set_wallet", {
+      receive: descriptorInput.value,
+      change: "",
+    }).catch(() => {
+      if (balanceMessage) {
+        balanceMessage.textContent = "Invalid descriptor!";
+      }
     });
+    balanceMessage.textContent = "Wallet set!";
+  }
+}
+
+async function fetchBalance() {
+  if (balanceMessage && descriptorInput) {
+    const balance = (await invoke("fetch_balance")) as { confirmed: number };
+    balanceMessage.textContent = balance.confirmed + " sats";
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  greetInputEl = document.querySelector("#greet-input");
-  greetMsgEl = document.querySelector("#greet-msg");
-  document.querySelector("#greet-form")?.addEventListener("submit", (e) => {
+  descriptorInput = document.querySelector("#desciptor-input");
+  balanceMessage = document.querySelector("#balance-msg");
+  document
+    .querySelector("#descriptor-form")
+    ?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      setWallet();
+    });
+  document.querySelector("#balance-form")?.addEventListener("submit", (e) => {
     e.preventDefault();
-    greet();
+    fetchBalance();
   });
 });
