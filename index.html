@@ -32,12 +32,20 @@
               <input type="radio" name="network" value="regtest">Regtest</input>
             </td>
           </tr>
+          <tr>
+            <td>
+              <input id="address-input" placeholder="destination address" />
+              <input id="feerate-input" type="number" placeholder="fee rate" min="5" />
+              <button type="button" id="sweep-button">Sweep</button>
+              <button type="button" id="download-button" disabled="true">Save PSBT</button>
+            </td>
+          </tr>
         </table>
       </form>
 
       
 
-      <p id="balance-msg"></p>
+      <p id="message"></p>
     </div>
   </body>
 </html>

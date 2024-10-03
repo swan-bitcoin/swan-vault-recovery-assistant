@@ -7,6 +7,9 @@
 export const commands = {
 async fetchBalance(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Balance> {
     return await TAURI_INVOKE("fetch_balance", { network, receive, change, electrum });
+},
+async sweep(address: string, feeRate: number, network: string, receive: string, change: string | null, electrum: string | null) : Promise<PsbtDetails> {
+    return await TAURI_INVOKE("sweep", { address, feeRate, network, receive, change, electrum });
 }
 }
 
@@ -37,6 +40,7 @@ untrusted_pending: string;
  * Confirmed and immediately spendable balance
  */
 confirmed: string }
+export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null }
 export type TempuraError = { error_type: string; message: string }
 
 /** tauri-specta globals **/

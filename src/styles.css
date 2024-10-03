@@ -128,3 +128,7 @@ button {
   height: 10vw;
   width: 10vw;
 }
+
+#feerate-input {
+  width: 8vw;
+}

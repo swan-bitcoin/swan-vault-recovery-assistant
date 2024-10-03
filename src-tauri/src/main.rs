@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::str::FromStr;
+
 use bdk::database::MemoryDatabase;
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
@@ -10,7 +12,7 @@ use specta_typescript::Typescript;
 // bdk and bitcoin imports
 use bdk;
 use bdk::bitcoin::secp256k1::Secp256k1;
-use bdk::bitcoin::Network;
+use bdk::bitcoin::{address, Network};
 use bdk::blockchain::ElectrumBlockchain;
 use bdk::descriptor::IntoWalletDescriptor;
 use bdk::electrum_client::Client;
@@ -33,11 +35,13 @@ impl std::fmt::Display for DescriptorType {
 
 #[derive(Debug, Default)]
 pub enum TempuraErrorType {
+  AddressError,
   BalanceError,
   BlockchainError,
   ClientError,
   DescriptorError(DescriptorType),
   NetworkError,
+  TransactionError,
   WalletSyncError,
   #[default]
   UnknownError,
@@ -46,11 +50,13 @@ pub enum TempuraErrorType {
 impl std::fmt::Display for TempuraErrorType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
+      TempuraErrorType::AddressError => write!(f, "AddressError"),
       TempuraErrorType::BalanceError => write!(f, "BalanceError"),
       TempuraErrorType::BlockchainError => write!(f, "BlockchainError"),
       TempuraErrorType::ClientError => write!(f, "ClientError"),
       TempuraErrorType::DescriptorError(t) => write!(f, "DescriptorError({})", t),
       TempuraErrorType::NetworkError => write!(f, "NetworkError"),
+      TempuraErrorType::TransactionError => write!(f, "TransactionError"),
       TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
       TempuraErrorType::UnknownError => write!(f, "UnknownError"),
     }
@@ -191,9 +197,80 @@ async fn fetch_balance(
   })
 }
 
+// again, unfortunately u64 is not supported, so we must convert to string for number values.
+#[derive(Default, Serialize, Deserialize, Type)]
+pub struct PsbtDetails {
+  pub psbt: String,
+  pub txid: String,
+  pub received: String,
+  pub sent: String,
+  pub fee: Option<String>,
+}
+
+impl PsbtDetails {
+  pub fn new(psbt: String, details: bdk::TransactionDetails) -> Self {
+    PsbtDetails {
+      psbt: psbt,
+      txid: details.txid.to_string(),
+      received: details.received.to_string(),
+      sent: details.sent.to_string(),
+      fee: match details.fee {
+        None => None,
+        Some(fee) => Some(fee.to_string()),
+      },
+    }
+  }
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn sweep(
+  address: String,
+  fee_rate: f32,
+  network: String,
+  receive: String,
+  change: Option<String>,
+  electrum: Option<String>,
+) -> Result<PsbtDetails, TempuraError> {
+  let network = get_network(network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, receive, change)?;
+
+  // Execute blocking wallet sync and balance retrieval in a separate thread context.
+  tokio::task::block_in_place(|| {
+    resolve!(
+      wallet.sync(&blockchain, SyncOptions::default()),
+      TempuraErrorType::WalletSyncError
+    );
+
+    let mut builder = wallet.build_tx();
+    let addr = resolve!(
+      bdk::bitcoin::Address::from_str(&address),
+      TempuraErrorType::AddressError
+    );
+    // check that recipient is on the same network as the wallet
+    if addr.network != wallet.network() {
+      return Err(TempuraError::new(
+        TempuraErrorType::AddressError,
+        &format!(
+          "Mismatched address and network. address: {}, network: {}",
+          address, network
+        ),
+      ));
+    }
+    builder.drain_wallet();
+    builder.drain_to(addr.payload.script_pubkey());
+    builder.enable_rbf();
+    builder.fee_rate(bdk::FeeRate::from_sat_per_vb(fee_rate));
+
+    let (psbt, details) = resolve!(builder.finish(), TempuraErrorType::TransactionError);
+    Ok(PsbtDetails::new(psbt.to_string(), details))
+  })
+}
+
 fn main() {
   let specta_builder: tauri_specta::Builder = tauri_specta::Builder::<tauri::Wry>::new()
-    .commands(tauri_specta::collect_commands![fetch_balance]);
+    .commands(tauri_specta::collect_commands![fetch_balance, sweep]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
   let specta_builder = specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw);
