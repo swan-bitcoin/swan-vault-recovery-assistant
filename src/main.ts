@@ -1,53 +1,62 @@
 // import { invoke } from "@tauri-apps/api/core";
-import { commands, TempuraError } from "./bindings";
+import { commands, type TempuraError } from "./bindings";
 
-let receiveInput: HTMLInputElement | null;
-let changeInput: HTMLInputElement | null;
-let balanceMessage: HTMLElement | null;
+let DOM: {
+  receiveInput: HTMLInputElement;
+  changeInput: HTMLInputElement;
+  message: HTMLElement;
+};
 
-// async function setWallet() {
-//   if (balanceMessage && receiveInput) {
-//     const change = changeInput?.value;
-//     await commands.setWallet(receiveInput.value, change).catch((e) => {
-//       if (balanceMessage) {
-//         balanceMessage.textContent = e.message;
-//       }
-//     });
-//     balanceMessage.textContent = "Wallet set!";
-//   }
-// }
+function isTempuraError(e: unknown): e is TempuraError {
+  const tempuraError = e as TempuraError;
+  return !!(tempuraError.error_type && tempuraError.message);
+}
 
-async function fetchBalance() {
-  const recv = receiveInput?.value;
-  if (!recv) {
-    if (balanceMessage) {
-      balanceMessage.textContent = "A valid receive descriptor is required";
-    }
+function handleError(e: unknown) {
+  if (!isTempuraError(e)) {
+    DOM.message.textContent = "An unknown error occurred";
     return;
   }
 
-  if (balanceMessage) {
-    const change = changeInput?.value ?? null;
-    balanceMessage.textContent = "Please wait...";
-    try {
-      const balance = await commands.fetchBalance(recv, change);
-      balanceMessage.textContent = balance.confirmed + " sats";
-    } catch (e: unknown) {
-      // TODO: this error strategy is causing the shape to change depending on the error.
-      console.log(e);
-      if (e instanceof Error) {
-        balanceMessage!.textContent = e.message;
-      } else {
-        balanceMessage!.textContent = "An unknown error occurred";
-      }
-    }
+  // TODO: we may not want to show the actual message directly to the user
+  // but instead log it show a generic message based on the type
+  console.log(e.error_type, e.message);
+  DOM.message.textContent = e.error_type.concat(": ").concat(e.message);
+}
+
+async function fetchBalance() {
+  const recv = DOM.receiveInput.value.trim();
+  const change = DOM.changeInput?.value.trim() || null;
+  if (!recv) {
+    DOM.message.textContent = "A valid receive descriptor is required";
+    return;
+  }
+
+  DOM.message.textContent = "Please wait...";
+  try {
+    const balance = await commands.fetchBalance(recv, change);
+    DOM.message.textContent = balance.confirmed + " sats";
+  } catch (e: unknown) {
+    handleError(e);
   }
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  receiveInput = document.querySelector("#receive-input");
-  changeInput = document.querySelector("#change-input");
-  balanceMessage = document.querySelector("#balance-msg");
+  const receiveInput =
+    document.querySelector<HTMLInputElement>("#receive-input");
+  const changeInput = document.querySelector<HTMLInputElement>("#change-input");
+  const message = document.querySelector<HTMLElement>("#balance-msg");
+
+  if (!(message && receiveInput && changeInput)) {
+    throw new Error("Failed to initialize: missing required DOM elements");
+  }
+
+  DOM = {
+    receiveInput,
+    changeInput,
+    message,
+  };
+
   document
     .querySelector("#descriptor-form")
     ?.addEventListener("submit", (e) => {

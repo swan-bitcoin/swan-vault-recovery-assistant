@@ -37,8 +37,7 @@ untrusted_pending: string;
  * Confirmed and immediately spendable balance
  */
 confirmed: string }
-export type DescriptorType = "Receive" | "Change"
-export type TempuraError = { BalanceError: string } | { BlockchainError: string } | { ClientError: string } | { DescriptorError: [DescriptorType, string] } | { NetworkError: string } | { WalletSyncError: string } | "UnknownError"
+export type TempuraError = { error_type: string; message: string }
 
 /** tauri-specta globals **/
 

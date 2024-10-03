@@ -5,36 +5,82 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use specta_typescript::Typescript;
-use tauri::State;
-
-// std rust imports
-use std::sync::{Arc, Mutex};
 
 // bdk and bitcoin imports
+use bdk;
 use bdk::bitcoin::secp256k1::Secp256k1;
 use bdk::bitcoin::Network;
 use bdk::blockchain::ElectrumBlockchain;
-use bdk::database::MemoryDatabase;
-use bdk::descriptor::{ExtendedDescriptor, IntoWalletDescriptor};
+use bdk::descriptor::IntoWalletDescriptor;
 use bdk::electrum_client::Client;
 use bdk::SyncOptions;
-use bdk::{self, wallet};
 
-// $specta
-#[derive(Default, Serialize, Deserialize, Type)]
-// #[derive(Default, Serialize, Deserialize)]
-enum DescriptorResponse {
+#[derive(Debug)]
+enum DescriptorType {
+  Receive,
+  Change,
+}
+
+impl std::fmt::Display for DescriptorType {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      DescriptorType::Receive => write!(f, "Receive"),
+      DescriptorType::Change => write!(f, "Change"),
+    }
+  }
+}
+
+// #[derive(Debug, Serialize, Deserialize, Type)]
+#[derive(Debug, Default)]
+pub enum TempuraErrorType {
+  BalanceError,
+  BlockchainError,
+  ClientError,
+  DescriptorError(DescriptorType),
+  NetworkError,
+  WalletSyncError,
   #[default]
-  None,
-  Testnet,
-  Mainnet,
+  UnknownError,
+}
+
+impl std::fmt::Display for TempuraErrorType {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      TempuraErrorType::BalanceError => write!(f, "BalanceError"),
+      TempuraErrorType::BlockchainError => write!(f, "BlockchainError"),
+      TempuraErrorType::ClientError => write!(f, "ClientError"),
+      TempuraErrorType::DescriptorError(t) => write!(f, "DescriptorError({})", t),
+      TempuraErrorType::NetworkError => write!(f, "NetworkError"),
+      TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
+      TempuraErrorType::UnknownError => write!(f, "UnknownError"),
+    }
+  }
+}
+
+#[derive(Debug, Serialize, Deserialize, Type)]
+pub struct TempuraError {
+  pub error_type: String,
+  pub message: String,
+}
+
+impl TempuraError {
+  pub fn new(error_type: TempuraErrorType, message: &str) -> Self {
+    TempuraError {
+      error_type: error_type.to_string(),
+      message: message.to_string(),
+    }
+  }
+}
+
+macro_rules! resolve {
+  ($expr:expr, $error_type:expr) => {
+    $expr.map_err(|e| TempuraError::new($error_type, &e.to_string()))?
+  };
 }
 
 // this type is copied from BDK so that we can specta-derive it,
 // but unfortunately u64 is not supported, so we must convert to string.
-// $specta
 #[derive(Default, Serialize, Deserialize, Type)]
-// #[derive(Default, Serialize, Deserialize)]
 struct Balance {
   /// All coinbase outputs not yet matured
   pub immature: String,
@@ -57,139 +103,9 @@ impl From<bdk::Balance> for Balance {
   }
 }
 
-use std::fmt;
-
-#[derive(Debug, Serialize, Deserialize, Type)]
-enum DescriptorType {
-  Receive,
-  Change,
-}
-
-// $specta
-#[derive(Debug, Default, Serialize, Deserialize, Type)]
-// #[derive(Debug, Default, Serialize, Deserialize)]
-pub enum TempuraError {
-  BalanceError(String),
-  BlockchainError(String),
-  ClientError(String),
-  DescriptorError(DescriptorType, String),
-  NetworkError(String),
-  WalletSyncError(String),
-  #[default]
-  UnknownError,
-}
-
-impl fmt::Display for TempuraError {
-  fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      TempuraError::BalanceError(msg) => write!(formatter, "Balance error: {}", msg),
-      TempuraError::BlockchainError(msg) => write!(formatter, "Blockchain error: {}", msg),
-      TempuraError::ClientError(msg) => write!(formatter, "Client error: {}", msg),
-      TempuraError::DescriptorError(descriptor_type, msg) => {
-        let type_str = match descriptor_type {
-          DescriptorType::Receive => "Receive",
-          DescriptorType::Change => "Change",
-        };
-        write!(formatter, "Receive descriptor error: {}", msg)
-      }
-      TempuraError::NetworkError(msg) => write!(formatter, "Network error: {}", msg),
-      TempuraError::WalletSyncError(msg) => write!(formatter, "Wallet sync error: {}", msg),
-      TempuraError::UnknownError => write!(formatter, "Unknown error"),
-    }
-  }
-}
-
-impl std::error::Error for TempuraError {}
-
-// #[derive(Default)]
-// struct AppState {
-//     wallet: Option<bdk::Wallet<MemoryDatabase>>,
-//     network: Option<Network>,
-// }
-
-// #[tauri::command]
-// #[specta::specta]
-// fn reset(state: State<Mutex<AppState>>) {
-//     let mut state = state.lock().unwrap();
-//     state.wallet = None;
-// }
-
-// #[tauri::command]
-// #[specta::specta]
-// fn verify_descriptors(descriptor: String) -> Result<DescriptorResponse, String> {
-//     let secp = Secp256k1::new();
-
-//     // TODO: this isn't sufficient since some descriptors are valid for both mainnet and testnet
-//     // example: wpkh(03d99179113327fc2a8349b4d47d1eac3033b51cbddcb59654c894320850500d4e)
-//     let is_testnet = descriptor.contains("tpub") || descriptor.contains("tprv");
-//     let network = match is_testnet {
-//         true => Network::Testnet,
-//         false => Network::Bitcoin,
-//     };
-
-//     match descriptor.into_wallet_descriptor(&secp, network) {
-//         Ok(_) => {}
-//         Err(e) => return Err(e.to_string()),
-//     };
-
-//     Ok(match is_testnet {
-//         true => DescriptorResponse::Testnet,
-//         false => DescriptorResponse::Mainnet,
-//     })
-// }
-
-// #[tauri::command]
-// #[specta::specta]
-// fn set_wallet(
-//     state: State<Mutex<AppState>>,
-//     receive: String,
-//     change: String,
-// ) -> Result<(), String> {
-//     let mut state = state.lock().unwrap();
-
-//     println!(
-//         "Setting wallet with receive: {} and change: {}",
-//         receive, change
-//     );
-
-//     // TODO: this isn't sufficient since some descriptors are valid for both mainnet and testnet
-//     // example: wpkh(03d99179113327fc2a8349b4d47d1eac3033b51cbddcb59654c894320850500d4e)
-//     let is_testnet = receive.contains("tpub") || receive.contains("tprv");
-//     let network = match is_testnet {
-//         true => Network::Testnet,
-//         false => Network::Bitcoin,
-//     };
-
-//     let secp = Secp256k1::new();
-//     let receive = match receive.into_wallet_descriptor(&secp, network) {
-//         Ok(_) => receive.to_string(),
-//         Err(e) => return Err(e.to_string()),
-//     };
-
-//     let binding = change.to_string();
-//     let change = match change.into_wallet_descriptor(&secp, network) {
-//         Ok(_) => Some(&binding),
-//         Err(_) => None,
-//     };
-//     let wallet = match bdk::Wallet::new(
-//         &receive,
-//         change,
-//         network,
-//         bdk::database::MemoryDatabase::default(),
-//     ) {
-//         Ok(wallet) => wallet,
-//         Err(e) => return Err(e.to_string()),
-//     };
-
-//     state.wallet = Some(wallet);
-//     state.network = Some(network);
-//     Ok(())
-// }
 #[tauri::command]
 #[specta::specta]
 async fn fetch_balance(receive: String, change: Option<String>) -> Result<Balance, TempuraError> {
-  // let state = state.lock().unwrap();
-
   // TODO: this isn't sufficient since some descriptors are valid for both mainnet and testnet
   // example: wpkh(03d99179113327fc2a8349b4d47d1eac3033b51cbddcb59654c894320850500d4e)
   let is_testnet = receive.contains("tpub") || receive.contains("tprv");
@@ -199,79 +115,59 @@ async fn fetch_balance(receive: String, change: Option<String>) -> Result<Balanc
   };
 
   let secp = Secp256k1::new();
-  let receive = match receive.into_wallet_descriptor(&secp, network) {
-    Ok(_) => receive.to_string(),
-    Err(e) => {
-      return Err(TempuraError::DescriptorError(
-        DescriptorType::Receive,
-        e.to_string(),
-      ))
-    }
-  };
-
-  let change = match change.as_ref() {
-    Some(change) => match change.into_wallet_descriptor(&secp, network) {
-      Ok(_) => Some(change),
-      Err(e) => {
-        return Err(TempuraError::DescriptorError(
-          DescriptorType::Change,
-          e.to_string(),
-        ))
-      }
-    },
+  let receive = resolve!(
+    receive.into_wallet_descriptor(&secp, network),
+    TempuraErrorType::DescriptorError(DescriptorType::Receive)
+  );
+  let change = match change {
+    Some(change) => Some(resolve!(
+      change.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(DescriptorType::Change)
+    )),
     None => None,
   };
 
-  let wallet = match bdk::Wallet::new(
-    &receive,
-    change,
-    network,
-    bdk::database::MemoryDatabase::default(),
-  ) {
-    Ok(wallet) => wallet,
-    Err(e) => return Err(TempuraError::ClientError(e.to_string())),
-  };
+  let wallet = resolve!(
+    bdk::Wallet::new(
+      receive,
+      change,
+      network,
+      bdk::database::MemoryDatabase::default()
+    ),
+    TempuraErrorType::ClientError
+  );
 
   let connection = match network {
     Network::Testnet => "electrum.blockstream.info:60001",
     Network::Bitcoin => "blockstream.info:110",
     _ => {
-      return Err(TempuraError::NetworkError(
-        "Unsupported network".to_string(),
+      return Err(TempuraError::new(
+        TempuraErrorType::NetworkError,
+        "Unsupported network",
       ))
     }
   };
-  let client = Client::new(connection).map_err(|e| TempuraError::ClientError(e.to_string()))?;
+  let client = resolve!(Client::new(connection), TempuraErrorType::ClientError);
   let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {
-    wallet
-      .sync(&blockchain, SyncOptions::default())
-      .map_err(|e: bdk::Error| TempuraError::WalletSyncError(e.to_string()))?;
+    resolve!(
+      wallet.sync(&blockchain, SyncOptions::default()),
+      TempuraErrorType::WalletSyncError
+    );
 
-    let balance: bdk::Balance = wallet
-      .get_balance()
-      .map_err(|e| TempuraError::BalanceError(e.to_string()))?;
+    let balance: bdk::Balance = resolve!(wallet.get_balance(), TempuraErrorType::BalanceError);
 
     Ok(balance.into())
   })
 }
 
 fn main() {
-  // let app_state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState::default()));
-  // let app_state: Mutex<AppState> = Mutex::new(AppState::default());
-  // let app_state = AppState::default();
+  let specta_builder: tauri_specta::Builder = tauri_specta::Builder::<tauri::Wry>::new()
+    .commands(tauri_specta::collect_commands![fetch_balance]);
 
-  let specta_builder: tauri_specta::Builder =
-    tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      fetch_balance,
-      // reset,
-      // set_wallet,
-      // verify_descriptors
-    ]);
-
-  // // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
+  // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
   let specta_builder = specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw);
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
@@ -281,13 +177,6 @@ fn main() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_shell::init())
-    // .manage(app_state)
-    // .invoke_handler(tauri::generate_handler![
-    //     fetch_balance,
-    //     reset,
-    //     set_wallet,
-    //     verify_descriptors
-    // ])
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
       // This is also required if you want to use events
@@ -297,7 +186,3 @@ fn main() {
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
-
-// fn main() {
-//     tempura_lib::run()
-// }

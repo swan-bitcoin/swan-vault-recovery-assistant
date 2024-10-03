@@ -43,6 +43,7 @@
 
 .row {
   display: flex;
+  flex-direction: row;
   justify-content: center;
   gap: 10px;
 }
@@ -114,11 +115,4 @@ button {
   button:active {
     background-color: #0f0f0f69;
   }
-}
-
-#descriptor-form input,
-#descriptor-form button {
-  display: block;
-  flex-direction: row;
-  margin-bottom: 10px; /* Optional: Adds space between elements */
 }
