@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use bdk::database::MemoryDatabase;
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -16,7 +17,7 @@ use bdk::electrum_client::Client;
 use bdk::SyncOptions;
 
 #[derive(Debug)]
-enum DescriptorType {
+pub enum DescriptorType {
   Receive,
   Change,
 }
@@ -102,17 +103,45 @@ impl From<bdk::Balance> for Balance {
   }
 }
 
-#[tauri::command]
-#[specta::specta]
-async fn fetch_balance(receive: String, change: Option<String>) -> Result<Balance, TempuraError> {
-  // TODO: this isn't sufficient since some descriptors are valid for both mainnet and testnet
-  // example: wpkh(03d99179113327fc2a8349b4d47d1eac3033b51cbddcb59654c894320850500d4e)
-  let is_testnet = receive.contains("tpub") || receive.contains("tprv");
-  let network = match is_testnet {
-    true => Network::Testnet,
-    false => Network::Bitcoin,
+fn get_blockchain(
+  network: Network,
+  electrum: Option<String>,
+) -> Result<ElectrumBlockchain, TempuraError> {
+  let connection = match electrum {
+    Some(electrum) => electrum,
+    None => match network {
+      Network::Testnet => "electrum.blockstream.info:60001".to_string(),
+      Network::Bitcoin => "blockstream.info:110".to_string(),
+      _ => {
+        return Err(TempuraError::new(
+          TempuraErrorType::NetworkError,
+          "Unsupported network",
+        ))
+      }
+    },
   };
 
+  let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
+  Ok(ElectrumBlockchain::from(client))
+}
+
+fn get_network(network: String) -> Result<Network, TempuraError> {
+  match network.as_ref() {
+    "bitcoin" => Ok(Network::Bitcoin),
+    "testnet" => Ok(Network::Testnet),
+    "regtest" => Ok(Network::Regtest),
+    other => Err(TempuraError::new(
+      TempuraErrorType::NetworkError,
+      format!("Unsupported network: {}", other).as_str(),
+    )),
+  }
+}
+
+fn get_wallet(
+  network: Network,
+  receive: String,
+  change: Option<String>,
+) -> Result<bdk::Wallet<MemoryDatabase>, TempuraError> {
   let secp = Secp256k1::new();
   let receive = resolve!(
     receive.into_wallet_descriptor(&secp, network),
@@ -126,7 +155,7 @@ async fn fetch_balance(receive: String, change: Option<String>) -> Result<Balanc
     None => None,
   };
 
-  let wallet = resolve!(
+  Ok(resolve!(
     bdk::Wallet::new(
       receive,
       change,
@@ -134,20 +163,20 @@ async fn fetch_balance(receive: String, change: Option<String>) -> Result<Balanc
       bdk::database::MemoryDatabase::default()
     ),
     TempuraErrorType::ClientError
-  );
+  ))
+}
 
-  let connection = match network {
-    Network::Testnet => "electrum.blockstream.info:60001",
-    Network::Bitcoin => "blockstream.info:110",
-    _ => {
-      return Err(TempuraError::new(
-        TempuraErrorType::NetworkError,
-        "Unsupported network",
-      ))
-    }
-  };
-  let client = resolve!(Client::new(connection), TempuraErrorType::ClientError);
-  let blockchain: ElectrumBlockchain = ElectrumBlockchain::from(client);
+#[tauri::command]
+#[specta::specta]
+async fn fetch_balance(
+  network: String,
+  receive: String,
+  change: Option<String>,
+  electrum: Option<String>,
+) -> Result<Balance, TempuraError> {
+  let network = get_network(network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, receive, change)?;
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {

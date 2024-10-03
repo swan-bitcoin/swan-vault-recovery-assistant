@@ -12,14 +12,30 @@
     <div class="container">
       <h1>tempura</h1>
       <div class="logo-container">
-        <img id="bitcoin-logo" src="./public/bitcoin.png" alt="tempura logo" />
+        <img id="bitcoin-logo" src="./bitcoin.png" alt="tempura logo" />
       </div>
 
       <form class="row" id="descriptor-form">
-        <input id="receive-input" placeholder="receive descriptor..." />
-        <input id="change-input" placeholder="(optional) change descriptor..." />
-        <button type="submit">Fetch Balance</button>
+        <table>
+          <tr>
+            <td>
+              <input id="receive-input" placeholder="receive descriptor..." />
+              <input id="change-input" placeholder="(optional) change descriptor..." />
+              <button type="submit">Fetch Balance</button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <input id="electrum-input" placeholder="(optional) custom electrum server" />
+              <input type="radio" name="network" value="bitcoin" checked>Bitcoin</input>
+              <input type="radio" name="network" value="testnet">Testnet</input>
+              <input type="radio" name="network" value="regtest">Regtest</input>
+            </td>
+          </tr>
+        </table>
       </form>
+
+      
 
       <p id="balance-msg"></p>
     </div>

@@ -5,8 +5,8 @@
 
 
 export const commands = {
-async fetchBalance(receive: string, change: string | null) : Promise<Balance> {
-    return await TAURI_INVOKE("fetch_balance", { receive, change });
+async fetchBalance(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Balance> {
+    return await TAURI_INVOKE("fetch_balance", { network, receive, change, electrum });
 }
 }
 

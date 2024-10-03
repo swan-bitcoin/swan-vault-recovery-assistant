@@ -2,9 +2,11 @@
 import { commands, type TempuraError } from "./bindings";
 
 let DOM: {
-  receiveInput: HTMLInputElement;
   changeInput: HTMLInputElement;
+  electrumInput: HTMLInputElement;
   message: HTMLElement;
+  receiveInput: HTMLInputElement;
+  networkRadios: NodeListOf<HTMLInputElement>;
 };
 
 function isTempuraError(e: unknown): e is TempuraError {
@@ -26,15 +28,25 @@ function handleError(e: unknown) {
 
 async function fetchBalance() {
   const recv = DOM.receiveInput.value.trim();
-  const change = DOM.changeInput?.value.trim() || null;
   if (!recv) {
     DOM.message.textContent = "A valid receive descriptor is required";
     return;
   }
 
+  const change = DOM.changeInput?.value.trim() || null;
+  const electrum = DOM.electrumInput?.value.trim() || null;
+  const network = Array.from(DOM.networkRadios).find(
+    (radio) => radio.checked
+  )!.value;
+
   DOM.message.textContent = "Please wait...";
   try {
-    const balance = await commands.fetchBalance(recv, change);
+    const balance = await commands.fetchBalance(
+      network,
+      recv,
+      change,
+      electrum
+    );
     DOM.message.textContent = balance.confirmed + " sats";
   } catch (e: unknown) {
     handleError(e);
@@ -42,19 +54,34 @@ async function fetchBalance() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
+  const changeInput = document.querySelector<HTMLInputElement>("#change-input");
+  const electrumInput =
+    document.querySelector<HTMLInputElement>("#electrum-input");
+  const message = document.querySelector<HTMLElement>("#balance-msg");
   const receiveInput =
     document.querySelector<HTMLInputElement>("#receive-input");
-  const changeInput = document.querySelector<HTMLInputElement>("#change-input");
-  const message = document.querySelector<HTMLElement>("#balance-msg");
+  const networkRadios = document.querySelectorAll<HTMLInputElement>(
+    'input[name="network"]'
+  );
 
-  if (!(message && receiveInput && changeInput)) {
+  if (
+    !(
+      changeInput &&
+      electrumInput &&
+      message &&
+      receiveInput &&
+      networkRadios.length > 0
+    )
+  ) {
     throw new Error("Failed to initialize: missing required DOM elements");
   }
 
   DOM = {
-    receiveInput,
     changeInput,
+    electrumInput,
     message,
+    receiveInput,
+    networkRadios,
   };
 
   document
