@@ -1,13 +1,18 @@
 # Tempura
 
-This is a native desktop application with a React frontend that uses
-Tauri to interact with a Rust backend. It persists no data. You can
-easily check balances with this app. It could be easily extended to list
-transactions, and a simple sweep recovery feature that could require
-users to type their mnemonics for simple empergency recovery,
-potentially adding hardware device support.
+Tempura is the world's simplest bitcoin wallet. It is a stateless native desktop application that forgets everything when you're done using it. It works with any wallet descriptor. Did I mention it forgets everything? No breadcrumbs to worry about. What was I talking about?
 
-## Setup Instructions
+Want to test your recovery path? Tempura won't tell.  
+Want to independently verify your balance? Tempura doesn't care.  
+Need to recover your funds from another wallet? Tempura can help.
+
+## Design Principles
+
+1. Tempura must not persist any data to disk under any circumstances.
+2. Tempura must use a minimal dependency footprint so it may easily be audited.
+3. Tempura is free to use or extend (MIT license).
+
+## Setup Instructions for Developers
 
 1. Verify you have rust installed
 
@@ -28,13 +33,14 @@ to update:
 rustup update
 ```
 
-2. checkout this repo and cd into it
-3. `pnpm install`
-4. `pnpm tauri dev`
+2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
+3. checkout this repo and cd into it
+4. `pnpm install`
+5. `pnpm tauri dev`
 
-## usage instructions
+## Usage Instructions
 
-paste both descriptors in and hit submit. app will probably crash if you leave one blank or the descriptor is invalid. app will probably crash if you mix testnet and mainnet descriptors. this is a proof of concept.
+Paste one or both descriptors in and hit 'Fetch Balance'. More features coming later.
 
 ## Recommended IDE Setup
 
