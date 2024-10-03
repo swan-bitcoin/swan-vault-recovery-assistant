@@ -116,3 +116,15 @@ button {
     background-color: #0f0f0f69;
   }
 }
+
+.logo-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 2vw;
+}
+
+#bitcoin-logo {
+  height: 10vw;
+  width: 10vw;
+}

@@ -30,7 +30,6 @@ impl std::fmt::Display for DescriptorType {
   }
 }
 
-// #[derive(Debug, Serialize, Deserialize, Type)]
 #[derive(Debug, Default)]
 pub enum TempuraErrorType {
   BalanceError,
@@ -179,7 +178,6 @@ fn main() {
     .plugin(tauri_plugin_shell::init())
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
-      // This is also required if you want to use events
       specta_builder.mount_events(app);
       Ok(())
     })
