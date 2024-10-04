@@ -1,14 +1,18 @@
-// import { invoke } from "@tauri-apps/api/core";
 import { commands, type TempuraError } from "./bindings";
+import {
+  writeText as toClipboard,
+  readText as fromClipboard,
+} from "@tauri-apps/plugin-clipboard-manager";
 
 let DOM: {
   addressInput: HTMLInputElement;
   changeInput: HTMLInputElement;
   electrumInput: HTMLInputElement;
   feeRateInput: HTMLInputElement;
-  message: HTMLElement;
+  message: HTMLParagraphElement;
   receiveInput: HTMLInputElement;
   networkRadios: NodeListOf<HTMLInputElement>;
+  psbtTextArea: HTMLTextAreaElement;
 };
 
 function isTempuraError(e: unknown): e is TempuraError {
@@ -76,6 +80,41 @@ async function fetchBalance() {
   }
 }
 
+function copyPsbtToClipboard() {
+  const psbt = DOM.psbtTextArea.value.trim();
+  if (!psbt) {
+    DOM.message.textContent = "No PSBT to copy";
+    return;
+  }
+
+  toClipboard(psbt)
+    .then(() => {
+      DOM.message.textContent = "PSBT copied to clipboard";
+    })
+    .catch((e) => {
+      console.log("Failed to copy PSBT to clipboard", e);
+      DOM.message.textContent = "Failed to copy PSBT to clipboard";
+    });
+}
+
+function pastePsbtToClipboard() {
+  fromClipboard()
+    .then((psbt) => {
+      const trimmed = psbt.trim();
+      DOM.psbtTextArea.value = trimmed;
+      if (!trimmed || !trimmed.startsWith("cHNid")) {
+        DOM.message.textContent =
+          "Warning: Pasted data does not look like a PSBT";
+      } else {
+        DOM.message.textContent = "PSBT pasted";
+      }
+    })
+    .catch((e) => {
+      console.log("Failed to paste PSBT from clipboard", e);
+      DOM.message.textContent = "Failed to copy PSBT to clipboard";
+    });
+}
+
 async function sweep() {
   const { address, recv, change, electrum, feeRate, network } = getInputs();
   require(recv, "Receive Descriptor");
@@ -93,64 +132,98 @@ async function sweep() {
       electrum
     );
     console.log(psbt);
-    DOM.message.textContent = psbt.psbt;
+    DOM.psbtTextArea.value = psbt.psbt;
+    DOM.message.textContent = "PSBT created";
   } catch (e: unknown) {
     handleError(e);
   }
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  const addressInput =
-    document.querySelector<HTMLInputElement>("#address-input");
-  const changeInput = document.querySelector<HTMLInputElement>("#change-input");
-  const electrumInput =
-    document.querySelector<HTMLInputElement>("#electrum-input");
-  const feeRateInput =
-    document.querySelector<HTMLInputElement>("#feerate-input");
-  const message = document.querySelector<HTMLElement>("#message");
-  const receiveInput =
-    document.querySelector<HTMLInputElement>("#receive-input");
-  const networkRadios = document.querySelectorAll<HTMLInputElement>(
-    'input[name="network"]'
-  );
-
-  if (
-    !(
-      addressInput &&
-      changeInput &&
-      electrumInput &&
-      feeRateInput &&
-      message &&
-      receiveInput &&
-      networkRadios.length > 0
-    )
-  ) {
-    const error = "Failed to initialize: missing required DOM elements";
-    if (message) {
-      message.textContent = error;
-    }
-    throw new Error("Failed to initialize: missing required DOM elements");
+function requireDomElement<T extends HTMLElement>(name: string): T {
+  const element = document.querySelector<T>(name);
+  if (!element) {
+    throw new Error(
+      `Failed to initialize: missing required DOM element ${name}`
+    );
   }
+  return element;
+}
 
-  DOM = {
-    addressInput,
-    changeInput,
-    electrumInput,
-    feeRateInput,
-    message,
-    receiveInput,
-    networkRadios,
-  };
+function requireDomElements<T extends HTMLElement>(
+  name: string
+): NodeListOf<T> {
+  const elements = document.querySelectorAll<T>(name);
+  if (elements.length === 0) {
+    throw new Error(
+      `Failed to initialize: missing required DOM element ${name}`
+    );
+  }
+  return elements;
+}
 
-  document
-    .querySelector("#descriptor-form")
-    ?.addEventListener("submit", (e) => {
+window.addEventListener("DOMContentLoaded", () => {
+  let message: HTMLParagraphElement | undefined = undefined;
+  try {
+    message = requireDomElement<HTMLParagraphElement>("#message");
+    const addressInput = requireDomElement<HTMLInputElement>("#address-input");
+    const changeInput = requireDomElement<HTMLInputElement>("#change-input");
+    const electrumInput =
+      requireDomElement<HTMLInputElement>("#electrum-input");
+    const feeRateInput = requireDomElement<HTMLInputElement>("#feerate-input");
+    const receiveInput = requireDomElement<HTMLInputElement>("#receive-input");
+    const networkRadios = requireDomElements<HTMLInputElement>(
+      'input[name="network"]'
+    );
+    const psbtTextArea =
+      requireDomElement<HTMLTextAreaElement>("#psbt-textarea");
+
+    DOM = {
+      addressInput,
+      changeInput,
+      electrumInput,
+      feeRateInput,
+      message,
+      receiveInput,
+      networkRadios,
+      psbtTextArea,
+    };
+
+    requireDomElement<HTMLButtonElement>(
+      "#fetch-balance-button"
+    ).addEventListener("click", (e) => {
       e.preventDefault();
       fetchBalance();
     });
 
-  document.querySelector("#sweep-button")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    sweep();
-  });
+    requireDomElement<HTMLButtonElement>("#sweep-button").addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        sweep();
+      }
+    );
+
+    requireDomElement<HTMLButtonElement>("#copy-psbt-button").addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        copyPsbtToClipboard();
+      }
+    );
+
+    requireDomElement<HTMLButtonElement>("#paste-psbt-button").addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        pastePsbtToClipboard();
+      }
+    );
+  } catch (e: unknown) {
+    const error =
+      (e as Error) ||
+      new Error("Failed to initialize: missing required DOM elements");
+    if (message) {
+      message.textContent = error.message;
+    }
+  }
 });

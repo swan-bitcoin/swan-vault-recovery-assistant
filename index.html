@@ -21,7 +21,7 @@
             <td>
               <input id="receive-input" placeholder="receive descriptor..." />
               <input id="change-input" placeholder="(optional) change descriptor..." />
-              <button type="submit">Fetch Balance</button>
+              <button id="fetch-balance-button">Fetch Balance</button>
             </td>
           </tr>
           <tr>
@@ -37,7 +37,17 @@
               <input id="address-input" placeholder="destination address" />
               <input id="feerate-input" type="number" placeholder="fee rate" min="5" />
               <button type="button" id="sweep-button">Sweep</button>
-              <button type="button" id="download-button" disabled="true">Save PSBT</button>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <textarea id="psbt-textarea" placeholder="psbt..." cols="50" rows="5" wrap="soft"></textarea>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <button type="button" id="copy-psbt-button">Copy PSBT to clipboard</button>
+              <button type="button" id="paste-psbt-button">Paste PSBT from clipboard</button>
             </td>
           </tr>
         </table>

@@ -281,6 +281,7 @@ fn main() {
     .expect("Failed to export typescript bindings");
 
   tauri::Builder::default()
+    .plugin(tauri_plugin_clipboard_manager::init())
     .plugin(tauri_plugin_shell::init())
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {

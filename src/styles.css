@@ -63,6 +63,7 @@ h1 {
 }
 
 input,
+textarea,
 button {
   border-radius: 8px;
   border: 1px solid transparent;
@@ -89,6 +90,7 @@ button:active {
 }
 
 input,
+textarea,
 button {
   outline: none;
 }
@@ -108,6 +110,7 @@ button {
   }
 
   input,
+  textarea,
   button {
     color: #ffffff;
     background-color: #0f0f0f98;
