@@ -10,9 +10,9 @@ let DOM: {
   electrumInput: HTMLInputElement;
   feeRateInput: HTMLInputElement;
   message: HTMLParagraphElement;
-  receiveInput: HTMLInputElement;
   networkRadios: NodeListOf<HTMLInputElement>;
   psbtTextArea: HTMLTextAreaElement;
+  receiveInput: HTMLInputElement;
 };
 
 function isTempuraError(e: unknown): e is TempuraError {
@@ -39,6 +39,7 @@ type Inputs = {
   electrum: string | null;
   feeRate: number;
   network: string;
+  psbt: string;
 };
 
 function getInputs(): Inputs {
@@ -50,8 +51,9 @@ function getInputs(): Inputs {
   const network = Array.from(DOM.networkRadios).find(
     (radio) => radio.checked
   )!.value;
+  const psbt = DOM.psbtTextArea.value.trim();
 
-  return { address, recv, change, electrum, feeRate, network };
+  return { address, recv, change, electrum, feeRate, network, psbt };
 }
 
 function require(value: unknown, itemName: string) {
@@ -62,19 +64,46 @@ function require(value: unknown, itemName: string) {
   }
 }
 
-async function fetchBalance() {
+async function broadcast() {
+  const { recv, change, electrum, network, psbt } = getInputs();
+  require(recv, "Receive Descriptor");
+  require(psbt, "PSBT");
+
+  DOM.message.textContent = "Please wait...";
+  try {
+    await commands.broadcast(psbt, network, recv, change, electrum);
+    DOM.message.textContent = "Broadcast successful!";
+  } catch (e: unknown) {
+    handleError(e);
+  }
+}
+
+async function getBalance() {
   const { recv, change, electrum, network } = getInputs();
   require(recv, "Receive Descriptor");
 
   DOM.message.textContent = "Please wait...";
   try {
-    const balance = await commands.fetchBalance(
-      network,
-      recv,
-      change,
-      electrum
-    );
-    DOM.message.textContent = balance.confirmed + " sats";
+    const balance = await commands.balance(network, recv, change, electrum);
+    DOM.message.textContent = "confirmed: "
+      .concat(balance.confirmed)
+      .concat(" sats")
+      .concat(" unconfirmed: ")
+      .concat(balance.untrusted_pending)
+      .concat(" sats");
+  } catch (e: unknown) {
+    handleError(e);
+  }
+}
+
+async function getAddress() {
+  const { recv, electrum, network } = getInputs();
+  require(recv, "Receive Descriptor");
+
+  DOM.message.textContent = "Please wait...";
+  try {
+    const address = await commands.address(network, recv, electrum);
+    DOM.message.textContent = "address: ".concat(address.address);
   } catch (e: unknown) {
     handleError(e);
   }
@@ -131,7 +160,6 @@ async function sweep() {
       change,
       electrum
     );
-    console.log(psbt);
     DOM.psbtTextArea.value = psbt.psbt;
     DOM.message.textContent = "PSBT created";
   } catch (e: unknown) {
@@ -170,12 +198,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const electrumInput =
       requireDomElement<HTMLInputElement>("#electrum-input");
     const feeRateInput = requireDomElement<HTMLInputElement>("#feerate-input");
-    const receiveInput = requireDomElement<HTMLInputElement>("#receive-input");
     const networkRadios = requireDomElements<HTMLInputElement>(
       'input[name="network"]'
     );
     const psbtTextArea =
       requireDomElement<HTMLTextAreaElement>("#psbt-textarea");
+    const receiveInput = requireDomElement<HTMLInputElement>("#receive-input");
 
     DOM = {
       addressInput,
@@ -183,16 +211,23 @@ window.addEventListener("DOMContentLoaded", () => {
       electrumInput,
       feeRateInput,
       message,
-      receiveInput,
       networkRadios,
       psbtTextArea,
+      receiveInput,
     };
 
     requireDomElement<HTMLButtonElement>(
       "#fetch-balance-button"
     ).addEventListener("click", (e) => {
       e.preventDefault();
-      fetchBalance();
+      getBalance();
+    });
+
+    requireDomElement<HTMLButtonElement>(
+      "#new-address-button"
+    ).addEventListener("click", (e) => {
+      e.preventDefault();
+      getAddress();
     });
 
     requireDomElement<HTMLButtonElement>("#sweep-button").addEventListener(
@@ -216,6 +251,14 @@ window.addEventListener("DOMContentLoaded", () => {
       (e) => {
         e.preventDefault();
         pastePsbtToClipboard();
+      }
+    );
+
+    requireDomElement<HTMLButtonElement>("#broadcast-button").addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        broadcast();
       }
     );
   } catch (e: unknown) {
