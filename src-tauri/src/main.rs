@@ -45,6 +45,7 @@ pub enum TempuraErrorType {
   DeviceError,
   NetworkError,
   PsbtError,
+  PsbtSignError,
   TransactionError,
   WalletSyncError,
   #[default]
@@ -62,6 +63,7 @@ impl std::fmt::Display for TempuraErrorType {
       TempuraErrorType::DeviceError => write!(f, "DeviceError"),
       TempuraErrorType::NetworkError => write!(f, "NetworkError"),
       TempuraErrorType::PsbtError => write!(f, "PsbtError"),
+      TempuraErrorType::PsbtSignError => write!(f, "PsbtSignError"),
       TempuraErrorType::TransactionError => write!(f, "TransactionError"),
       TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
       TempuraErrorType::UnknownError => write!(f, "UnknownError"),
@@ -279,6 +281,39 @@ async fn broadcast(
   ))
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
+  println!("network b4: {:?}", network);
+  let network = get_network(network)?;
+  println!("network: {:?}", network);
+  let psbt = resolve!(
+    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
+    TempuraErrorType::PsbtError
+  );
+
+  let mut devices = resolve!(hwi::HWIClient::enumerate(), TempuraErrorType::DeviceError);
+  println!("num devices: {}", devices.len());
+
+  if devices.is_empty() {
+    return Err(TempuraError::new(
+      TempuraErrorType::DeviceError,
+      "No devices found",
+    ));
+  }
+
+  let first_device = resolve!(devices.swap_remove(0), TempuraErrorType::DeviceError);
+  println!("first_device: {:?}", first_device);
+  let client = resolve!(
+    hwi::HWIClient::get_client(&first_device, true, network.into()),
+    TempuraErrorType::DeviceError
+  );
+
+  let psbt = resolve!(client.sign_tx(&psbt), TempuraErrorType::PsbtSignError);
+  println!("psbt: {:?}", psbt);
+  Ok(psbt.psbt.to_string())
+}
+
 // again, unfortunately u64 is not supported, so we must convert to string for number values.
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct PsbtDetails {
@@ -348,45 +383,6 @@ async fn sweep(
     let (psbt, details) = resolve!(builder.finish(), TempuraErrorType::TransactionError);
     Ok(PsbtDetails::new(psbt.to_string(), details))
   })
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn sign(
-  message: String,
-  network: String,
-  // receive: String,
-  // change: Option<String>,
-  // electrum: Option<String>,
-) -> Result<Vec<u8>, TempuraError> {
-  let network2 = get_network(network)?;
-  // let blockchain = get_blockchain(network, electrum)?;
-  // let wallet = get_wallet(network, receive, change)?;
-
-  let mut devices = resolve!(hwi::HWIClient::enumerate(), TempuraErrorType::DeviceError);
-  // println!("devices: {:?}", devices);
-
-  if devices.is_empty() {
-    return Err(TempuraError::new(
-      TempuraErrorType::DeviceError,
-      "No devices found",
-    ));
-  }
-
-  let first_device = resolve!(devices.swap_remove(0), TempuraErrorType::DeviceError);
-  println!("first_device: {:?}", first_device);
-  let client = resolve!(
-    hwi::HWIClient::get_client(&first_device, true, network2.into()),
-    TempuraErrorType::DeviceError
-  );
-  let derivation_path: bdk::bitcoin::bip32::DerivationPath =
-    bdk::bitcoin::bip32::DerivationPath::from_str("m/44'/1'/0'/0/0").unwrap();
-  let s = resolve!(
-    client.sign_message(&message, &derivation_path),
-    TempuraErrorType::DeviceError
-  );
-  println!("{:?}", s.signature);
-  Ok(s.signature)
 }
 
 fn main() {

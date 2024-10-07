@@ -13,7 +13,6 @@ let DOM: {
   networkRadios: NodeListOf<HTMLInputElement>;
   psbtTextArea: HTMLTextAreaElement;
   receiveInput: HTMLInputElement;
-  signMessageInput: HTMLInputElement;
 };
 
 function isTempuraError(e: unknown): e is TempuraError {
@@ -39,7 +38,6 @@ type Inputs = {
   change: string | null;
   electrum: string | null;
   feeRate: number;
-  messageToSign: string;
   network: string;
   psbt: string;
 };
@@ -50,7 +48,6 @@ function getInputs(): Inputs {
   const change = DOM.changeInput?.value.trim() || null;
   const electrum = DOM.electrumInput?.value.trim() || null;
   const feeRate = Number(DOM.feeRateInput?.value.trim());
-  const messageToSign = DOM.signMessageInput.value.trim();
   const network = Array.from(DOM.networkRadios).find(
     (radio) => radio.checked
   )!.value;
@@ -62,7 +59,6 @@ function getInputs(): Inputs {
     change,
     electrum,
     feeRate,
-    messageToSign,
     network,
     psbt,
   };
@@ -90,15 +86,15 @@ async function broadcast() {
   }
 }
 
-async function signMessage() {
-  const { network, messageToSign } = getInputs();
-  require(messageToSign, "Message to sign");
+async function sign() {
+  const { network, psbt } = getInputs();
+  require(psbt, "PSBT");
 
   DOM.message.textContent = "Please wait...";
   try {
-    const signature = await commands.sign(messageToSign, network);
-    DOM.message.textContent =
-      "0x" + signature.map((num) => num.toString(16).padStart(2, "0")).join("");
+    const signature = await commands.sign(psbt, network);
+    DOM.psbtTextArea.value = signature;
+    DOM.message.textContent = "PSBT signed successfully";
   } catch (e: unknown) {
     handleError(e);
   }
@@ -230,9 +226,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const psbtTextArea =
       requireDomElement<HTMLTextAreaElement>("#psbt-textarea");
     const receiveInput = requireDomElement<HTMLInputElement>("#receive-input");
-    const signMessageInput = requireDomElement<HTMLInputElement>(
-      "#sign-message-input"
-    );
 
     DOM = {
       addressInput,
@@ -243,7 +236,6 @@ window.addEventListener("DOMContentLoaded", () => {
       networkRadios,
       psbtTextArea,
       receiveInput,
-      signMessageInput,
     };
 
     requireDomElement<HTMLButtonElement>(
@@ -296,7 +288,7 @@ window.addEventListener("DOMContentLoaded", () => {
       "#sign-message-button"
     ).addEventListener("click", (e) => {
       e.preventDefault();
-      signMessage();
+      sign();
     });
   } catch (e: unknown) {
     const error =
