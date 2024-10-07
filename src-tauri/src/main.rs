@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use specta_typescript::Typescript;
 
+// use bitcoin::Network;
+
 // bdk and bitcoin imports
 use bdk;
 use bdk::bitcoin::secp256k1::Secp256k1;
@@ -40,6 +42,7 @@ pub enum TempuraErrorType {
   BlockchainError,
   ClientError,
   DescriptorError(DescriptorType),
+  DeviceError,
   NetworkError,
   PsbtError,
   TransactionError,
@@ -56,6 +59,7 @@ impl std::fmt::Display for TempuraErrorType {
       TempuraErrorType::BlockchainError => write!(f, "BlockchainError"),
       TempuraErrorType::ClientError => write!(f, "ClientError"),
       TempuraErrorType::DescriptorError(t) => write!(f, "DescriptorError({})", t),
+      TempuraErrorType::DeviceError => write!(f, "DeviceError"),
       TempuraErrorType::NetworkError => write!(f, "NetworkError"),
       TempuraErrorType::PsbtError => write!(f, "PsbtError"),
       TempuraErrorType::TransactionError => write!(f, "TransactionError"),
@@ -346,10 +350,49 @@ async fn sweep(
   })
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn sign(
+  message: String,
+  network: String,
+  // receive: String,
+  // change: Option<String>,
+  // electrum: Option<String>,
+) -> Result<Vec<u8>, TempuraError> {
+  let network2 = get_network(network)?;
+  // let blockchain = get_blockchain(network, electrum)?;
+  // let wallet = get_wallet(network, receive, change)?;
+
+  let mut devices = resolve!(hwi::HWIClient::enumerate(), TempuraErrorType::DeviceError);
+  // println!("devices: {:?}", devices);
+
+  if devices.is_empty() {
+    return Err(TempuraError::new(
+      TempuraErrorType::DeviceError,
+      "No devices found",
+    ));
+  }
+
+  let first_device = resolve!(devices.swap_remove(0), TempuraErrorType::DeviceError);
+  println!("first_device: {:?}", first_device);
+  let client = resolve!(
+    hwi::HWIClient::get_client(&first_device, true, network2.into()),
+    TempuraErrorType::DeviceError
+  );
+  let derivation_path: bdk::bitcoin::bip32::DerivationPath =
+    bdk::bitcoin::bip32::DerivationPath::from_str("m/44'/1'/0'/0/0").unwrap();
+  let s = resolve!(
+    client.sign_message(&message, &derivation_path),
+    TempuraErrorType::DeviceError
+  );
+  println!("{:?}", s.signature);
+  Ok(s.signature)
+}
+
 fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      address, balance, broadcast, sweep
+      address, balance, broadcast, sign, sweep
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}

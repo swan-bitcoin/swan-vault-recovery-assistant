@@ -14,6 +14,8 @@ Need to recover your funds from another wallet? Tempura can help.
 
 ## Setup Instructions for Developers
 
+### Prereqs
+
 1. Verify you have rust installed
 
 ```bash
@@ -34,9 +36,38 @@ rustup update
 ```
 
 2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
-3. checkout this repo and cd into it
-4. `pnpm install`
-5. `pnpm tauri dev`
+
+3. Other system packages
+
+install all requirements required by [rust-hwi](https://github.com/bitcoindevkit/rust-hwi?tab=readme-ov-file#prerequisites)
+
+this is probably
+
+```bash
+sudo apt install libusb-1.0-0-dev libudev-dev python3-dev
+```
+
+### run the application
+
+1. checkout this repo and cd into it
+2. create a python virtual environment and activate it (required for `rust-hwi` python dependencies)
+
+```bash
+$ python -m venv venv
+$ source venv/bin/activate
+```
+
+3. install the frontend requirements
+
+```bash
+$ pnpm install
+```
+
+4. run tauri in dev mode:
+
+```bash
+$ pnpm tauri dev
+```
 
 ## Usage Instructions
 
