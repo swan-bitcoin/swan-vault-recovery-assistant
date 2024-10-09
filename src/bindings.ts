@@ -5,6 +5,11 @@
 
 
 export const commands = {
+/**
+ * 
+ * * interface functions
+ * 
+ */
 async address(network: string, descriptor: string, electrum: string | null) : Promise<AddressInfo> {
     return await TAURI_INVOKE("address", { network, descriptor, electrum });
 },
@@ -32,6 +37,11 @@ async sweep(address: string, feeRate: number, network: string, receive: string, 
 
 /** user-defined types **/
 
+/**
+ * 
+ * * types
+ * 
+ */
 export type AddressInfo = { index: number; address: string }
 export type Balance = { 
 /**
