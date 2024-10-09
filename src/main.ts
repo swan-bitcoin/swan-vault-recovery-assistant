@@ -53,7 +53,15 @@ function getInputs(): Inputs {
   )!.value;
   const psbt = DOM.psbtTextArea.value.trim();
 
-  return { address, recv, change, electrum, feeRate, network, psbt };
+  return {
+    address,
+    recv,
+    change,
+    electrum,
+    feeRate,
+    network,
+    psbt,
+  };
 }
 
 function require(value: unknown, itemName: string) {
@@ -73,6 +81,20 @@ async function broadcast() {
   try {
     await commands.broadcast(psbt, network, recv, change, electrum);
     DOM.message.textContent = "Broadcast successful!";
+  } catch (e: unknown) {
+    handleError(e);
+  }
+}
+
+async function sign() {
+  const { network, psbt } = getInputs();
+  require(psbt, "PSBT");
+
+  DOM.message.textContent = "Please wait...";
+  try {
+    const signature = await commands.sign(psbt, network);
+    DOM.psbtTextArea.value = signature;
+    DOM.message.textContent = "PSBT signed successfully";
   } catch (e: unknown) {
     handleError(e);
   }
@@ -261,6 +283,13 @@ window.addEventListener("DOMContentLoaded", () => {
         broadcast();
       }
     );
+
+    requireDomElement<HTMLButtonElement>(
+      "#sign-message-button"
+    ).addEventListener("click", (e) => {
+      e.preventDefault();
+      sign();
+    });
   } catch (e: unknown) {
     const error =
       (e as Error) ||

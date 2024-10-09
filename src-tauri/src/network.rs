@@ -1,0 +1,59 @@
+use crate::errors::{TempuraError, TempuraErrorType};
+
+#[derive(Clone, Copy, Debug)]
+pub enum Network {
+  Bitcoin,
+  Testnet,
+  Signet,
+  Regtest,
+}
+
+impl std::fmt::Display for Network {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Network::Bitcoin => write!(f, "bitcoin"),
+      Network::Testnet => write!(f, "testnet"),
+      Network::Signet => write!(f, "signet"),
+      Network::Regtest => write!(f, "regtest"),
+    }
+  }
+}
+
+impl std::str::FromStr for Network {
+  type Err = TempuraError;
+
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    match s {
+      "bitcoin" => Ok(Network::Bitcoin),
+      "testnet" => Ok(Network::Testnet),
+      "signet" => Ok(Network::Signet),
+      "regtest" => Ok(Network::Regtest),
+      other => Err(TempuraError::new(
+        TempuraErrorType::NetworkError,
+        format!("Unsupported network: {}", other).as_str(),
+      )),
+    }
+  }
+}
+
+impl From<Network> for bdk::bitcoin::Network {
+  fn from(network: Network) -> Self {
+    match network {
+      Network::Bitcoin => bdk::bitcoin::Network::Bitcoin,
+      Network::Testnet => bdk::bitcoin::Network::Testnet,
+      Network::Signet => bdk::bitcoin::Network::Signet,
+      Network::Regtest => bdk::bitcoin::Network::Regtest,
+    }
+  }
+}
+
+impl From<Network> for bitcoin::Network {
+  fn from(network: Network) -> Self {
+    match network {
+      Network::Bitcoin => bitcoin::Network::Bitcoin,
+      Network::Testnet => bitcoin::Network::Testnet,
+      Network::Signet => bitcoin::Network::Signet,
+      Network::Regtest => bitcoin::Network::Regtest,
+    }
+  }
+}

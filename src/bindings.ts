@@ -5,6 +5,11 @@
 
 
 export const commands = {
+/**
+ * 
+ * * interface functions
+ * 
+ */
 async address(network: string, descriptor: string, electrum: string | null) : Promise<AddressInfo> {
     return await TAURI_INVOKE("address", { network, descriptor, electrum });
 },
@@ -13,6 +18,9 @@ async balance(network: string, receive: string, change: string | null, electrum:
 },
 async broadcast(psbt: string, network: string, receive: string, change: string | null, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, receive, change, electrum });
+},
+async sign(psbt: string, network: string) : Promise<string> {
+    return await TAURI_INVOKE("sign", { psbt, network });
 },
 async sweep(address: string, feeRate: number, network: string, receive: string, change: string | null, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, receive, change, electrum });
@@ -29,6 +37,11 @@ async sweep(address: string, feeRate: number, network: string, receive: string, 
 
 /** user-defined types **/
 
+/**
+ * 
+ * * types
+ * 
+ */
 export type AddressInfo = { index: number; address: string }
 export type Balance = { 
 /**

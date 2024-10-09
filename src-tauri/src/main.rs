@@ -3,7 +3,12 @@
 
 use std::str::FromStr;
 
-use bdk::database::MemoryDatabase;
+#[macro_use]
+mod errors;
+use errors::{DescriptorType, TempuraError, TempuraErrorType};
+mod network;
+use network::Network;
+
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -12,142 +17,16 @@ use specta_typescript::Typescript;
 // bdk and bitcoin imports
 use bdk;
 use bdk::bitcoin::secp256k1::Secp256k1;
-use bdk::bitcoin::Network;
 use bdk::blockchain::ElectrumBlockchain;
+use bdk::database::MemoryDatabase;
 use bdk::descriptor::IntoWalletDescriptor;
 use bdk::electrum_client::Client;
 use bdk::SyncOptions;
+use hwi::HWIClient;
 
-#[derive(Debug)]
-pub enum DescriptorType {
-  Receive,
-  Change,
-}
-
-impl std::fmt::Display for DescriptorType {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      DescriptorType::Receive => write!(f, "Receive"),
-      DescriptorType::Change => write!(f, "Change"),
-    }
-  }
-}
-
-#[derive(Debug, Default)]
-pub enum TempuraErrorType {
-  AddressError,
-  BalanceError,
-  BlockchainError,
-  ClientError,
-  DescriptorError(DescriptorType),
-  NetworkError,
-  PsbtError,
-  TransactionError,
-  WalletSyncError,
-  #[default]
-  UnknownError,
-}
-
-impl std::fmt::Display for TempuraErrorType {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      TempuraErrorType::AddressError => write!(f, "AddressError"),
-      TempuraErrorType::BalanceError => write!(f, "BalanceError"),
-      TempuraErrorType::BlockchainError => write!(f, "BlockchainError"),
-      TempuraErrorType::ClientError => write!(f, "ClientError"),
-      TempuraErrorType::DescriptorError(t) => write!(f, "DescriptorError({})", t),
-      TempuraErrorType::NetworkError => write!(f, "NetworkError"),
-      TempuraErrorType::PsbtError => write!(f, "PsbtError"),
-      TempuraErrorType::TransactionError => write!(f, "TransactionError"),
-      TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
-      TempuraErrorType::UnknownError => write!(f, "UnknownError"),
-    }
-  }
-}
-
-#[derive(Debug, Serialize, Deserialize, Type)]
-pub struct TempuraError {
-  pub error_type: String,
-  pub message: String,
-}
-
-impl TempuraError {
-  pub fn new(error_type: TempuraErrorType, message: &str) -> Self {
-    TempuraError {
-      error_type: error_type.to_string(),
-      message: message.to_string(),
-    }
-  }
-}
-
-macro_rules! resolve {
-  ($expr:expr, $error_type:expr) => {
-    $expr.map_err(|e| TempuraError::new($error_type, &e.to_string()))?
-  };
-}
-
-fn get_blockchain(
-  network: Network,
-  electrum: Option<String>,
-) -> Result<ElectrumBlockchain, TempuraError> {
-  let connection = match electrum {
-    Some(electrum) => electrum,
-    None => match network {
-      Network::Testnet => "electrum.blockstream.info:60001".to_string(),
-      Network::Bitcoin => "blockstream.info:110".to_string(),
-      _ => {
-        return Err(TempuraError::new(
-          TempuraErrorType::NetworkError,
-          "Unsupported network",
-        ))
-      }
-    },
-  };
-
-  let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
-  Ok(ElectrumBlockchain::from(client))
-}
-
-fn get_network(network: String) -> Result<Network, TempuraError> {
-  match network.as_ref() {
-    "bitcoin" => Ok(Network::Bitcoin),
-    "testnet" => Ok(Network::Testnet),
-    "regtest" => Ok(Network::Regtest),
-    other => Err(TempuraError::new(
-      TempuraErrorType::NetworkError,
-      format!("Unsupported network: {}", other).as_str(),
-    )),
-  }
-}
-
-fn get_wallet(
-  network: Network,
-  receive: String,
-  change: Option<String>,
-) -> Result<bdk::Wallet<MemoryDatabase>, TempuraError> {
-  let secp = Secp256k1::new();
-  let receive = resolve!(
-    receive.into_wallet_descriptor(&secp, network),
-    TempuraErrorType::DescriptorError(DescriptorType::Receive)
-  );
-  let change = match change {
-    Some(change) => Some(resolve!(
-      change.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(DescriptorType::Change)
-    )),
-    None => None,
-  };
-
-  Ok(resolve!(
-    bdk::Wallet::new(
-      receive,
-      change,
-      network,
-      bdk::database::MemoryDatabase::default()
-    ),
-    TempuraErrorType::ClientError
-  ))
-}
+/**
+ * types
+ */
 
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct AddressInfo {
@@ -162,32 +41,6 @@ impl From<bdk::wallet::AddressInfo> for AddressInfo {
       address: addrinfo.address.to_string(),
     }
   }
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn address(
-  network: String,
-  descriptor: String,
-  electrum: Option<String>,
-) -> Result<AddressInfo, TempuraError> {
-  let network = get_network(network)?;
-  let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, descriptor, None)?;
-
-  // Execute blocking wallet sync and balance retrieval in a separate thread context.
-  tokio::task::block_in_place(|| {
-    resolve!(
-      wallet.sync(&blockchain, SyncOptions::default()),
-      TempuraErrorType::WalletSyncError
-    );
-
-    let addr = resolve!(
-      wallet.get_address(bdk::wallet::AddressIndex::LastUnused),
-      TempuraErrorType::AddressError
-    );
-    Ok(addr.into())
-  })
 }
 
 // this type is copied from BDK so that we can specta-derive it,
@@ -215,66 +68,6 @@ impl From<bdk::Balance> for Balance {
   }
 }
 
-#[tauri::command]
-#[specta::specta]
-async fn balance(
-  network: String,
-  receive: String,
-  change: Option<String>,
-  electrum: Option<String>,
-) -> Result<Balance, TempuraError> {
-  let network = get_network(network)?;
-  let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, receive, change)?;
-
-  // Execute blocking wallet sync and balance retrieval in a separate thread context.
-  tokio::task::block_in_place(|| {
-    resolve!(
-      wallet.sync(&blockchain, SyncOptions::default()),
-      TempuraErrorType::WalletSyncError
-    );
-
-    let balance: bdk::Balance = resolve!(wallet.get_balance(), TempuraErrorType::BalanceError);
-
-    Ok(balance.into())
-  })
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn broadcast(
-  psbt: String,
-  network: String,
-  receive: String,
-  change: Option<String>,
-  electrum: Option<String>,
-) -> Result<(), TempuraError> {
-  let network = get_network(network)?;
-  let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, receive, change)?;
-
-  let mut psbt = resolve!(
-    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
-    TempuraErrorType::PsbtError
-  );
-
-  if !resolve!(
-    wallet.finalize_psbt(&mut psbt, bdk::SignOptions::default()),
-    TempuraErrorType::PsbtError
-  ) {
-    return Err(TempuraError::new(
-      TempuraErrorType::PsbtError,
-      "Failed to finalize PSBT",
-    ));
-  }
-
-  let tx = psbt.extract_tx();
-  Ok(resolve!(
-    bdk::blockchain::Blockchain::broadcast(&blockchain, &tx),
-    TempuraErrorType::TransactionError
-  ))
-}
-
 // again, unfortunately u64 is not supported, so we must convert to string for number values.
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct PsbtDetails {
@@ -300,6 +93,203 @@ impl PsbtDetails {
   }
 }
 
+/**
+ * utilities
+ */
+
+fn get_blockchain(
+  network: Network,
+  electrum: Option<String>,
+) -> Result<ElectrumBlockchain, TempuraError> {
+  let connection = match electrum {
+    Some(electrum) => electrum,
+    None => match network {
+      Network::Testnet => "electrum.blockstream.info:60001".to_string(),
+      Network::Bitcoin => "blockstream.info:110".to_string(),
+      Network::Regtest => "localhost:50021".to_string(),
+      _ => {
+        return Err(TempuraError::new(
+          TempuraErrorType::NetworkError,
+          "You must specify an electrum server for this network",
+        ))
+      }
+    },
+  };
+
+  let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
+  Ok(ElectrumBlockchain::from(client))
+}
+
+fn get_hwi_client(network: Network) -> Result<HWIClient, TempuraError> {
+  #[cfg(debug_assertions)]
+  let _ = HWIClient::set_log_level(hwi::types::LogLevel::DEBUG);
+
+  // because of the buggy way enumerate() works in rust-hwi, we must try to
+  // find Jade devices with `find_device` first, and only then use enumerate
+  // if necessary.
+  if let Ok(client) = HWIClient::find_device(
+    None,
+    Some(hwi::types::HWIDeviceType::Jade),
+    None,
+    true,
+    network.into(),
+  ) {
+    return Ok(client);
+  }
+
+  let mut devices = resolve!(hwi::HWIClient::enumerate(), TempuraErrorType::DeviceError);
+  println!("num devices: {}", devices.len());
+
+  if devices.is_empty() {
+    return Err(TempuraError::new(
+      TempuraErrorType::DeviceError,
+      "No devices found",
+    ));
+  }
+
+  let first_device = resolve!(devices.swap_remove(0), TempuraErrorType::DeviceError);
+  println!("first_device: {:?}", first_device);
+  let network: bitcoin::Network = network.into();
+  let client = resolve!(
+    hwi::HWIClient::get_client(&first_device, true, network.into()),
+    TempuraErrorType::DeviceError
+  );
+  Ok(client)
+}
+
+fn get_wallet(
+  network: Network,
+  receive: String,
+  change: Option<String>,
+) -> Result<bdk::Wallet<MemoryDatabase>, TempuraError> {
+  let secp = Secp256k1::new();
+  let network: bdk::bitcoin::Network = network.into();
+  let receive = resolve!(
+    receive.into_wallet_descriptor(&secp, network),
+    TempuraErrorType::DescriptorError(DescriptorType::Receive)
+  );
+  let change = match change {
+    Some(change) => Some(resolve!(
+      change.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(DescriptorType::Change)
+    )),
+    None => None,
+  };
+
+  Ok(resolve!(
+    bdk::Wallet::new(
+      receive,
+      change,
+      network,
+      bdk::database::MemoryDatabase::default()
+    ),
+    TempuraErrorType::ClientError
+  ))
+}
+
+/**
+ * interface functions
+ */
+
+#[tauri::command]
+#[specta::specta]
+async fn address(
+  network: String,
+  descriptor: String,
+  electrum: Option<String>,
+) -> Result<AddressInfo, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, descriptor, None)?;
+
+  // Execute blocking wallet sync and balance retrieval in a separate thread context.
+  tokio::task::block_in_place(|| {
+    resolve!(
+      wallet.sync(&blockchain, SyncOptions::default()),
+      TempuraErrorType::WalletSyncError
+    );
+
+    let addr = resolve!(
+      wallet.get_address(bdk::wallet::AddressIndex::LastUnused),
+      TempuraErrorType::AddressError
+    );
+    Ok(addr.into())
+  })
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn balance(
+  network: String,
+  receive: String,
+  change: Option<String>,
+  electrum: Option<String>,
+) -> Result<Balance, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, receive, change)?;
+
+  // Execute blocking wallet sync and balance retrieval in a separate thread context.
+  tokio::task::block_in_place(|| {
+    resolve!(
+      wallet.sync(&blockchain, SyncOptions::default()),
+      TempuraErrorType::WalletSyncError
+    );
+
+    let balance: bdk::Balance = resolve!(wallet.get_balance(), TempuraErrorType::BalanceError);
+
+    Ok(balance.into())
+  })
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn broadcast(
+  psbt: String,
+  network: String,
+  receive: String,
+  change: Option<String>,
+  electrum: Option<String>,
+) -> Result<(), TempuraError> {
+  let network = Network::from_str(&network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, receive, change)?;
+
+  let mut psbt = resolve!(
+    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
+    TempuraErrorType::PsbtError
+  );
+
+  if !resolve!(
+    wallet.finalize_psbt(&mut psbt, bdk::SignOptions::default()),
+    TempuraErrorType::PsbtError
+  ) {
+    return Err(TempuraError::new(
+      TempuraErrorType::PsbtError,
+      "Failed to finalize PSBT",
+    ));
+  }
+
+  let tx = psbt.extract_tx();
+  Ok(resolve!(
+    bdk::blockchain::Blockchain::broadcast(&blockchain, &tx),
+    TempuraErrorType::TransactionError
+  ))
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let psbt = resolve!(bitcoin::Psbt::from_str(&psbt), TempuraErrorType::PsbtError);
+  let client = get_hwi_client(network)?;
+
+  let psbt = hwi::types::HWIPartiallySignedTransaction { psbt };
+  let psbt = resolve!(client.sign_tx(&psbt), TempuraErrorType::PsbtSignError);
+  println!("psbt: {:?}", psbt);
+  Ok(psbt.psbt.to_string())
+}
+
 #[tauri::command]
 #[specta::specta]
 async fn sweep(
@@ -310,7 +300,7 @@ async fn sweep(
   change: Option<String>,
   electrum: Option<String>,
 ) -> Result<PsbtDetails, TempuraError> {
-  let network = get_network(network)?;
+  let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let wallet = get_wallet(network, receive, change)?;
 
@@ -346,10 +336,14 @@ async fn sweep(
   })
 }
 
+/**
+ * entrypoint
+ */
+
 fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      address, balance, broadcast, sweep
+      address, balance, broadcast, sign, sweep
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
