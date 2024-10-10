@@ -9,56 +9,58 @@
   </head>
 
   <body>
-    <div class="container">
-      <h1>tempura</h1>
-      <div class="logo-container">
-        <img id="bitcoin-logo" src="./bitcoin.png" alt="tempura logo" />
+    <div id="root" class="flex flex-grow p-4 gap-8">
+      <div class="flex-col w-2/6">
+        <div class="font-bold w-full text-center mb-3">tempura</div>
+        <img class="size-20 mx-auto" id="bitcoin-logo" src="./bitcoin.png" alt="tempura logo" />
+        <div class="font-bold mt-10"><p id="message"></p></div>
       </div>
 
-      <form class="row" id="descriptor-form">
-        <table>
-          <tr>
-            <td>
-              <input id="receive-input" placeholder="receive descriptor..." />
-              <input id="change-input" placeholder="(optional) change descriptor..." />
-              <button id="fetch-balance-button">Fetch Balance</button>
-              <button id="new-address-button">New Address</button>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <input id="electrum-input" placeholder="(optional) custom electrum server" />
-              <input type="radio" name="network" value="bitcoin" checked>Bitcoin</input>
-              <input type="radio" name="network" value="testnet">Testnet</input>
-              <input type="radio" name="network" value="regtest">Regtest</input>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <input id="address-input" placeholder="destination address" />
-              <input id="feerate-input" type="number" placeholder="fee rate" min="5" />
-              <button type="button" id="sweep-button">Sweep</button>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <textarea id="psbt-textarea" placeholder="psbt..." cols="50" rows="5" wrap="soft"></textarea>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <button type="button" id="copy-psbt-button">Copy PSBT to clipboard</button>
-              <button type="button" id="paste-psbt-button">Paste PSBT from clipboard</button>
-              <button type="button" id="sign-message-button">Sign</button>
-              <button type="button" id="broadcast-button">Broadcast</button>
-            </td>
-          </tr>
-        </table>
+      <form id="descriptor-form" class="flex-col">
+        <div class="mb-3">
+          <input class="input-default w-full" id="receive-input" placeholder="receive descriptor..." />
+        </div>
+        <div class="mb-3">
+          <input class="input-default w-full" id="change-input" placeholder="(optional) change descriptor..." />
+        </div>
+        <div role="group" class="mb-5">
+          <button type="button" class="btn btn-default" id="fetch-balance-button">Fetch Balance</button>
+          <button type="button" class="btn btn-default" id="new-address-button">New Address</button>
+        </div>
+        <div class="mb-3">
+          <input class="input-default w-full" id="electrum-input" placeholder="(optional) custom electrum server" />
+        </div>
+        <div class="mb-5">
+          <span class="label-default">Network:</span>
+          <input id="bitcoin" value="bitcoin" type="radio" name="network" checked/><label class="label-default" for="bitcoin">Bitcoin</label>
+          <input id="testnet" value="testnet" type="radio" name="network"/><label class="label-default" for="testnet">Testnet</label>
+          <input id="regtest" value="regtest" type="radio" name="network"/><label class="label-default" for="regtest">Regtest</label>
+        </div>
+        <div class="mb-3">
+          <input class="input-default w-full" id="address-input" placeholder="destination address" />
+        </div>
+        <div class="mb-5">
+          <input class="input-default w-3/12 inline-flex" id="feerate-input" type="number" placeholder="fee rate" min="5" />
+          <label class="label-default inline-flex" for="feerate-input">sats/vB (satoshis per virtual byte)</label>
+        </div>
+        <div class="mb-5">
+          <button class="btn btn-default" type="button" id="sweep-button">Create sweep PSBT</button>
+        </div>
+        <div class="mb-3">
+          <textarea class="input-default w-full h-40" id="psbt-textarea" placeholder="psbt..." wrap="soft"></textarea>
+        </div>
+        <div class="mb-5" role="group">
+          <button class="btn btn-default" type="button" id="copy-psbt-button">Copy PSBT to clipboard</button>
+          <button class="btn btn-default" type="button" id="paste-psbt-button">Paste PSBT from clipboard</button>
+        </div>
+        <div class="mb-5" role="group">
+          <button class="btn btn-destructive" type="button" id="sign-message-button">Sign</button>
+          <button class="btn btn-destructive" type="button" id="broadcast-button">Broadcast</button>
+        </div>
       </form>
 
       
 
-      <p id="message"></p>
     </div>
   </body>
 </html>
