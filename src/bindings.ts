@@ -19,6 +19,9 @@ async balance(network: string, receive: string, change: string | null, electrum:
 async broadcast(psbt: string, network: string, receive: string, change: string | null, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, receive, change, electrum });
 },
+async enumerate(network: string) : Promise<string> {
+    return await TAURI_INVOKE("enumerate", { network });
+},
 async sign(psbt: string, network: string) : Promise<string> {
     return await TAURI_INVOKE("sign", { psbt, network });
 },
