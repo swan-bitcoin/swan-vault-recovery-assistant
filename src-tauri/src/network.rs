@@ -47,17 +47,6 @@ impl From<Network> for bdk::bitcoin::Network {
   }
 }
 
-impl From<Network> for bitcoin::Network {
-  fn from(network: Network) -> Self {
-    match network {
-      Network::Bitcoin => bitcoin::Network::Bitcoin,
-      Network::Testnet => bitcoin::Network::Testnet,
-      Network::Signet => bitcoin::Network::Signet,
-      Network::Regtest => bitcoin::Network::Regtest,
-    }
-  }
-}
-
 #[derive(Debug, Clone)]
 pub struct HwiNetwork(String);
 
