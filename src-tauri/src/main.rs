@@ -240,14 +240,50 @@ async fn broadcast(
   ))
 }
 
+fn find_hwi() -> Result<String, TempuraError> {
+  // Get the PATH environment variable
+  let path_var = std::env::var("PATH").map_err(|_| {
+    TempuraError::new(
+      TempuraErrorType::CommandError,
+      "Failed to get PATH environment variable",
+    )
+  })?;
+
+  // Split the PATH into directories
+  let mut paths: Vec<&str> = path_var
+    .split(if cfg!(windows) { ';' } else { ':' })
+    .collect();
+  paths.insert(0, "./bin");
+
+  // Check each directory for the executable
+  let hwi_path = paths
+    .iter()
+    .map(|dir| std::path::Path::new(dir).join("hwi"))
+    .find(|path| {
+      path.exists()
+        && std::fs::metadata(path)
+          .map(|meta| meta.is_file())
+          .unwrap_or(false)
+    })
+    .ok_or_else(|| {
+      TempuraError::new(
+        TempuraErrorType::CommandError,
+        "hwi executable not found in PATH",
+      )
+    })?;
+
+  Ok(hwi_path.to_string_lossy().into_owned())
+}
+
 #[tauri::command]
 #[specta::specta]
 async fn enumerate(network: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
+  let hwi_path = find_hwi()?;
 
   let output = resolve!(
-    Command::new("./bin/hwi")
+    Command::new(hwi_path)
       .args(["--chain", network.as_str(), "enumerate"])
       .output(),
     TempuraErrorType::CommandError
@@ -266,14 +302,15 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
+  let hwi_path = find_hwi()?;
 
   let output = resolve!(
-    Command::new("./bin/hwi")
+    Command::new(hwi_path)
       .args([
         "--chain",
         network.as_str(),
         "--device-type",
-        "jade", // TODO: assume jade for the moment
+        "jade", // TODO: assume jade for now
         "signtx",
         &psbt
       ])
