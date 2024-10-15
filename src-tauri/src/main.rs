@@ -253,7 +253,7 @@ fn find_hwi() -> Result<String, TempuraError> {
   let mut paths: Vec<&str> = path_var
     .split(if cfg!(windows) { ';' } else { ':' })
     .collect();
-  paths.insert(0, "./bin");
+  paths.insert(0, ".");
 
   // Check each directory for the executable
   let hwi_path = paths
