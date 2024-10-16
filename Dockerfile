@@ -6,7 +6,12 @@
 # slim images or multi-stage is not necessary since this is not being deployed.
 # this image takes a long time to build without cached layers.
 #
+# build:
 # docker build --tag tempura .
+#
+# copy build artifacts out of the container:
+# docker run --it --rm --name tempura tempura
+# docker container cp tempura:/tempura/src-tauri/target/release/bundle/deb/tempura_<symver>_amd64.deb .
 #
 FROM ubuntu:latest
 

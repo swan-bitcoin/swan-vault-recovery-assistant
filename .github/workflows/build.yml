@@ -2,11 +2,9 @@ name: Build tempura release
 
 on:
   push:
-    branches:
-      - jdf/hwi-cli
+    branches: [master]
   pull_request:
-    branches:
-      - jdf/hwi-cli
+    types: [opened, synchronize]
 
 jobs:
   build:
