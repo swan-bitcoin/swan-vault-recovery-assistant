@@ -12,6 +12,11 @@ Need to recover your funds from another wallet? Tempura can help.
 2. Tempura must use a minimal dependency footprint so it may easily be audited.
 3. Tempura is free to use or extend (MIT license).
 
+## Additional Design Principles
+
+1. The rust backend must be completely stateless.
+2. The frontend maintains state only in DOM components; a user is always able to see what data is being used.
+
 ## Setup Instructions for Developers
 
 ### Prereqs
@@ -36,6 +41,8 @@ rustup update
 ```
 
 2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
+
+3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory after cloning this repository. Download the HWI binaries from [HWI's github releases page](https://github.com/bitcoin-core/HWI/releases) -- this project was last verified against v3.1.0 on 10/16/2024.
 
 ### run the application
 
