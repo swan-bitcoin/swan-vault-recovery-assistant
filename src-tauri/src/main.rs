@@ -1,13 +1,14 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::process::Command;
 use std::str::FromStr;
 
 #[macro_use]
 mod errors;
 use errors::{DescriptorType, TempuraError, TempuraErrorType};
 mod network;
-use network::Network;
+use network::{HwiNetwork, Network};
 
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
@@ -22,7 +23,6 @@ use bdk::database::MemoryDatabase;
 use bdk::descriptor::IntoWalletDescriptor;
 use bdk::electrum_client::Client;
 use bdk::SyncOptions;
-use hwi::HWIClient;
 
 /**
  * types
@@ -118,43 +118,6 @@ fn get_blockchain(
 
   let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
   Ok(ElectrumBlockchain::from(client))
-}
-
-fn get_hwi_client(network: Network) -> Result<HWIClient, TempuraError> {
-  #[cfg(debug_assertions)]
-  let _ = HWIClient::set_log_level(hwi::types::LogLevel::DEBUG);
-
-  // because of the buggy way enumerate() works in rust-hwi, we must try to
-  // find Jade devices with `find_device` first, and only then use enumerate
-  // if necessary.
-  if let Ok(client) = HWIClient::find_device(
-    None,
-    Some(hwi::types::HWIDeviceType::Jade),
-    None,
-    true,
-    network.into(),
-  ) {
-    return Ok(client);
-  }
-
-  let mut devices = resolve!(hwi::HWIClient::enumerate(), TempuraErrorType::DeviceError);
-  println!("num devices: {}", devices.len());
-
-  if devices.is_empty() {
-    return Err(TempuraError::new(
-      TempuraErrorType::DeviceError,
-      "No devices found",
-    ));
-  }
-
-  let first_device = resolve!(devices.swap_remove(0), TempuraErrorType::DeviceError);
-  println!("first_device: {:?}", first_device);
-  let network: bitcoin::Network = network.into();
-  let client = resolve!(
-    hwi::HWIClient::get_client(&first_device, true, network.into()),
-    TempuraErrorType::DeviceError
-  );
-  Ok(client)
 }
 
 fn get_wallet(
@@ -277,17 +240,90 @@ async fn broadcast(
   ))
 }
 
+fn find_hwi() -> Result<String, TempuraError> {
+  // Get the PATH environment variable
+  let path_var = std::env::var("PATH").map_err(|_| {
+    TempuraError::new(
+      TempuraErrorType::CommandError,
+      "Failed to get PATH environment variable",
+    )
+  })?;
+
+  // Split the PATH into directories
+  let mut paths: Vec<&str> = path_var
+    .split(if cfg!(windows) { ';' } else { ':' })
+    .collect();
+  paths.insert(0, ".");
+
+  // Check each directory for the executable
+  let hwi_path = paths
+    .iter()
+    .map(|dir| std::path::Path::new(dir).join("hwi"))
+    .find(|path| {
+      path.exists()
+        && std::fs::metadata(path)
+          .map(|meta| meta.is_file())
+          .unwrap_or(false)
+    })
+    .ok_or_else(|| {
+      TempuraError::new(
+        TempuraErrorType::CommandError,
+        "hwi executable not found in PATH",
+      )
+    })?;
+
+  Ok(hwi_path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn enumerate(network: String) -> Result<String, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let network: HwiNetwork = network.into();
+  let hwi_path = find_hwi()?;
+
+  let output = resolve!(
+    Command::new(hwi_path)
+      .args(["--chain", network.as_str(), "enumerate"])
+      .output(),
+    TempuraErrorType::CommandError
+  );
+
+  let output = resolve!(
+    String::from_utf8(output.stdout),
+    TempuraErrorType::ParseError
+  );
+
+  Ok(output)
+}
+
 #[tauri::command]
 #[specta::specta]
 async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
-  let psbt = resolve!(bitcoin::Psbt::from_str(&psbt), TempuraErrorType::PsbtError);
-  let client = get_hwi_client(network)?;
+  let network: HwiNetwork = network.into();
+  let hwi_path = find_hwi()?;
 
-  let psbt = hwi::types::HWIPartiallySignedTransaction { psbt };
-  let psbt = resolve!(client.sign_tx(&psbt), TempuraErrorType::PsbtSignError);
-  println!("psbt: {:?}", psbt);
-  Ok(psbt.psbt.to_string())
+  let output = resolve!(
+    Command::new(hwi_path)
+      .args([
+        "--chain",
+        network.as_str(),
+        "--device-type",
+        "jade", // TODO: assume jade for now
+        "signtx",
+        &psbt
+      ])
+      .output(),
+    TempuraErrorType::CommandError
+  );
+
+  let output = resolve!(
+    String::from_utf8(output.stdout),
+    TempuraErrorType::ParseError
+  );
+
+  Ok(output)
 }
 
 #[tauri::command]
@@ -343,7 +379,7 @@ async fn sweep(
 fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      address, balance, broadcast, sign, sweep
+      address, balance, broadcast, enumerate, sign, sweep
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}

@@ -18,10 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.0.0", features = [] }
 
 [dependencies]
-# bdk and hwi both contain 'bitcoin' dependencies which currently do not match. 
 bdk = "0.29.0"
-hwi = "0.10.0"
-bitcoin = "0.32.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 specta = "=2.0.0-rc.20"

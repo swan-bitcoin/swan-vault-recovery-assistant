@@ -1,0 +1,18 @@
+# build artifacts, metadata, and test files
+.git
+.github
+.gitignore
+.vscode
+dist
+node_modules
+README.md
+src-tauri/target
+test
+
+# hwi binaries used locally
+src-tauri/hwi**
+
+# docker stuff
+Dockerfile
+docker-compose.yml
+.dockerignore

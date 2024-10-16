@@ -1,0 +1,116 @@
+name: Build tempura release
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        # available versions: https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#standard-github-hosted-runners-for-public-repositories
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
+        include:
+          - os: ubuntu-latest
+            hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-linux-x86_64.tar.gz
+          # - os: windows-latest
+          #   hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-windows-x86_64.zip
+          # - os: macos-latest
+          #   hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-mac-x86_64.tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install system dependencies (linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      # - name: Install system dependencies (macos)
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      #   run: brew install gtk+3 webkit2gtk
+
+      # - name: Install system dependencies (windows)
+      #   if: ${{ matrix.os == 'windows-latest' }}
+      #   run: |
+      #     choco install gtk-runtime
+      #     RefreshEnv
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download and extract HWI (linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: |
+          curl -L ${{ matrix.hwi_url }} -o hwi.tar.gz
+          tar -xzf hwi.tar.gz -C ./src-tauri
+          mv ./src-tauri/hwi ./src-tauri/hwi-x86_64-unknown-linux-gnu
+        shell: bash
+
+      - name: Download and extract HWI (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        run: |
+          curl -L ${{ matrix.hwi_url }} -o hwi.tar.gz
+          tar -xzf hwi.tar.gz -C ./src-tauri
+          mv ./src-tauri/hwi ./src-tauri/hwi-x86_64-apple-darwin
+        shell: bash
+
+      - name: Download and extract HWI (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        run: |
+          Invoke-WebRequest -Uri ${{ matrix.hwi_url }} -OutFile hwi.zip
+          Expand-Archive -Path hwi.zip -DestinationPath ./src-tauri
+          Rename-Item -Path ./src-tauri/hwi.exe -NewName hwi-x86_64-pc-windows-msvc.exe
+        shell: pwsh
+
+      - name: Build project
+        run: pnpm tauri build
+
+        # https://jonaskruckenberg.github.io/tauri-docs-wip/building/building-your-application.html#packaging-formats
+      - name: Publish artifacts (linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tempura-linux
+          path: |
+            src-tauri/target/release/bundle/deb/tempura*.deb
+            src-tauri/target/release/bundle/appimage/tempura*.AppImage
+            src-tauri/target/release/bundle/rpm/tempura*.rpm
+
+      # - name: Publish artifacts (macos)
+      #   if: ${{ matrix.os == 'macos-latest' }}
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: tempura-macos
+      #     path: |
+      #       src-tauri/target/release/tempura.app
+      #       src-tauri/target/release/tempura.dmg
+      #       src-tauri/target/release/tempura.app.tar.gz
+
+      # - name: Publish artifacts (windows)
+      #   if: ${{ matrix.os == 'windows-latest' }}
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: tempura-windows
+      #     path: |
+      #       src-tauri/target/release/tempura.exe
+      #       src-tauri/target/release/tempura.msi
+      #       src-tauri/target/release/tempura.msi.zip

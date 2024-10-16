@@ -3,6 +3,7 @@ import {
   writeText as toClipboard,
   readText as fromClipboard,
 } from "@tauri-apps/plugin-clipboard-manager";
+import { getDeviceMessage, getSignMessageAndPsbt } from "./parsing";
 
 let DOM: {
   addressInput: HTMLInputElement;
@@ -21,15 +22,19 @@ function isTempuraError(e: unknown): e is TempuraError {
 }
 
 function handleError(e: unknown) {
-  if (!isTempuraError(e)) {
-    DOM.message.textContent = "An unknown error occurred";
+  if (isTempuraError(e)) {
+    console.log(e.error_type, e.message);
+    DOM.message.textContent = e.error_type.concat(": ").concat(e.message);
     return;
   }
 
-  // TODO: we may not want to show the actual message directly to the user
-  // but instead log it show a generic message based on the type
-  console.log(e.error_type, e.message);
-  DOM.message.textContent = e.error_type.concat(": ").concat(e.message);
+  if (e instanceof Error) {
+    console.error(e);
+    DOM.message.textContent = e.message;
+    return;
+  }
+
+  DOM.message.textContent = "An unknown error occurred";
 }
 
 type Inputs = {
@@ -86,15 +91,14 @@ async function broadcast() {
   }
 }
 
-async function sign() {
-  const { network, psbt } = getInputs();
-  require(psbt, "PSBT");
+async function enumerate() {
+  const { network } = getInputs();
 
-  DOM.message.textContent = "Please wait...";
+  DOM.message.textContent =
+    "Please wait... (be sure to check attached devices for prompts)";
   try {
-    const signature = await commands.sign(psbt, network);
-    DOM.psbtTextArea.value = signature;
-    DOM.message.textContent = "PSBT signed successfully";
+    const response = await commands.enumerate(network);
+    DOM.message.textContent = getDeviceMessage(response);
   } catch (e: unknown) {
     handleError(e);
   }
@@ -164,6 +168,21 @@ function pastePsbtToClipboard() {
       console.log("Failed to paste PSBT from clipboard", e);
       DOM.message.textContent = "Failed to copy PSBT to clipboard";
     });
+}
+
+async function sign() {
+  const { network, psbt } = getInputs();
+  require(psbt, "PSBT");
+
+  DOM.message.textContent = "Please wait...";
+  try {
+    const response = await commands.sign(psbt, network);
+    const { message, signedPsbt } = getSignMessageAndPsbt(response);
+    DOM.psbtTextArea.value = signedPsbt;
+    DOM.message.textContent = message;
+  } catch (e: unknown) {
+    handleError(e);
+  }
 }
 
 async function sweep() {
@@ -290,6 +309,14 @@ window.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       sign();
     });
+
+    requireDomElement<HTMLButtonElement>("#enumerate-button").addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        enumerate();
+      }
+    );
   } catch (e: unknown) {
     const error =
       (e as Error) ||
