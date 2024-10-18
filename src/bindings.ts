@@ -16,6 +16,9 @@ async address(network: string, descriptor: string, electrum: string | null) : Pr
 async balance(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Balance> {
     return await TAURI_INVOKE("balance", { network, receive, change, electrum });
 },
+async estimateFee(network: string, electrum: string | null) : Promise<number> {
+    return await TAURI_INVOKE("estimate_fee", { network, electrum });
+},
 async broadcast(psbt: string, network: string, receive: string, change: string | null, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, receive, change, electrum });
 },

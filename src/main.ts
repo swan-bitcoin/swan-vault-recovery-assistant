@@ -179,6 +179,7 @@ async function sign() {
 }
 
 async function sweep() {
+  await initFeeEstimate()
   const { address, recv, change, electrum, feeRate, network } = getInputs()
   require(recv, 'Receive Descriptor')
   require(address, 'Address')
@@ -191,6 +192,17 @@ async function sweep() {
     DOM.message.textContent = 'PSBT created'
   } catch (e: unknown) {
     handleError(e)
+  }
+}
+
+async function initFeeEstimate() {
+  if (!DOM.feeRateInput.value) {
+    DOM.feeRateInput.disabled = true
+    const { electrum, network } = getInputs()
+    const feeRate = await commands.estimateFee(network, electrum)
+    DOM.feeRateInput.value = feeRate.toString()
+    DOM.feeRateInput.disabled = false
+    DOM.feeRateInput.focus()
   }
 }
 
@@ -232,6 +244,10 @@ window.addEventListener('DOMContentLoaded', () => {
       psbtTextArea,
       receiveInput,
     }
+
+    requireDomElement<HTMLInputElement>('#feerate-input').addEventListener('focus', (e) => {
+      initFeeEstimate()
+    })
 
     requireDomElement<HTMLButtonElement>('#fetch-balance-button').addEventListener('click', (e) => {
       e.preventDefault()
