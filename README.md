@@ -28,7 +28,7 @@ $ rustc --version
 rustc 1.80.0 (051478957 2024-07-21)
 ```
 
-to install:
+to install, visit [rustup.rs](http://rustup.rs) or run the following command (linux, mac, WSL):
 
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
