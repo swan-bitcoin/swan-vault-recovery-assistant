@@ -240,6 +240,20 @@ async fn broadcast(
   ))
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn estimate_fee(
+  network: String,
+  electrum: Option<String>,
+) -> Result<f32, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  Ok(resolve!(
+    bdk::blockchain::Blockchain::estimate_fee(&blockchain, 1).map(|f| f.as_sat_per_vb()),
+    TempuraErrorType::BlockchainError
+  ))
+}
+
 fn find_hwi() -> Result<String, TempuraError> {
   // Get the PATH environment variable
   let path_var = std::env::var("PATH").map_err(|_| {
@@ -379,7 +393,7 @@ async fn sweep(
 fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      address, balance, broadcast, enumerate, sign, sweep
+      address, balance, estimate_fee, broadcast, enumerate, sign, sweep
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}

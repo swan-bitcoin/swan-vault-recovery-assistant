@@ -47,8 +47,15 @@
         <div class="mb-3">
           <input class="input-default w-full" id="address-input" placeholder="destination address" />
         </div>
-        <div class="mb-5">
-          <input class="input-default w-3/12 inline-flex" id="feerate-input" type="number" placeholder="fee rate" min="5" />
+        <div id="fee-div" class="mb-5">
+          <input
+            class="input-default w-3/12 inline-flex"
+            id="feerate-input"
+            type="number"
+            step="0.01"
+            placeholder="fee rate"
+            min="5"
+          />
           <label class="label-default inline-flex" for="feerate-input">sats/vB (satoshis per virtual byte)</label>
         </div>
         <div class="mb-5">
