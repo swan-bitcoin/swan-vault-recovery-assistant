@@ -1,0 +1,10 @@
+node_modules
+
+# backend
+src-tauri
+
+# TODO: Add more here?
+dist
+
+# generated
+src/bindings.ts

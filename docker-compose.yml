@@ -2,7 +2,7 @@ networks:
   tempura-net:
     name: tempura-net
     driver: bridge
-    ipam: 
+    ipam:
       config:
         - subnet: 172.50.1.0/24
 
@@ -12,22 +12,22 @@ services:
     image: ruimarinho/bitcoin-core:23
     restart: always
     ports:
-       - 18453:18443
-       - 18454:18444
+      - 18453:18443
+      - 18454:18444
     networks:
       - tempura-net
     command: [
-      "-printtoconsole",
-      "-regtest",
-      "-listen",
-      "-txindex",
-      "-fallbackfee=0.0002",  # 20 sats per byte
-      "-rpcallowip=172.50.1.0/24",
-      "-rpcbind=tempura-bitcoind",
-      "-rpcbind=127.0.0.1",
-      "-rpcuser=tempura",
-      "-rpcpassword=hunter2",
-    ]
+        '-printtoconsole',
+        '-regtest',
+        '-listen',
+        '-txindex',
+        '-fallbackfee=0.0002', # 20 sats per byte
+        '-rpcallowip=172.50.1.0/24',
+        '-rpcbind=tempura-bitcoind',
+        '-rpcbind=127.0.0.1',
+        '-rpcuser=tempura',
+        '-rpcpassword=hunter2',
+      ]
 
   tempura-fulcrum:
     container_name: tempura-fulcrum
@@ -39,10 +39,4 @@ services:
       - 50021:50001
     networks:
       - tempura-net
-    command: [
-      "Fulcrum",
-      "-t", "0.0.0.0:50001",
-      "-b", "tempura-bitcoind:18443",
-      "-u", "tempura",
-      "-p", "hunter2",
-    ]
+    command: ['Fulcrum', '-t', '0.0.0.0:50001', '-b', 'tempura-bitcoind:18443', '-u', 'tempura', '-p', 'hunter2']
