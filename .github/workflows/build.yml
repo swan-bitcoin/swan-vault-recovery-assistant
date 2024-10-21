@@ -14,13 +14,6 @@ jobs:
         # https://github.com/actions/runner-images
         # os: [macos-latest] # TODO
         os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-linux-x86_64.tar.gz
-          - os: windows-latest
-            hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-windows-x86_64.zip
-          # - os: macos-latest
-          #   hwi_url: https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-mac-x86_64.tar.gz
 
     steps:
       - name: Checkout code
@@ -52,30 +45,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Download and extract HWI (linux)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          curl -L ${{ matrix.hwi_url }} -o hwi.tar.gz
-          tar -xzf hwi.tar.gz -C ./src-tauri
-          mv ./src-tauri/hwi ./src-tauri/hwi-x86_64-unknown-linux-gnu
-        shell: bash
-
-      - name: Download and extract HWI (macos)
-        if: ${{ matrix.os == 'macos-latest' }}
-        run: |
-          curl -L ${{ matrix.hwi_url }} -o hwi.tar.gz
-          tar -xzf hwi.tar.gz -C ./src-tauri
-          mv ./src-tauri/hwi ./src-tauri/hwi-x86_64-apple-darwin
-        shell: bash
-
-      - name: Download and extract HWI (windows)
-        if: ${{ matrix.os == 'windows-latest' }}
-        run: |
-          Invoke-WebRequest -Uri ${{ matrix.hwi_url }} -OutFile hwi.zip
-          Expand-Archive -Path hwi.zip -DestinationPath ./src-tauri
-          Rename-Item -Path ./src-tauri/hwi.exe -NewName hwi-x86_64-pc-windows-msvc.exe
-        shell: pwsh
 
       - name: Build project
         run: pnpm tauri build
