@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "typecheck": "tsc --noEmit",
     "test": "pnpm test:watch run",
     "test:watch": "vitest",
     "postinstall": "tsx scripts/fetch-hwi.ts",
