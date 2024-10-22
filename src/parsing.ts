@@ -16,6 +16,21 @@ type SignResponse = {
   error: string | null | undefined
 }
 
+export function getDevice(val: unknown): Device {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 0) {
+    throw new Error('No devices found')
+  }
+  if (devices.length > 1) {
+    throw new Error('Multiple devices found. Please unplug all but one device.')
+  }
+  const device = devices[0]
+  if (device.error) {
+    throw new Error(`Device error: ${device.error}`)
+  }
+  return device
+}
+
 export function getDeviceMessage(val: unknown): string {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
