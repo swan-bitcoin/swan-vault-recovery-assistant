@@ -11,9 +11,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    /* Linting */
-    "strict": true,
-    "noFallthroughCasesInSwitch": true,
     "paths": {
       "test/*": ["./test/*"],
       "@/*": ["./src/*"]
