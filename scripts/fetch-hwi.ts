@@ -26,7 +26,7 @@ function progressStream(totalSize: number) {
 }
 
 function makeUrl(platform: string, triple: string) {
-  const arch = triple.split('-')[0]
+  let arch = triple.split('-')[0]
   if (platform === 'win32') return `${URL_BASE}-windows-${arch}.zip`
   let hwiPlatform: string
   switch (platform) {
@@ -35,6 +35,7 @@ function makeUrl(platform: string, triple: string) {
       break
     case 'darwin':
       hwiPlatform = 'mac'
+      if (arch === 'aarch64') arch = 'arm64'
       break
     default:
       throw new Error(`Unexpected platform: ${platform}`)

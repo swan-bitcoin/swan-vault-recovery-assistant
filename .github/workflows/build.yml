@@ -12,8 +12,7 @@ jobs:
     strategy:
       matrix:
         # https://github.com/actions/runner-images
-        # os: [macos-latest] # TODO
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - name: Checkout code
@@ -60,15 +59,14 @@ jobs:
             src-tauri/target/release/bundle/appimage/tempura*.AppImage
             src-tauri/target/release/bundle/rpm/tempura*.rpm
 
-      # - name: Publish artifacts (macos)
-      #   if: ${{ matrix.os == 'macos-latest' }}
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: tempura-macos
-      #     path: |
-      #       src-tauri/target/release/tempura.app
-      #       src-tauri/target/release/tempura.dmg
-      #       src-tauri/target/release/tempura.app.tar.gz
+      - name: Publish artifacts (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tempura-macos
+          path: |
+            src-tauri/target/release/bundle/macos/tempura.app
+            src-tauri/target/release/bundle/dmg/tempura*.dmg
 
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
