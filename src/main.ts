@@ -245,7 +245,7 @@ window.addEventListener('DOMContentLoaded', () => {
       receiveInput,
     }
 
-    requireDomElement<HTMLInputElement>('#feerate-input').addEventListener('focus', (e) => {
+    requireDomElement<HTMLInputElement>('#feerate-input').addEventListener('focus', () => {
       initFeeEstimate()
     })
 
