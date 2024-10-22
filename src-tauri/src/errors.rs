@@ -77,3 +77,19 @@ macro_rules! resolve {
     $expr.map_err(|e| TempuraError::new($error_type, &e.to_string()))?
   };
 }
+
+#[macro_export]
+macro_rules! resolve_io {
+  ($expr:expr) => {{
+    let o = $expr.output().map_err(|e| {
+      if e.kind() == std::io::ErrorKind::NotFound {
+        return TempuraError::new(
+          TempuraErrorType::CommandError,
+          "HWI executable not found in PATH or working directory.",
+        );
+      }
+      TempuraError::new(TempuraErrorType::CommandError, &e.to_string())
+    })?;
+    resolve!(String::from_utf8(o.stdout), TempuraErrorType::ParseError)
+  }};
+}
