@@ -6,9 +6,24 @@ import { createWriteStream } from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as tar from 'tar'
+import progress from 'progress-stream'
 
 const HWI_VERSION = '3.1.0'
 const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
+const MIB_SIZE = 1024 * 1024
+
+function progressStream(totalSize: number) {
+  const progressStream = progress({
+    length: totalSize,
+    time: 10000 /* 10 seconds */,
+  })
+  progressStream.on('progress', (progress) => {
+    const transferred = (progress.transferred / MIB_SIZE).toFixed(2)
+    const total = (progress.length / MIB_SIZE).toFixed(2)
+    console.log(`downloading... ${transferred} / ${total} MiB (${progress.percentage.toFixed(2)}%)`)
+  })
+  return progressStream
+}
 
 function makeUrl(platform: string, triple: string) {
   const arch = triple.split('-')[0]
@@ -53,7 +68,13 @@ async function main() {
   // tmpdir in destination so rename is atomic and never cross-device
   const tmpdir = await fs.mkdtemp(path.join('src-tauri', '.tmphwi-'))
   try {
-    const hwiStream = await fetch(url).then((r) => Readable.fromWeb(r.body as any).pipe(extractor(platform, tmpdir)))
+    console.log(`downloading HWI from ${url} ...`)
+    const hwiStream = await fetch(url).then((r) => {
+      const size = Number(r.headers.get('content-length'))
+      return Readable.fromWeb(r.body as any)
+        .pipe(progressStream(size))
+        .pipe(extractor(platform, tmpdir))
+    })
     await new Promise((resolve) => hwiStream.on('finish', resolve))
     await fs.rename(path.join(tmpdir, 'hwi'), hwiFile)
   } finally {
