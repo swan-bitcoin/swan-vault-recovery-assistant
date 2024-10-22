@@ -1,5 +1,8 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+// prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 
 use std::process::Command;
 use std::str::FromStr;
@@ -97,6 +100,74 @@ impl PsbtDetails {
  * utilities
  */
 
+fn find_hwi() -> Result<String, TempuraError> {
+  let path_var = std::env::var("PATH").map_err(|_| {
+    TempuraError::new(
+      TempuraErrorType::CommandError,
+      "Failed to get PATH environment variable",
+    )
+  })?;
+
+  // split PATH into directories, add the binary directory and the cargo target directory to the front
+  // the binary directory will be searched first, and will usually work with local builds and installed packages/msi.
+  //   NOTE: this is better than searching the current_dir, as MSI-installed binaries consider the MSI's build directory as the current_dir at runtime.
+  // the target directory is where tauri places the hwi executable when building, and will work for local builds (even custom).
+  let mut paths: Vec<&str> = path_var
+    .split(if cfg!(windows) { ';' } else { ':' })
+    .collect();
+  let target_path = std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| {
+    let build_type = {
+      #[cfg(debug_assertions)]
+      {
+        "debug"
+      }
+      #[cfg(not(debug_assertions))]
+      {
+        "release"
+      }
+    };
+
+    #[cfg(target_os = "windows")]
+    {
+      format!(".\\target\\{}", build_type)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+      format!("./target/{}", build_type)
+    }
+  });
+  paths.insert(0, &target_path);
+
+  let mut exe_parent_path: String = String::from(".");
+  if let Ok(exe_path) = std::env::current_exe() {
+    if let Some(parent_dir) = exe_path.parent() {
+      exe_parent_path = parent_dir.to_string_lossy().into_owned();
+    }
+  }
+  paths.insert(0, &exe_parent_path);
+
+  // search each directory for the executable
+  let hwi_name = if cfg!(windows) { "hwi.exe" } else { "hwi" };
+  let hwi_path = paths
+    .iter()
+    .map(|dir| std::path::Path::new(dir).join(hwi_name))
+    .find(|path| {
+      path.exists()
+        && std::fs::metadata(path)
+          .map(|meta| meta.is_file())
+          .unwrap_or(false)
+    })
+    .ok_or_else(|| {
+      TempuraError::new(
+        TempuraErrorType::CommandError,
+        "hwi executable not found in PATH",
+      )
+    })?;
+
+  Ok(hwi_path.to_string_lossy().into_owned())
+}
+
 fn get_blockchain(
   network: Network,
   electrum: Option<String>,
@@ -118,6 +189,19 @@ fn get_blockchain(
 
   let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
   Ok(ElectrumBlockchain::from(client))
+}
+
+fn get_hwi() -> Result<Command, TempuraError> {
+  let hwi_path = find_hwi()?;
+
+  #[allow(unused_mut)]
+  let mut command = Command::new(hwi_path);
+  #[cfg(target_os = "windows")]
+  {
+    const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
+    command.creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW);
+  }
+  Ok(command)
 }
 
 fn get_wallet(
@@ -242,10 +326,7 @@ async fn broadcast(
 
 #[tauri::command]
 #[specta::specta]
-async fn estimate_fee(
-  network: String,
-  electrum: Option<String>,
-) -> Result<f32, TempuraError> {
+async fn estimate_fee(network: String, electrum: Option<String>) -> Result<f32, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   Ok(resolve!(
@@ -254,50 +335,15 @@ async fn estimate_fee(
   ))
 }
 
-fn find_hwi() -> Result<String, TempuraError> {
-  // Get the PATH environment variable
-  let path_var = std::env::var("PATH").map_err(|_| {
-    TempuraError::new(
-      TempuraErrorType::CommandError,
-      "Failed to get PATH environment variable",
-    )
-  })?;
-
-  // Split the PATH into directories
-  let mut paths: Vec<&str> = path_var
-    .split(if cfg!(windows) { ';' } else { ':' })
-    .collect();
-  paths.insert(0, ".");
-
-  // Check each directory for the executable
-  let hwi_path = paths
-    .iter()
-    .map(|dir| std::path::Path::new(dir).join("hwi"))
-    .find(|path| {
-      path.exists()
-        && std::fs::metadata(path)
-          .map(|meta| meta.is_file())
-          .unwrap_or(false)
-    })
-    .ok_or_else(|| {
-      TempuraError::new(
-        TempuraErrorType::CommandError,
-        "hwi executable not found in PATH",
-      )
-    })?;
-
-  Ok(hwi_path.to_string_lossy().into_owned())
-}
-
 #[tauri::command]
 #[specta::specta]
 async fn enumerate(network: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
-  let hwi_path = find_hwi()?;
+  let mut command = get_hwi()?;
 
   let output = resolve!(
-    Command::new(hwi_path)
+    command
       .args(["--chain", network.as_str(), "enumerate"])
       .output(),
     TempuraErrorType::CommandError
@@ -316,10 +362,10 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
-  let hwi_path = find_hwi()?;
+  let mut command = get_hwi()?;
 
   let output = resolve!(
-    Command::new(hwi_path)
+    command
       .args([
         "--chain",
         network.as_str(),
@@ -393,7 +439,13 @@ async fn sweep(
 fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
-      address, balance, estimate_fee, broadcast, enumerate, sign, sweep
+      address,
+      balance,
+      estimate_fee,
+      broadcast,
+      enumerate,
+      sign,
+      sweep
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
