@@ -146,6 +146,18 @@ function copyPsbtToClipboard() {
     })
 }
 
+async function estimateFee() {
+  DOM.message.textContent = 'Please wait...'
+  try {
+    const { electrum, network } = getInputs()
+    const feeRate = await commands.estimateFee(network, electrum)
+    DOM.feeRateInput.value = feeRate.toString()
+    DOM.message.textContent = 'fee estimate retrieved successfully'
+  } catch (e: unknown) {
+    handleError(e)
+  }
+}
+
 function pastePsbtToClipboard() {
   fromClipboard()
     .then((psbt) => {
@@ -181,7 +193,6 @@ async function sign() {
 }
 
 async function sweep() {
-  await initFeeEstimate()
   const { address, recv, change, electrum, feeRate, network } = getInputs()
   require(recv, 'Receive Descriptor')
   require(address, 'Address')
@@ -194,17 +205,6 @@ async function sweep() {
     DOM.message.textContent = 'PSBT created'
   } catch (e: unknown) {
     handleError(e)
-  }
-}
-
-async function initFeeEstimate() {
-  if (!DOM.feeRateInput.value) {
-    DOM.feeRateInput.disabled = true
-    const { electrum, network } = getInputs()
-    const feeRate = await commands.estimateFee(network, electrum)
-    DOM.feeRateInput.value = feeRate.toString()
-    DOM.feeRateInput.disabled = false
-    DOM.feeRateInput.focus()
   }
 }
 
@@ -247,8 +247,8 @@ window.addEventListener('DOMContentLoaded', () => {
       receiveInput,
     }
 
-    requireDomElement<HTMLInputElement>('#feerate-input').addEventListener('focus', () => {
-      initFeeEstimate()
+    requireDomElement<HTMLInputElement>('#estimate-button').addEventListener('click', (e) => {
+      estimateFee()
     })
 
     requireDomElement<HTMLButtonElement>('#fetch-balance-button').addEventListener('click', (e) => {
