@@ -25,28 +25,52 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Install Node.js
-        if: ${{ matrix.os != 'windows-latest' }}
-        uses: actions/setup-node@v3
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'pnpm'
 
       - name: Install system dependencies (linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
-      # - name: Install system dependencies (macos)
-      #   if: ${{ matrix.os == 'macos-latest' }}
-      #   run: brew install gtk+3 webkit2gtk
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Restore cargo cache
+        id: restore-cargo-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+            !src-tauri/target/release/hwi
+            !src-tauri/target/release/tempura
+            !src-tauri/target/release/bundle
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build project
         run: pnpm tauri build
+
+      - name: Save cargo cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+            !src-tauri/target/release/hwi
+            !src-tauri/target/release/tempura
+            !src-tauri/target/release/bundle
+          key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
         # https://jonaskruckenberg.github.io/tauri-docs-wip/building/building-your-application.html#packaging-formats
       - name: Publish artifacts (linux)
