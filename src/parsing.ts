@@ -69,18 +69,21 @@ function parseJson(val: unknown): unknown {
   return parsed
 }
 
+const isDevice = (item: unknown): item is Device => {
+  if (typeof item !== 'object' || item === null) return false
+
+  const device = item as Device
+  return (
+    typeof device.type === 'string' &&
+    typeof device.model === 'string' &&
+    typeof device.path === 'string' &&
+    typeof device.needs_pin_sent === 'boolean' &&
+    typeof device.needs_passphrase_sent === 'boolean'
+  )
+}
+
 function parseDeviceResponse(val: unknown): DeviceResponse {
   const parsed = parseJson(val)
-
-  const isDevice = (item: any): item is Device => {
-    return (
-      typeof item.type === 'string' &&
-      typeof item.model === 'string' &&
-      typeof item.path === 'string' &&
-      typeof item.needs_pin_sent === 'boolean' &&
-      typeof item.needs_passphrase_sent === 'boolean'
-    )
-  }
 
   if (!Array.isArray(parsed) || !parsed.every((item) => isDevice(item))) {
     throw new Error(`Invalid device list found when enumerating devices.\nresponse: ${val}`)
@@ -88,12 +91,14 @@ function parseDeviceResponse(val: unknown): DeviceResponse {
   return parsed
 }
 
+const isSignResponse = (item: unknown): item is SignResponse => {
+  if (typeof item !== 'object' || item === null) return false
+  const signResponse = item as SignResponse
+  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+}
+
 function parseSignResponse(val: unknown): SignResponse {
   const parsed = parseJson(val)
-
-  const isSignResponse = (item: any): item is SignResponse => {
-    return typeof item.psbt === 'string' && typeof item.signed === 'boolean'
-  }
 
   if (typeof parsed !== 'object' || !isSignResponse(parsed)) {
     throw new Error(`Invalid response when attempting to sign PSBT.\nresponse: ${val}`)
