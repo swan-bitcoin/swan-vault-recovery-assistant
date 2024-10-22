@@ -18,17 +18,17 @@
 
       <form id="descriptor-form" class="flex-col">
         <div class="mb-3">
-          <input class="input-default w-full" id="receive-input" placeholder="receive descriptor..." />
+          <input class="w-full" id="receive-input" type="text" placeholder="receive descriptor..." />
         </div>
         <div class="mb-3">
-          <input class="input-default w-full" id="change-input" placeholder="(optional) change descriptor..." />
+          <input class="w-full" id="change-input" type="text" placeholder="(optional) change descriptor..." />
         </div>
         <div role="group" class="mb-5">
-          <button type="button" class="btn btn-default" id="fetch-balance-button">Fetch Balance</button>
-          <button type="button" class="btn btn-default" id="new-address-button">New Address</button>
+          <button type="button" class="btn-default" id="fetch-balance-button">Fetch Balance</button>
+          <button type="button" class="btn-default" id="new-address-button">New Address</button>
         </div>
         <div class="mb-3">
-          <input class="input-default w-full" id="electrum-input" placeholder="(optional) custom electrum server" />
+          <input class="w-full" id="electrum-input" type="text" placeholder="(optional) custom electrum server" />
         </div>
         <div class="mb-5">
           <span class="label-default">Network:</span>
@@ -45,7 +45,7 @@
           >
         </div>
         <div class="mb-3">
-          <input class="input-default w-full" id="address-input" placeholder="destination address" />
+          <input class="w-full" id="address-input" type="text" placeholder="destination address" />
         </div>
         <div id="fee-div" class="mb-5">
           <input
@@ -59,19 +59,19 @@
           <label class="label-default inline-flex" for="feerate-input">sats/vB (satoshis per virtual byte)</label>
         </div>
         <div class="mb-5">
-          <button class="btn btn-default" type="button" id="sweep-button">Create sweep PSBT</button>
+          <button class="btn-default" type="button" id="sweep-button">Create sweep PSBT</button>
         </div>
         <div class="mb-3">
-          <textarea class="input-default w-full h-40" id="psbt-textarea" placeholder="psbt..." wrap="soft"></textarea>
+          <textarea class="w-full h-40" id="psbt-textarea" placeholder="psbt..." wrap="soft"></textarea>
         </div>
         <div class="mb-5" role="group">
-          <button class="btn btn-default" type="button" id="copy-psbt-button">Copy PSBT to clipboard</button>
-          <button class="btn btn-default" type="button" id="paste-psbt-button">Paste PSBT from clipboard</button>
+          <button class="btn-default" type="button" id="copy-psbt-button">Copy PSBT to clipboard</button>
+          <button class="btn-default" type="button" id="paste-psbt-button">Paste PSBT from clipboard</button>
         </div>
         <div class="mb-5" role="group">
-          <button class="btn btn-default" type="button" id="enumerate-button">Check Devices</button>
-          <button class="btn btn-destructive" type="button" id="sign-message-button">Sign</button>
-          <button class="btn btn-destructive" type="button" id="broadcast-button">Broadcast</button>
+          <button class="btn-default" type="button" id="enumerate-button">Check Devices</button>
+          <button class="btn-warning" type="button" id="sign-message-button">Sign</button>
+          <button class="btn-destructive" type="button" id="broadcast-button">Broadcast</button>
         </div>
       </form>
     </div>
