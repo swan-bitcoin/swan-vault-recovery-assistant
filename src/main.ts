@@ -39,7 +39,7 @@ type Inputs = {
   recv: string
   change: string | null
   electrum: string | null
-  feeRate: number
+  feeRate: number | null
   network: string
   psbt: string
 }
@@ -49,7 +49,7 @@ function getInputs(): Inputs {
   const recv = DOM.receiveInput.value.trim()
   const change = DOM.changeInput?.value.trim() || null
   const electrum = DOM.electrumInput?.value.trim() || null
-  const feeRate = Number(DOM.feeRateInput?.value.trim())
+  const feeRate = Number(DOM.feeRateInput?.value.trim()) || null
   const network = Array.from(DOM.networkRadios).find((radio) => radio.checked)!.value
   const psbt = DOM.psbtTextArea.value.trim()
 
@@ -146,6 +146,18 @@ function copyPsbtToClipboard() {
     })
 }
 
+async function estimateFee() {
+  DOM.message.textContent = 'Please wait...'
+  try {
+    const { electrum, network } = getInputs()
+    const feeRate = await commands.estimateFee(network, electrum)
+    DOM.feeRateInput.value = feeRate.toString()
+    DOM.message.textContent = 'fee estimate retrieved successfully'
+  } catch (e: unknown) {
+    handleError(e)
+  }
+}
+
 function pastePsbtToClipboard() {
   fromClipboard()
     .then((psbt) => {
@@ -181,30 +193,20 @@ async function sign() {
 }
 
 async function sweep() {
-  await initFeeEstimate()
-  const { address, recv, change, electrum, feeRate, network } = getInputs()
+  const inputs = getInputs()
+  const { address, recv, change, electrum, network } = inputs
+  let { feeRate } = inputs
   require(recv, 'Receive Descriptor')
   require(address, 'Address')
-  require(feeRate, 'Fee Rate')
 
   DOM.message.textContent = 'Please wait...'
   try {
+    feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
     DOM.message.textContent = 'PSBT created'
   } catch (e: unknown) {
     handleError(e)
-  }
-}
-
-async function initFeeEstimate() {
-  if (!DOM.feeRateInput.value) {
-    DOM.feeRateInput.disabled = true
-    const { electrum, network } = getInputs()
-    const feeRate = await commands.estimateFee(network, electrum)
-    DOM.feeRateInput.value = feeRate.toString()
-    DOM.feeRateInput.disabled = false
-    DOM.feeRateInput.focus()
   }
 }
 
@@ -247,8 +249,9 @@ window.addEventListener('DOMContentLoaded', () => {
       receiveInput,
     }
 
-    requireDomElement<HTMLInputElement>('#feerate-input').addEventListener('focus', () => {
-      initFeeEstimate()
+    requireDomElement<HTMLInputElement>('#estimate-button').addEventListener('click', (e) => {
+      e.preventDefault()
+      estimateFee()
     })
 
     requireDomElement<HTMLButtonElement>('#fetch-balance-button').addEventListener('click', (e) => {

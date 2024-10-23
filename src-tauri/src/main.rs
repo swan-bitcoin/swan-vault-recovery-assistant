@@ -307,10 +307,25 @@ async fn broadcast(
 async fn estimate_fee(network: String, electrum: Option<String>) -> Result<f32, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
-  Ok(resolve!(
-    bdk::blockchain::Blockchain::estimate_fee(&blockchain, 1).map(|f| f.as_sat_per_vb()),
-    TempuraErrorType::BlockchainError
-  ))
+
+  // BDK may panic here when the electrum server returns a value that it doesn't expect.
+  let result = std::panic::catch_unwind(|| {
+    bdk::blockchain::Blockchain::estimate_fee(&blockchain, 1).map(|f| f.as_sat_per_vb())
+  });
+
+  match result {
+    Ok(inner_result) => match inner_result {
+      Ok(fee) => Ok(fee),
+      Err(e) => Err(TempuraError::new(
+        TempuraErrorType::BlockchainError,
+        &e.to_string(),
+      )),
+    },
+    Err(_) => Err(TempuraError::new(
+      TempuraErrorType::BlockchainError,
+      "An unexpected error occurred while estimating the fee",
+    )),
+  }
 }
 
 #[tauri::command]
