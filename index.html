@@ -47,17 +47,16 @@
         <div class="mb-3">
           <input class="w-full" id="address-input" type="text" placeholder="destination address" />
         </div>
-        <div id="fee-div" class="mb-5">
+        <div id="fee-div" class="mb-5 flex items-center">
           <input
-            class="input-default w-3/12 inline-flex"
+            class="input-default w-2/3 inline-flex"
             id="feerate-input"
             type="number"
             step="0.01"
-            placeholder="fee rate"
+            placeholder="(optional) fee rate sats/vB"
             min="5"
           />
-          <button class="btn-default" type="button" id="estimate-button">Estimate Fee</button>
-          <label class="label-default inline-flex" for="feerate-input">sats/vB (satoshis per virtual byte)</label>
+          <button class="btn-default w-1/3" type="button" id="estimate-button">Suggest A Fee</button>
         </div>
         <div class="mb-5">
           <button class="btn-default" type="button" id="sweep-button">Create Sweep PSBT</button>

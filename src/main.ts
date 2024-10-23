@@ -39,7 +39,7 @@ type Inputs = {
   recv: string
   change: string | null
   electrum: string | null
-  feeRate: number
+  feeRate: number | null
   network: string
   psbt: string
 }
@@ -49,7 +49,7 @@ function getInputs(): Inputs {
   const recv = DOM.receiveInput.value.trim()
   const change = DOM.changeInput?.value.trim() || null
   const electrum = DOM.electrumInput?.value.trim() || null
-  const feeRate = Number(DOM.feeRateInput?.value.trim())
+  const feeRate = Number(DOM.feeRateInput?.value.trim()) || null
   const network = Array.from(DOM.networkRadios).find((radio) => radio.checked)!.value
   const psbt = DOM.psbtTextArea.value.trim()
 
@@ -193,13 +193,15 @@ async function sign() {
 }
 
 async function sweep() {
-  const { address, recv, change, electrum, feeRate, network } = getInputs()
+  const inputs = getInputs()
+  const { address, recv, change, electrum, network } = inputs
+  let { feeRate } = inputs
   require(recv, 'Receive Descriptor')
   require(address, 'Address')
-  require(feeRate, 'Fee Rate')
 
   DOM.message.textContent = 'Please wait...'
   try {
+    feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
     DOM.message.textContent = 'PSBT created'
@@ -248,6 +250,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     requireDomElement<HTMLInputElement>('#estimate-button').addEventListener('click', (e) => {
+      e.preventDefault()
       estimateFee()
     })
 
