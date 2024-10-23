@@ -25,8 +25,8 @@ async broadcast(psbt: string, network: string, receive: string, change: string |
 async enumerate(network: string) : Promise<string> {
     return await TAURI_INVOKE("enumerate", { network });
 },
-async sign(psbt: string, network: string) : Promise<string> {
-    return await TAURI_INVOKE("sign", { psbt, network });
+async sign(psbt: string, network: string, deviceType: string) : Promise<string> {
+    return await TAURI_INVOKE("sign", { psbt, network, deviceType });
 },
 async sweep(address: string, feeRate: number, network: string, receive: string, change: string | null, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, receive, change, electrum });

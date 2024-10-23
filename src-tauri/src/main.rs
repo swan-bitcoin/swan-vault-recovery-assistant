@@ -329,7 +329,7 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 
 #[tauri::command]
 #[specta::specta]
-async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
+async fn sign(psbt: String, network: String, device_type: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
   let mut command = get_hwi()?;
@@ -338,7 +338,7 @@ async fn sign(psbt: String, network: String) -> Result<String, TempuraError> {
     "--chain",
     network.as_str(),
     "--device-type",
-    "jade", // TODO: assume jade for now
+    &device_type,
     "signtx",
     &psbt
   ])))

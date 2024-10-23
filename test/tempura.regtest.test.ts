@@ -26,7 +26,7 @@ import * as bip39 from 'bip39'
  * unfunded wallet as well. You can use the descriptors and unfunded address to test spending.
  */
 const STATIC_WALLET_MNEMONIC: string | undefined =
-  'moment cream pizza cube crack video half organ finger piano eternal define'
+  'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine'
 const STATIC_WALLET_XPRV: string | undefined = undefined
 
 const BASE_URL: string = 'http://localhost:3105'

@@ -1,6 +1,6 @@
 import { commands, type TempuraError } from './bindings'
 import { writeText as toClipboard, readText as fromClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { getDeviceMessage, getSignMessageAndPsbt } from './parsing'
+import { getDevice, getDeviceMessage, getSignMessageAndPsbt } from './parsing'
 
 let DOM: {
   addressInput: HTMLInputElement
@@ -169,7 +169,9 @@ async function sign() {
 
   DOM.message.textContent = 'Please wait...'
   try {
-    const response = await commands.sign(psbt, network)
+    const enumeration = await commands.enumerate(network)
+    const device = getDevice(enumeration)
+    const response = await commands.sign(psbt, network, device.type)
     const { message, signedPsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = signedPsbt
     DOM.message.textContent = message

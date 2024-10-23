@@ -17,6 +17,14 @@ Need to recover your funds from another wallet? Tempura can help.
 1. The rust backend must be completely stateless.
 2. The frontend maintains state only in DOM components; a user is always able to see what data is being used.
 
+## Device Support
+
+Tempura uses [bitcoin-core's HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs). This means that, in theory, any device supported by HWI is supported by tempura.
+
+"In theory, theory and practice are the same. In practice, they are not."
+
+Tempura has been well tested with Jade, and has been tested successfully with Trezor. Please report any issues.
+
 ## Setup Instructions for Developers
 
 ### Prereqs
