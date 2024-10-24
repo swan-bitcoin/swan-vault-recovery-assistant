@@ -16,6 +16,8 @@ use network::{HwiNetwork, Network};
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
 use specta::Type;
+#[cfg(debug_assertions)] // <- Only use on non-release builds
+use specta_typescript::Typescript;
 
 // bdk and bitcoin imports
 use bdk;
