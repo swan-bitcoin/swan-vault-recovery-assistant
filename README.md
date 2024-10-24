@@ -113,3 +113,9 @@ As of 08/13/2024, (upgrade to Tauri 2.0-rc3), the dependency list is out of date
 ```bash
 sudo apt-get update && sudo apt-get install javascriptcoregtk-4.1 libsoup-3.0 webkit2gtk-4.1 -y
 ```
+
+## Pull Request Labels
+
+If modifying the bundling process, verify on all platforms by adding the `all
+bundles` label to your pull request. Otherwise CI will only bundle the MAC
+bundle (because its fastest) to check the release build.
