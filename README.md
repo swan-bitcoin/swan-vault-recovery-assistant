@@ -73,6 +73,27 @@ $ pnpm install
 (venv) $ pnpm tauri dev
 ```
 
+## Simulating a 'regtest' bitcoin network
+
+Verify you have docker installed
+
+```bash
+$ docker -v
+Docker version 24.0.7, build 24.0.7
+```
+
+A network simulation script is provided in the `/test` directory. It can be ran with
+
+```bash
+$ pnpm simnet
+```
+
+the script will automatically initialize the `docker compose` stack and bring the bitcoin network up to a healthy state for sending transactions and estimating fees. The script may take up to a minute to prepare the network the first time it is ran.
+
+The `~~ NETWORK READY ~~` message will be printed when the setup is done. A couple wallet descriptors will be generated above this message; one funded wallet and one unfunded wallet. The funded wallet's mnemonic will be printed as well so you can test with any PSBT signing software or a physical hardware device. Make sure the hardware device is initialized in test mode and DO NOT USE THIS MNEMONIC WITH A REAL BITCOIN WALLET!
+
+If you would like to reset the network (destroying all blocks/transactions in the process), simply run `docker compose down` when the simnet script is not running.
+
 ## Usage Instructions
 
 Paste one or both descriptors in and hit 'Fetch Balance'. Other features are available the furter down you go, with requirements listed between them. More details coming soon.

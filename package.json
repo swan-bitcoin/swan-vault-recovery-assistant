@@ -13,7 +13,9 @@
     "test": "pnpm test:watch run",
     "test:watch": "vitest",
     "postinstall": "tsx scripts/fetch-hwi.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "simnet": "tsx test/scripts/simulate-network.ts",
+    "simulate-network": "pnpm simnet"
   },
   "dependencies": {
     "@tauri-apps/api": ">=2.0.0",

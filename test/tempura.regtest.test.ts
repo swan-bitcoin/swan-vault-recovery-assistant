@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { afterAll, beforeAll, describe, test, expect, it } from 'vitest'
-import RegtestClient from './regtest.client'
+import RegtestClient from './util/regtest.client'
 import bitcoin, { networks } from 'bitcoinjs-lib'
 import prand from 'pure-rand'
 import { BIP32Factory } from 'bip32'
@@ -65,10 +65,6 @@ beforeAll(
   60 * 1000 // 60 seconds
 )
 
-// afterAll(async () => {
-//   await stopServer();
-// });
-
 test('regtest client', async () => {
   const info = await client.getBlockchainInfo()
   expect(info).toBeTruthy()
@@ -78,86 +74,3 @@ test('regtest client', async () => {
 //
 // test helpers and tests
 //
-
-type Key = {
-  master: {
-    fingerprint: string
-    tprv: string
-  }
-  derived: {
-    tprv: string
-    tpub: string
-  }
-}
-
-const staticKey = (): Key => {
-  let master
-  if (STATIC_WALLET_MNEMONIC) {
-    master = bip32.fromSeed(bip39.mnemonicToSeedSync(STATIC_WALLET_MNEMONIC), bitcoin.networks.regtest)
-  } else if (STATIC_WALLET_XPRV) {
-    master = bip32.fromBase58(STATIC_WALLET_XPRV, bitcoin.networks.regtest)
-  } else {
-    throw new Error('no mnemonic or xprv set')
-  }
-
-  const derived = master.derivePath(DERIVATION_PATH_FORMAT_SINGLE_TICK)
-  return {
-    master: {
-      fingerprint: master.fingerprint.toString('hex'),
-      tprv: master.toBase58(),
-    },
-    derived: {
-      tprv: derived.toBase58(),
-      tpub: derived.neutered().toBase58(),
-    },
-  }
-}
-
-const generateKey = (): Key => {
-  // we intentionally do not want to use prand here because we need unique keys on each run!
-  const seed = bitcoin.crypto.sha256(Buffer.from(Math.random().toString()))
-  const master = bip32.fromSeed(seed, bitcoin.networks.regtest)
-  const derived = master.derivePath(DERIVATION_PATH_FORMAT_SINGLE_TICK)
-  return {
-    master: {
-      fingerprint: master.fingerprint.toString('hex'),
-      tprv: master.toBase58(),
-    },
-    derived: {
-      tprv: derived.toBase58(),
-      tpub: derived.neutered().toBase58(),
-    },
-  }
-}
-
-const getAddress = async (key: Key, path: string): Promise<string> => {
-  const pk = bip32.fromBase58(key.derived.tpub, bitcoin.networks.regtest)
-  const dpk = pk.derivePath(path)
-  const { address } = bitcoin.payments.p2wpkh({
-    pubkey: dpk.publicKey,
-    network: bitcoin.networks.regtest,
-  })
-  return address!
-}
-
-test('generate some keys, create descriptors, fund one wallet', async () => {
-  log('-----------------------------------------')
-  const key = staticKey()
-  const pub = `wpkh([${key.master.fingerprint}/84'/1'/0']${key.derived.tpub}/0/*)`
-  const prv = `wpkh([${key.master.fingerprint}/84'/1'/0']${key.derived.tprv}/0/*)`
-  log('funded wallet descriptor (public):', pub)
-  log('funded wallet descriptor (private):', prv)
-  const address = await getAddress(key, '0/0')
-  log('address', address)
-  log('-----------------------------------------')
-  await client.sendToAddressAndConfirm(address!, 10)
-
-  const key2 = generateKey()
-  const pub2 = `wpkh([${key2.master.fingerprint}/84'/1'/0']${key2.derived.tpub}/0/*)`
-  const prv2 = `wpkh([${key2.master.fingerprint}/84'/1'/0']${key2.derived.tprv}/0/*)`
-  log('non-funded descriptor (public):', pub2)
-  log('non-funded descriptor (private):', prv2)
-  const address2 = await getAddress(key2, '0/0')
-  log('address', address2)
-  log('-----------------------------------------')
-})
