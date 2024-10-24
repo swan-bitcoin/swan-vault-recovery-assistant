@@ -1,6 +1,7 @@
 import { commands, type TempuraError } from './bindings'
 import { writeText as toClipboard, readText as fromClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { getDevice, getDeviceMessage, getSignMessageAndPsbt } from './parsing'
+import { Balance, Success } from './components'
 
 let DOM: {
   addressInput: HTMLInputElement
@@ -105,12 +106,7 @@ async function getBalance() {
   DOM.message.textContent = 'Please wait...'
   try {
     const balance = await commands.balance(network, recv, change, electrum)
-    DOM.message.textContent = 'confirmed: '
-      .concat(balance.confirmed)
-      .concat(' sats')
-      .concat(' unconfirmed: ')
-      .concat(balance.untrusted_pending)
-      .concat(' sats')
+    DOM.message.innerHTML = Balance({ confirmed: balance.confirmed, unconfirmed: balance.untrusted_pending })
   } catch (e: unknown) {
     handleError(e)
   }
@@ -152,7 +148,7 @@ async function estimateFee() {
     const { electrum, network } = getInputs()
     const feeRate = await commands.estimateFee(network, electrum)
     DOM.feeRateInput.value = feeRate.toString()
-    DOM.message.textContent = 'fee estimate retrieved successfully'
+    DOM.message.innerHTML = Success('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -204,7 +200,7 @@ async function sweep() {
     feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
-    DOM.message.textContent = 'PSBT created'
+    DOM.message.innerHTML = Success('PSBT created!')
   } catch (e: unknown) {
     handleError(e)
   }
