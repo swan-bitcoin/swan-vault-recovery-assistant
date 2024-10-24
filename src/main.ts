@@ -148,7 +148,7 @@ async function estimateFee() {
     const { electrum, network } = getInputs()
     const feeRate = await commands.estimateFee(network, electrum)
     DOM.feeRateInput.value = feeRate.toString()
-    DOM.message.textContent = 'fee estimate retrieved successfully'
+    DOM.message.innerHTML = Success('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
