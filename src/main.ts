@@ -105,12 +105,15 @@ async function getBalance() {
   DOM.message.textContent = 'Please wait...'
   try {
     const balance = await commands.balance(network, recv, change, electrum)
-    DOM.message.textContent = 'confirmed: '
-      .concat(balance.confirmed)
-      .concat(' sats')
-      .concat(' unconfirmed: ')
-      .concat(balance.untrusted_pending)
-      .concat(' sats')
+    DOM.message.innerHTML = `<h1>Your Balance</h1>
+      <div class="stat">
+        <div class="stat-value">${balance.confirmed} sats</div>
+        <div class="stat-desc">Confirmed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">${balance.untrusted_pending} sats</div>
+        <div class="stat-desc">Unconfirmed</div>
+      </div>`
   } catch (e: unknown) {
     handleError(e)
   }
