@@ -4,6 +4,6 @@ module.exports = {
   content: ['./src/**/*.ts', 'index.html'],
   plugins: [require('tailwindcss-animate'), require('daisyui')],
   daisyui: {
-    themes: ['halloween'],
+    themes: ['halloween', 'dark', 'business', 'bumblebee', 'coffee', 'retro'],
   },
 }
