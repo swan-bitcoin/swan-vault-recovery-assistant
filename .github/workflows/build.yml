@@ -19,7 +19,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Rust
-        if: ${{ matrix.os != 'windows-latest' }}
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -51,9 +50,8 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
-            !src-tauri/target/release/tempura
             !src-tauri/target/release/bundle
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
       - name: Build project
         run: pnpm tauri build
@@ -68,7 +66,6 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
-            !src-tauri/target/release/tempura
             !src-tauri/target/release/bundle
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
