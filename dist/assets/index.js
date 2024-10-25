@@ -167,6 +167,16 @@ function getDevice(val) {
   }
   return device
 }
+function getDevicePrompt(val) {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 1) {
+    return 'You may want to sign with this device next...'
+  }
+  if (devices.length === 0) {
+    return 'Make sure your device is connected. Perhaps try a different cable.'
+  }
+  return 'Make sure only one device is connected.'
+}
 function getDeviceMessage(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -289,18 +299,26 @@ async function broadcast() {
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
+    const userBubble = createConversationBubble('Broadcast the transaction from this PSBT', true)
+    DOM.conversation.appendChild(userBubble)
     await commands.broadcast(psbt, network, recv, change, electrum)
-    DOM.tempMessage.textContent = 'Broadcast successful!'
+    const tempuraBubble = createConversationBubble('Broadcast successful!')
+    DOM.conversation.appendChild(tempuraBubble)
+    DOM.tempMessage.textContent = 'Anything else?'
   } catch (e) {
     handleError(e)
   }
 }
 async function enumerate() {
   const { network } = getInputs()
-  DOM.tempMessage.textContent = 'Please wait... (be sure to check attached devices for prompts)'
+  DOM.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
+    const userBubble = createConversationBubble('Find my device', true)
+    DOM.conversation.appendChild(userBubble)
     const response = await commands.enumerate(network)
-    DOM.tempMessage.textContent = getDeviceMessage(response)
+    const tempuraBubble = createConversationBubble(getDeviceMessage(response))
+    DOM.conversation.appendChild(tempuraBubble)
+    DOM.tempMessage.textContent = getDevicePrompt(response)
   } catch (e) {
     handleError(e)
   }
@@ -385,14 +403,19 @@ function pastePsbtToClipboard() {
 async function sign() {
   const { network, psbt } = getInputs()
   require2(psbt, 'PSBT')
-  DOM.tempMessage.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
+    const userBubble = createConversationBubble('Sign this transaction (PSBT)', true)
+    DOM.conversation.appendChild(userBubble)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
+    DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
     const { message, signedPsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = signedPsbt
-    DOM.tempMessage.textContent = message
+    DOM.tempMessage.textContent = 'Sign again or broadcast next?'
+    const tempuraBubble = createConversationBubble(message)
+    DOM.conversation.appendChild(tempuraBubble)
   } catch (e) {
     handleError(e)
   }
@@ -405,10 +428,14 @@ async function sweep() {
   require2(address, 'Address')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
+    const userBubble = createConversationBubble(`Create a transaction (PSBT) sending all wallet funds to ${address}`, true)
+    DOM.conversation.appendChild(userBubble)
     feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
-    DOM.tempMessage.innerHTML = Success('PSBT created!')
+    DOM.tempMessage.textContent = 'Sign next?'
+    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
+    DOM.conversation.appendChild(tempuraBubble)
   } catch (e) {
     handleError(e)
   }
