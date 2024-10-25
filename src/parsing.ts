@@ -73,17 +73,6 @@ export function getSignMessageAndPsbt(val: unknown): {
  * parsing utilities, not exported
  */
 
-function parseJson(val: unknown): unknown {
-  if (typeof val !== 'string') {
-    throw new Error(`Expected a JSON string response, found ${typeof val}.\nresponse: ${val}`)
-  }
-  const parsed = JSON.parse(val)
-  if (parsed.error) {
-    throw new Error(parsed.error)
-  }
-  return parsed
-}
-
 const isDevice = (item: unknown): item is Device => {
   if (typeof item !== 'object' || item === null) return false
 
@@ -97,6 +86,12 @@ const isDevice = (item: unknown): item is Device => {
   )
 }
 
+const isSignResponse = (item: unknown): item is SignResponse => {
+  if (typeof item !== 'object' || item === null) return false
+  const signResponse = item as SignResponse
+  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+}
+
 function parseDeviceResponse(val: unknown): DeviceResponse {
   const parsed = parseJson(val)
 
@@ -106,17 +101,30 @@ function parseDeviceResponse(val: unknown): DeviceResponse {
   return parsed
 }
 
-const isSignResponse = (item: unknown): item is SignResponse => {
-  if (typeof item !== 'object' || item === null) return false
-  const signResponse = item as SignResponse
-  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+function parseJson(val: unknown): unknown {
+  if (typeof val !== 'string') {
+    throw new Error(`Expected a JSON string response, found ${typeof val}.\nresponse: ${val}`)
+  }
+  const parsed = JSON.parse(val)
+  if (parsed?.error) {
+    throw new Error(parsed.error)
+  }
+  return parsed
 }
 
 function parseSignResponse(val: unknown): SignResponse {
   const parsed = parseJson(val)
 
-  if (typeof parsed !== 'object' || !isSignResponse(parsed)) {
+  if (!isSignResponse(parsed)) {
     throw new Error(`Invalid response when attempting to sign PSBT.\nresponse: ${val}`)
   }
   return parsed
+}
+
+export const TEST = {
+  isDevice,
+  isSignResponse,
+  parseJson,
+  parseDeviceResponse,
+  parseSignResponse,
 }
