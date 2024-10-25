@@ -1,14 +1,16 @@
+import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, type TempuraError } from './bindings'
-import { writeText as toClipboard, readText as fromClipboard } from '@tauri-apps/plugin-clipboard-manager'
+import { Address, Balance, Success } from './components'
+import { createConversationBubble } from './helpers'
 import { getDevice, getDeviceMessage, getSignMessageAndPsbt } from './parsing'
-import { Balance, Success } from './components'
 
 let DOM: {
   addressInput: HTMLInputElement
   changeInput: HTMLInputElement
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
-  message: HTMLParagraphElement
+  tempMessage: HTMLDivElement
+  conversation: HTMLDivElement
   networkRadios: NodeListOf<HTMLInputElement>
   psbtTextArea: HTMLTextAreaElement
   receiveInput: HTMLInputElement
@@ -22,17 +24,17 @@ function isTempuraError(e: unknown): e is TempuraError {
 function handleError(e: unknown) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.message.textContent = e.error_type.concat(': ').concat(e.message)
+    DOM.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
     return
   }
 
   if (e instanceof Error) {
     console.error(e)
-    DOM.message.textContent = e.message
+    DOM.tempMessage.textContent = e.message
     return
   }
 
-  DOM.message.textContent = 'An unknown error occurred'
+  DOM.tempMessage.textContent = 'An unknown error occurred'
 }
 
 type Inputs = {
@@ -68,7 +70,7 @@ function getInputs(): Inputs {
 function require(value: unknown, itemName: string) {
   if (!value) {
     const message = itemName.concat(' is required')
-    DOM.message.textContent = message
+    DOM.tempMessage.textContent = message
     throw new Error(message)
   }
 }
@@ -78,10 +80,10 @@ async function broadcast() {
   require(recv, 'Receive Descriptor')
   require(psbt, 'PSBT')
 
-  DOM.message.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Please wait...'
   try {
     await commands.broadcast(psbt, network, recv, change, electrum)
-    DOM.message.textContent = 'Broadcast successful!'
+    DOM.tempMessage.textContent = 'Broadcast successful!'
   } catch (e: unknown) {
     handleError(e)
   }
@@ -90,10 +92,10 @@ async function broadcast() {
 async function enumerate() {
   const { network } = getInputs()
 
-  DOM.message.textContent = 'Please wait... (be sure to check attached devices for prompts)'
+  DOM.tempMessage.textContent = 'Please wait... (be sure to check attached devices for prompts)'
   try {
     const response = await commands.enumerate(network)
-    DOM.message.textContent = getDeviceMessage(response)
+    DOM.tempMessage.textContent = getDeviceMessage(response)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -102,11 +104,20 @@ async function enumerate() {
 async function getBalance() {
   const { recv, change, electrum, network } = getInputs()
   require(recv, 'Receive Descriptor')
+  DOM.tempMessage.textContent = 'Fetching balance ...'
 
-  DOM.message.textContent = 'Please wait...'
   try {
     const balance = await commands.balance(network, recv, change, electrum)
-    DOM.message.innerHTML = Balance({ confirmed: balance.confirmed, unconfirmed: balance.untrusted_pending })
+    DOM.tempMessage.textContent = 'Balance fetched successfully!'
+    const tempuraBubble = createConversationBubble(
+      Balance({
+        confirmed: balance.confirmed,
+        unconfirmed: balance.untrusted_pending,
+      })
+    )
+    const userBubble = createConversationBubble('What is my balance?', true)
+    DOM.conversation.appendChild(userBubble)
+    DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -116,10 +127,14 @@ async function getAddress() {
   const { recv, electrum, network } = getInputs()
   require(recv, 'Receive Descriptor')
 
-  DOM.message.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
   try {
-    const address = await commands.address(network, recv, electrum)
-    DOM.message.textContent = 'address: '.concat(address.address)
+    const { address } = await commands.address(network, recv, electrum)
+    DOM.tempMessage.textContent = 'Address retrieved successfully!'
+    const tempuraBubble = createConversationBubble(Address({ address }))
+    const userBubble = createConversationBubble('Give me an address!', true)
+    DOM.conversation.appendChild(userBubble)
+    DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -128,27 +143,27 @@ async function getAddress() {
 function copyPsbtToClipboard() {
   const psbt = DOM.psbtTextArea.value.trim()
   if (!psbt) {
-    DOM.message.textContent = 'No PSBT to copy'
+    DOM.tempMessage.textContent = 'No PSBT to copy'
     return
   }
 
   toClipboard(psbt)
     .then(() => {
-      DOM.message.textContent = 'PSBT copied to clipboard'
+      DOM.tempMessage.textContent = 'PSBT copied to clipboard'
     })
     .catch((e) => {
       console.log('Failed to copy PSBT to clipboard', e)
-      DOM.message.textContent = 'Failed to copy PSBT to clipboard'
+      DOM.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
 
 async function estimateFee() {
-  DOM.message.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Please wait...'
   try {
     const { electrum, network } = getInputs()
     const feeRate = await commands.estimateFee(network, electrum)
     DOM.feeRateInput.value = feeRate.toString()
-    DOM.message.innerHTML = Success('Fee retrieved')
+    DOM.tempMessage.innerHTML = Success('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -160,14 +175,14 @@ function pastePsbtToClipboard() {
       const trimmed = psbt.trim()
       DOM.psbtTextArea.value = trimmed
       if (!trimmed || !trimmed.startsWith('cHNid')) {
-        DOM.message.textContent = 'Warning: Pasted data does not look like a PSBT'
+        DOM.tempMessage.textContent = 'Warning: Pasted data does not look like a PSBT'
       } else {
-        DOM.message.textContent = 'PSBT pasted'
+        DOM.tempMessage.textContent = 'PSBT pasted'
       }
     })
     .catch((e) => {
       console.log('Failed to paste PSBT from clipboard', e)
-      DOM.message.textContent = 'Failed to copy PSBT to clipboard'
+      DOM.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
 
@@ -175,14 +190,14 @@ async function sign() {
   const { network, psbt } = getInputs()
   require(psbt, 'PSBT')
 
-  DOM.message.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Please wait...'
   try {
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
     const response = await commands.sign(psbt, network, device.type)
     const { message, signedPsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = signedPsbt
-    DOM.message.textContent = message
+    DOM.tempMessage.textContent = message
   } catch (e: unknown) {
     handleError(e)
   }
@@ -195,12 +210,12 @@ async function sweep() {
   require(recv, 'Receive Descriptor')
   require(address, 'Address')
 
-  DOM.message.textContent = 'Please wait...'
+  DOM.tempMessage.textContent = 'Please wait...'
   try {
     feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
-    DOM.message.innerHTML = Success('PSBT created!')
+    DOM.tempMessage.innerHTML = Success('PSBT created!')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -223,9 +238,10 @@ function requireDomElements<T extends HTMLElement>(name: string): NodeListOf<T> 
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  let message: HTMLParagraphElement | undefined = undefined
+  let tempMessage: HTMLDivElement | undefined = undefined
   try {
-    message = requireDomElement<HTMLParagraphElement>('#message')
+    tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
+    const conversation = requireDomElement<HTMLDivElement>('#conversation')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
     const electrumInput = requireDomElement<HTMLInputElement>('#electrum-input')
@@ -239,7 +255,8 @@ window.addEventListener('DOMContentLoaded', () => {
       changeInput,
       electrumInput,
       feeRateInput,
-      message,
+      tempMessage,
+      conversation,
       networkRadios,
       psbtTextArea,
       receiveInput,
@@ -291,8 +308,8 @@ window.addEventListener('DOMContentLoaded', () => {
     })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
-    if (message) {
-      message.textContent = error.message
+    if (tempMessage) {
+      tempMessage.textContent = error.message
     }
   }
 })
