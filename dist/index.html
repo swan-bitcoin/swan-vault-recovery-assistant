@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en" data-theme="halloween">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tempura</title>
+    <script type="module" crossorigin src="/assets/index.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index.css" />
+  </head>
+
+  <body class="flex flex-col min-h-screen">
+    <!-- Navbar -->
+    <nav class="navbar bg-base-200">
+      <div class="ml-6">Tempura</div>
+    </nav>
+
+    <!-- Main content section -->
+    <main class="flex flex-grow p-4">
+      <!-- Chat bubble on the left -->
+      <div class="flex-col w-2/5">
+        <div class="sticky mt-5 top-10">
+          <!-- Persistent conversation -->
+          <div id="conversation"></div>
+          <!-- Temporary feedback -->
+          <div class="chat chat-start">
+            <div class="chat-image avatar">
+              <span class="text-4xl">🍤</span>
+            </div>
+            <div class="chat-bubble chat-bubble-primary" id="temporary-message">
+              Hi there! To start, enter your descriptors.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards section -->
+      <div class="flex flex-col w-2/5 gap-4">
+        <!-- First Card: Wallet Set Up -->
+        <div class="card bg-base-300 shadow-xl card-compact">
+          <div class="card-body">
+            <h2 class="card-title">Wallet Set Up</h2>
+            <!-- Receive descriptor -->
+            <div class="form-control mb-3">
+              <div class="label justify-normal gap-2">
+                <label class="label-text">Receive Descriptor</label>
+                <div class="group">
+                  <span class="cursor-pointer">ℹ️</span>
+                  <div
+                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                  >
+                    A receive descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
+                    <code>/0/*</code> and a checksum.
+                  </div>
+                </div>
+              </div>
+              <input class="input input-bordered" id="receive-input" type="text" />
+            </div>
+
+            <!-- Change descriptor -->
+            <div class="form-control mb-3">
+              <div class="label justify-normal gap-2">
+                <label class="label-text">Change Descriptor</label>
+                <div class="group">
+                  <span class="cursor-pointer">ℹ️</span>
+                  <div
+                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                  >
+                    A change descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
+                    <code>/1/*</code> and a checksum.
+                  </div>
+                </div>
+              </div>
+              <input class="input input-bordered" id="change-input" type="text" />
+            </div>
+
+            <!-- Custom Electrum server -->
+            <div class="form-control mb-3">
+              <div class="label justify-normal gap-2">
+                <label class="label-text">Custom Electrum Server</label>
+                <div class="group">
+                  <span class="cursor-pointer">ℹ️</span>
+                  <div
+                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                  >
+                    Enter a custom Electrum server in the format <code>server:port</code>. This is optional, and if left
+                    blank, the default server (Blockstream) will be used.
+                  </div>
+                </div>
+              </div>
+              <input
+                class="input input-ghost input-bordered w-full max-w-xs"
+                id="electrum-input"
+                type="text"
+                placeholder="electrum.blockstream.info:60001"
+              />
+            </div>
+
+            <!-- Network selection -->
+            <div class="form-control mb-5">
+              <div class="label">
+                <label class="label-text">Network</label>
+              </div>
+              <div class="flex gap-4">
+                <label class="label cursor-pointer">
+                  <input
+                    id="bitcoin"
+                    value="bitcoin"
+                    type="radio"
+                    name="network"
+                    class="radio checked:bg-orange-500"
+                    checked
+                  />
+                  <span class="label-text ml-2">Bitcoin</span>
+                </label>
+                <label class="label cursor-pointer">
+                  <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
+                  <span class="label-text ml-2">Testnet</span>
+                </label>
+                <label class="label cursor-pointer">
+                  <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
+                  <span class="label-text ml-2">Regtest</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Buttons: Fetch balance, New address -->
+            <div class="card-actions justify-end mb-6">
+              <button type="button" class="btn btn-outline btn-primary btn-sm" id="new-address-button">New Address</button>
+              <button type="button" class="btn btn-primary btn-sm" id="fetch-balance-button">Fetch Balance</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Second Card: Send Transaction  -->
+        <div class="card bg-base-300 shadow-xl card-compact">
+          <div class="card-body">
+            <h2 class="card-title">Send Transaction</h2>
+            <form id="transaction-form">
+              <!-- Destination address -->
+              <div class="form-control mb-3">
+                <label class="label">Destination Address</label>
+                <input class="input input-bordered" id="address-input" type="text" placeholder="bc1q..." />
+              </div>
+
+              <!-- Fee rate -->
+              <div class="form-control mb-5">
+                <label class="label">Fee Rate</label>
+                <div class="flex items-center gap-2">
+                  <input
+                    class="input input-bordered w-3/12 inline-flex"
+                    id="feerate-input"
+                    type="number"
+                    step="1"
+                    value="5"
+                    min="5"
+                  />
+                  <label class="label inline-flex" for="feerate-input">sats/vB</label>
+                  <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
+                </div>
+              </div>
+
+              <!-- Sweep button -->
+              <div class="card-actions justify-end mb-6">
+                <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
+              </div>
+
+              <!-- PSBT textarea -->
+              <div class="form-control mb-3">
+                <label class="label">PSBT</label>
+                <textarea
+                  class="textarea textarea-bordered h-40"
+                  id="psbt-textarea"
+                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                ></textarea>
+              </div>
+
+              <!-- PSBT controls -->
+              <div class="card-actions justify-end mb-6">
+                <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
+                <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+                <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+              </div>
+
+              <!-- Device & Broadcast controls -->
+              <div class="card-actions mb-6 justify-center">
+                <button class="btn btn-warning" type="button" id="sign-message-button">Sign</button>
+                <button class="btn btn-secondary" type="button" id="broadcast-button">Broadcast</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer p-4 bg-base-200 text-base-content">
+      <div class="items-center grid-flow-col">
+        <p>&copy; 2024 Tempura. All rights reserved.</p>
+      </div>
+    </footer>
+  </body>
+</html>

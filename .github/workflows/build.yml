@@ -67,6 +67,9 @@ jobs:
       - name: Build project
         run: pnpm tauri build
 
+      - name: Check for git diffs after build
+        run: pnpm ci:gitdiff
+
       - name: Save cargo cache
         uses: actions/cache/save@v4
         with:
