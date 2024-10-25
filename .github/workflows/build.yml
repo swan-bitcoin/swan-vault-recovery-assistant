@@ -4,7 +4,7 @@ on:
   push:
     branches: [master]
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, labeled]
 
 jobs:
   build:
@@ -13,6 +13,17 @@ jobs:
       matrix:
         # https://github.com/actions/runner-images
         os: [ubuntu-latest, windows-latest, macos-latest]
+        isPR:
+          - ${{github.event_name == 'pull_request'}}
+        allBundles:
+          - ${{github.event.label.name == 'all bundles'}}
+        exclude:
+          - isPR: true
+            allBundles: false
+            os: ubuntu-latest
+          - isPR: true
+            allBundles: false
+            os: windows-latest
 
     steps:
       - name: Checkout code
