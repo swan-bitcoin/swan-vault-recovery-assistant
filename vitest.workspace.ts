@@ -4,6 +4,13 @@ import { defineWorkspace } from 'vitest/config'
 export default defineWorkspace([
   {
     test: {
+      name: 'unit',
+      mockReset: true,
+      include: ['src/**/*.test.ts'],
+    },
+  },
+  {
+    test: {
       pool: 'threads',
       poolOptions: {
         threads: {

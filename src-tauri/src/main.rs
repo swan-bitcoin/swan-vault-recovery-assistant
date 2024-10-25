@@ -16,8 +16,6 @@ use network::{HwiNetwork, Network};
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
 use specta::Type;
-#[cfg(debug_assertions)] // <- Only use on non-release builds
-use specta_typescript::Typescript;
 
 // bdk and bitcoin imports
 use bdk;
@@ -427,7 +425,10 @@ fn main() {
 
   #[cfg(debug_assertions)] // <- Only export on non-release builds
   specta_builder
-    .export(Typescript::default(), "../src/bindings.ts")
+    .export(
+      specta_typescript::Typescript::default(),
+      "../src/bindings.ts",
+    )
     .expect("Failed to export typescript bindings");
 
   tauri::Builder::default()
