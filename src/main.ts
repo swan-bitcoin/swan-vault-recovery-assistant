@@ -107,6 +107,8 @@ async function getBalance() {
   DOM.tempMessage.textContent = 'Fetching balance ...'
 
   try {
+    const userBubble = createConversationBubble('What is my balance?', true)
+    DOM.conversation.appendChild(userBubble)
     const balance = await commands.balance(network, recv, change, electrum)
     DOM.tempMessage.textContent = 'Balance fetched successfully!'
     const tempuraBubble = createConversationBubble(
@@ -115,8 +117,6 @@ async function getBalance() {
         unconfirmed: balance.untrusted_pending,
       })
     )
-    const userBubble = createConversationBubble('What is my balance?', true)
-    DOM.conversation.appendChild(userBubble)
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
@@ -129,11 +129,11 @@ async function getAddress() {
 
   DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
   try {
+    const userBubble = createConversationBubble('Give me an address!', true)
+    DOM.conversation.appendChild(userBubble)
     const { address } = await commands.address(network, recv, electrum)
     DOM.tempMessage.textContent = 'Address retrieved successfully!'
     const tempuraBubble = createConversationBubble(Address({ address }))
-    const userBubble = createConversationBubble('Give me an address!', true)
-    DOM.conversation.appendChild(userBubble)
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
