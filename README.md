@@ -119,3 +119,10 @@ sudo apt-get update && sudo apt-get install javascriptcoregtk-4.1 libsoup-3.0 we
 If modifying the bundling process, verify on all platforms by adding the `all
 bundles` label to your pull request. Otherwise CI will only bundle the MAC
 bundle (because its fastest) to check the release build.
+
+## Committed front-end build outputs
+
+Because Tempura has moderately complex front-end build pipeline that
+transforms its TypeScript and CSS before execution in the application, we
+commit the resulting compiled JavaScript and CSS files for anyone to audit the
+behavior of the application without having to audit the build pipeline itself.
