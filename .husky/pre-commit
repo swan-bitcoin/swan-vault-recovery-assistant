@@ -1,5 +1,27 @@
 # Apply prettier to staged files
 ./node_modules/.bin/nano-staged 
 
-pnpm build
 pnpm lint
+
+# Generate build products from the staged files
+
+# 1. Clear any changes to the generated files
+git reset dist
+git checkout dist
+
+# 2. Make the working directory match the stage
+git diff --full-index --binary > .tmp.stash.$$
+git stash -q --keep-index
+
+# 3. Generate build products
+pnpm build
+
+# 4. Stage the generated build products
+git update-index --add dist/**/*.*
+
+# 5. Return the non-generated files and stash to their original state
+git apply --whitespace=nowarn --allow-empty < .tmp.stash.$$
+git stash drop -q
+
+# 6. Cleanup
+rm .tmp.stash.$$
