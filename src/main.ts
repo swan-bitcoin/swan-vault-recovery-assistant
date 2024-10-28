@@ -206,8 +206,8 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, signedPsbt } = getSignMessageAndPsbt(response)
-    DOM.psbtTextArea.value = signedPsbt
+    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    DOM.psbtTextArea.value = responsePsbt
 
     DOM.tempMessage.textContent = 'Sign again or broadcast next?'
     const tempuraBubble = createConversationBubble(message)

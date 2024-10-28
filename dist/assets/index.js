@@ -172,15 +172,15 @@ function getDeviceMessage(val) {
   if (devices.length === 0) {
     return 'No devices found'
   }
-  let message = devices.length === 1 ? `Found ` : `Found ${devices.length} devices: [`
+  let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
   devices.forEach((device, index, arr) => {
-    message = message.concat(`a ${device.model} device`)
+    message = message.concat(`${device.model} device `)
     if (device.error) {
-      message = message.concat(` which is reporting an error: '${device.error}'`)
+      message = message.concat(`which is reporting an error: '${device.error}'`)
     } else if (device.fingerprint) {
-      message = message.concat(` with fingerprint '${device.fingerprint}'`)
+      message = message.concat(`with fingerprint '${device.fingerprint}'`)
     } else {
-      message = message.concat(' no fingerprint')
+      message = message.concat('with no fingerprint')
     }
     if (index < arr.length - 1) {
       message = message.concat(', ')
@@ -204,7 +204,7 @@ function getDevicePrompt(val) {
 function getSignMessageAndPsbt(val) {
   const signResponse = parseSignResponse(val)
   const message = signResponse.signed ? 'PSBT signed successfully' : 'PSBT not signed'
-  return { message, signedPsbt: signResponse.psbt }
+  return { message, psbt: signResponse.psbt }
 }
 const isDevice = (item) => {
   if (typeof item !== 'object' || item === null) return false
@@ -411,8 +411,8 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, signedPsbt } = getSignMessageAndPsbt(response)
-    DOM.psbtTextArea.value = signedPsbt
+    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    DOM.psbtTextArea.value = responsePsbt
     DOM.tempMessage.textContent = 'Sign again or broadcast next?'
     const tempuraBubble = createConversationBubble(message)
     DOM.conversation.appendChild(tempuraBubble)
