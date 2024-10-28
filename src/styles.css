@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root:has(input.dev-mode-toggle:checked) .dev-only {
+  @apply block;
+}
+
+.dev-only {
+  @apply hidden;
+}
