@@ -61,11 +61,11 @@ export function getDeviceMessage(val: unknown): string {
 
 export function getDevicePrompt(val: unknown): string {
   const devices = parseDeviceResponse(val)
-  if (devices.length === 1) {
-    return 'You may want to sign with this device next...'
-  }
   if (devices.length === 0) {
     return 'Make sure your device is connected. Perhaps try a different cable.'
+  }
+  if (devices.length === 1) {
+    return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'
 }
