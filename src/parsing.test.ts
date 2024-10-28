@@ -1,7 +1,131 @@
 import { describe, it, expect } from 'vitest'
 import * as parsing from './parsing'
 
-// TODO: parsing interface functions
+const DEVICE1 = {
+  type: 'a',
+  model: 'b',
+  path: 'c',
+  needs_pin_sent: false,
+  needs_passphrase_sent: false,
+}
+const DEVICE2 = {
+  type: 'd',
+  model: 'e',
+  path: 'f',
+  needs_pin_sent: false,
+  needs_passphrase_sent: true,
+  fingerprint: '12345678',
+}
+const DEVICE3 = {
+  type: 'g',
+  model: 'h',
+  path: 'i',
+  needs_pin_sent: true,
+  needs_passphrase_sent: true,
+}
+
+/**
+ * parsing interface
+ */
+
+describe('getDevice()', () => {
+  it('should successfully return a single device when present', () => {
+    const str = '[{"type":"jade","model":"jade","path":"/dev/ttyACM0","needs_pin_sent":false,"needs_passphrase_sent":false}]'
+
+    const device = parsing.getDevice(str)
+    expect(device).toStrictEqual({
+      type: 'jade',
+      model: 'jade',
+      path: '/dev/ttyACM0',
+      needs_passphrase_sent: false,
+      needs_pin_sent: false,
+    })
+  })
+
+  it('should throw an error when no devices are present', () => {
+    expect(() => parsing.getDevice('[]')).toThrowError(/No devices found/)
+  })
+
+  it('should throw an error when multiple devices are present', () => {
+    const devices = [DEVICE1, DEVICE2]
+    expect(() => parsing.getDevice(JSON.stringify(devices))).toThrowError(/Multiple devices found/)
+  })
+
+  it('should throw an error when a device reports an error', () => {
+    const devices = [
+      {
+        ...DEVICE1,
+        error: 'cheeseburger',
+      },
+    ]
+    expect(() => parsing.getDevice(JSON.stringify(devices))).toThrowError(/cheeseburger/)
+  })
+})
+
+describe('getDeviceMessage()', () => {
+  it('should return a message when no devices are present', () => {
+    expect(parsing.getDeviceMessage('[]')).toBe('No devices found')
+  })
+
+  it('should return a message when a single device is present with no fingerprint', () => {
+    const devices = [DEVICE1]
+    expect(parsing.getDeviceMessage(JSON.stringify(devices))).toMatch(/Found a .* device with no fingerprint/)
+  })
+
+  it('should return a message when a single device is present with a fingerprint', () => {
+    const devices = [DEVICE2]
+    expect(parsing.getDeviceMessage(JSON.stringify(devices))).toMatch(/Found a .* device with fingerprint '[a-fA-F0-9]{8}'/)
+  })
+
+  it('should return a message when multiple devices are present', () => {
+    const devices = [DEVICE1, DEVICE2, { ...DEVICE3, error: 'cheeseburger' }]
+    expect(parsing.getDeviceMessage(JSON.stringify(devices))).toMatch(
+      /Found 3 devices: \[.* device with no fingerprint, .* device with fingerprint '12345678', .* device which is reporting an error.*\]/
+    )
+  })
+})
+
+describe('getDevicePrompt()', () => {
+  it('should return a message when no devices are present', () => {
+    expect(parsing.getDevicePrompt('[]')).toMatch(/Make sure your device is connected/)
+  })
+
+  it('should return a message when a single device is present', () => {
+    const devices = [DEVICE1]
+    expect(parsing.getDevicePrompt(JSON.stringify(devices))).toMatch(/You may want to sign with this device/)
+  })
+
+  it('should return a message when a single device is present', () => {
+    const devices = [DEVICE1, DEVICE2]
+    expect(parsing.getDevicePrompt(JSON.stringify(devices))).toMatch(/Make sure only one device is connected/)
+  })
+})
+
+describe('getSignMessageAndPsbt()', () => {
+  it('should return a message and psbt when a valid response is present', () => {
+    const response = {
+      psbt: 'a',
+      signed: false,
+    }
+
+    expect(parsing.getSignMessageAndPsbt(JSON.stringify(response))).toStrictEqual({
+      message: 'PSBT not signed',
+      psbt: 'a',
+    })
+  })
+
+  it('should return a message and psbt when a valid response is present', () => {
+    const response = {
+      psbt: 'b',
+      signed: true,
+    }
+
+    expect(parsing.getSignMessageAndPsbt(JSON.stringify(response))).toStrictEqual({
+      message: 'PSBT signed successfully',
+      psbt: 'b',
+    })
+  })
+})
 
 /**
  * parsing utilities, not exported
@@ -130,21 +254,12 @@ describe('parseDeviceResponse()', () => {
         needs_passphrase_sent: false,
       },
       {
-        type: 'd',
-        model: 'e',
-        path: 'f',
-        needs_pin_sent: false,
-        needs_passphrase_sent: false,
-        fingerprint: '12345678',
+        ...DEVICE2,
         error: 'bad stuff',
         code: 13,
       },
       {
-        type: 'g',
-        model: 'h',
-        path: 'i',
-        needs_pin_sent: false,
-        needs_passphrase_sent: false,
+        ...DEVICE3,
         someotherproperties: true,
       },
     ]
@@ -157,22 +272,10 @@ describe('parseDeviceResponse()', () => {
 
   it.each([
     {},
-    {
-      type: 'a',
-      model: 'b',
-      path: 'c',
-      needs_pin_sent: false,
-      needs_passphrase_sent: false,
-    }, // not an array
+    DEVICE1, // not an array
     [{ type: 'a' }], // incomplete device
     [
-      {
-        type: 'a',
-        model: 'b',
-        path: 'c',
-        needs_pin_sent: false,
-        needs_passphrase_sent: false,
-      },
+      DEVICE1,
       {
         type: 'a',
         model: 'b',

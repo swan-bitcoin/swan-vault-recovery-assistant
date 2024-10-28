@@ -37,16 +37,16 @@ export function getDeviceMessage(val: unknown): string {
     return 'No devices found'
   }
 
-  let message = devices.length === 1 ? `Found ` : `Found ${devices.length} devices: [`
+  let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
 
   devices.forEach((device, index, arr) => {
-    message = message.concat(`a ${device.model} device`)
+    message = message.concat(`${device.model} device `)
     if (device.error) {
-      message = message.concat(` which is reporting an error: '${device.error}'`)
+      message = message.concat(`which is reporting an error: '${device.error}'`)
     } else if (device.fingerprint) {
-      message = message.concat(` with fingerprint '${device.fingerprint}'`)
+      message = message.concat(`with fingerprint '${device.fingerprint}'`)
     } else {
-      message = message.concat(' no fingerprint')
+      message = message.concat('with no fingerprint')
     }
     if (index < arr.length - 1) {
       message = message.concat(', ')
@@ -72,12 +72,12 @@ export function getDevicePrompt(val: unknown): string {
 
 export function getSignMessageAndPsbt(val: unknown): {
   message: string
-  signedPsbt: string
+  psbt: string
 } {
   const signResponse = parseSignResponse(val)
 
   const message = signResponse.signed ? 'PSBT signed successfully' : 'PSBT not signed'
-  return { message, signedPsbt: signResponse.psbt }
+  return { message, psbt: signResponse.psbt }
 }
 
 /**
