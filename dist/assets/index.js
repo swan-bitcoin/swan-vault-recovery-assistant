@@ -167,16 +167,6 @@ function getDevice(val) {
   }
   return device
 }
-function getDevicePrompt(val) {
-  const devices = parseDeviceResponse(val)
-  if (devices.length === 1) {
-    return 'You may want to sign with this device next...'
-  }
-  if (devices.length === 0) {
-    return 'Make sure your device is connected. Perhaps try a different cable.'
-  }
-  return 'Make sure only one device is connected.'
-}
 function getDeviceMessage(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -200,6 +190,16 @@ function getDeviceMessage(val) {
     message = message.concat(']')
   }
   return message
+}
+function getDevicePrompt(val) {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 1) {
+    return 'You may want to sign with this device next...'
+  }
+  if (devices.length === 0) {
+    return 'Make sure your device is connected. Perhaps try a different cable.'
+  }
+  return 'Make sure only one device is connected.'
 }
 function getSignMessageAndPsbt(val) {
   const signResponse = parseSignResponse(val)
