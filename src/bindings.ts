@@ -16,20 +16,14 @@ async address(network: string, descriptor: string, electrum: string | null) : Pr
 async balance(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Balance> {
     return await TAURI_INVOKE("balance", { network, receive, change, electrum });
 },
+async estimateFee(network: string, electrum: string | null) : Promise<number> {
+    return await TAURI_INVOKE("estimate_fee", { network, electrum });
+},
 async broadcast(psbt: string, network: string, receive: string, change: string | null, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, receive, change, electrum });
 },
 async enumerate(network: string) : Promise<string> {
     return await TAURI_INVOKE("enumerate", { network });
-},
-async estimateFee(network: string, electrum: string | null) : Promise<number> {
-    return await TAURI_INVOKE("estimate_fee", { network, electrum });
-},
-async isDescriptor(descriptor: string) : Promise<boolean> {
-    return await TAURI_INVOKE("is_descriptor", { descriptor });
-},
-async isDescriptorForNetwork(descriptor: string, network: string) : Promise<boolean> {
-    return await TAURI_INVOKE("is_descriptor_for_network", { descriptor, network });
 },
 async sign(psbt: string, network: string, deviceType: string) : Promise<string> {
     return await TAURI_INVOKE("sign", { psbt, network, deviceType });
