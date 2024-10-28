@@ -190,17 +190,6 @@ function getSignMessageAndPsbt(val) {
   const message = signResponse.signed ? 'PSBT signed successfully' : 'PSBT not signed'
   return { message, signedPsbt: signResponse.psbt }
 }
-function parseJson(val) {
-  if (typeof val !== 'string') {
-    throw new Error(`Expected a JSON string response, found ${typeof val}.
-response: ${val}`)
-  }
-  const parsed = JSON.parse(val)
-  if (parsed.error) {
-    throw new Error(parsed.error)
-  }
-  return parsed
-}
 const isDevice = (item) => {
   if (typeof item !== 'object' || item === null) return false
   const device = item
@@ -212,6 +201,11 @@ const isDevice = (item) => {
     typeof device.needs_passphrase_sent === 'boolean'
   )
 }
+const isSignResponse = (item) => {
+  if (typeof item !== 'object' || item === null) return false
+  const signResponse = item
+  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+}
 function parseDeviceResponse(val) {
   const parsed = parseJson(val)
   if (!Array.isArray(parsed) || !parsed.every((item) => isDevice(item))) {
@@ -220,14 +214,20 @@ response: ${val}`)
   }
   return parsed
 }
-const isSignResponse = (item) => {
-  if (typeof item !== 'object' || item === null) return false
-  const signResponse = item
-  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+function parseJson(val) {
+  if (typeof val !== 'string') {
+    throw new Error(`Expected a JSON string response, found ${typeof val}.
+response: ${val}`)
+  }
+  const parsed = JSON.parse(val)
+  if (parsed == null ? void 0 : parsed.error) {
+    throw new Error(parsed.error)
+  }
+  return parsed
 }
 function parseSignResponse(val) {
   const parsed = parseJson(val)
-  if (typeof parsed !== 'object' || !isSignResponse(parsed)) {
+  if (!isSignResponse(parsed)) {
     throw new Error(`Invalid response when attempting to sign PSBT.
 response: ${val}`)
   }
