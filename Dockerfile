@@ -28,20 +28,12 @@ RUN apt-get update && apt-get install -y \
   librsvg2-dev \
   npm
 
-# install rust & pnpm, download and extract hwi from github into /tmp
+# install rust & pnpm
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN npm install -g pnpm && \
-  curl -LsSf \
-  https://github.com/bitcoin-core/HWI/releases/download/3.1.0/hwi-3.1.0-linux-x86_64.tar.gz -o /tmp/hwi.tar.gz && \
-  tar -xzf /tmp/hwi.tar.gz -C /tmp && \
-  rm /tmp/hwi.tar.gz
+RUN npm install -g pnpm
 
+# copy, install dependencies build
 WORKDIR /tempura
 COPY . .
-
-# place the hwi binary into the expected location in tauri.conf, install dependencies build
-RUN target_triple=$(rustc -Vv | grep host | cut -f2 -d' ') && \
-  mv /tmp/hwi ./src-tauri/hwi-$target_triple && \
-  pnpm install -f && \
-  pnpm tauri build
+RUN pnpm install -f && pnpm tauri build
