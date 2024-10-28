@@ -144,12 +144,12 @@ fn get_wallet(
   let network: bdk::bitcoin::Network = network.into();
   let receive = resolve!(
     receive.into_wallet_descriptor(&secp, network),
-    TempuraErrorType::DescriptorError(DescriptorType::Receive)
+    TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
   );
   let change = match change {
     Some(change) => Some(resolve!(
       change.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(DescriptorType::Change)
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
     )),
     None => None,
   };
@@ -343,6 +343,32 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 
 #[tauri::command]
 #[specta::specta]
+async fn is_descriptor(descriptor: String) -> bool {
+  bdk::descriptor::ExtendedDescriptor::from_str(&descriptor).is_ok()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn is_descriptor_for_network(
+  descriptor: String,
+  network: String,
+) -> Result<bool, TempuraError> {
+  let secp = Secp256k1::new();
+  let network: bdk::bitcoin::Network = Network::from_str(&network)?.into();
+  match descriptor.into_wallet_descriptor(&secp, network) {
+    Ok(_) => Ok(true),
+    Err(e) => match e {
+      bdk::descriptor::DescriptorError::Key(bdk::keys::KeyError::InvalidNetwork) => Ok(false),
+      _ => Err(TempuraError::new(
+        TempuraErrorType::DescriptorError(None),
+        &e.to_string(),
+      )),
+    },
+  }
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn sign(psbt: String, network: String, device_type: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
@@ -413,9 +439,11 @@ fn main() {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
       balance,
-      estimate_fee,
       broadcast,
       enumerate,
+      estimate_fee,
+      is_descriptor,
+      is_descriptor_for_network,
       sign,
       sweep
     ]);
