@@ -61,6 +61,9 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
+            !src-tauri/target/release/hwi.exe
+            !src-tauri/target/release/tempura
+            !src-tauri/target/release/tempura.exe
             !src-tauri/target/release/bundle
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
@@ -80,6 +83,9 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
+            !src-tauri/target/release/hwi.exe
+            !src-tauri/target/release/tempura
+            !src-tauri/target/release/tempura.exe
             !src-tauri/target/release/bundle
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
