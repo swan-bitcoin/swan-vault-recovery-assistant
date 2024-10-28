@@ -79,14 +79,20 @@ const commands = {
   async balance(network, receive, change, electrum) {
     return await invoke('balance', { network, receive, change, electrum })
   },
-  async estimateFee(network, electrum) {
-    return await invoke('estimate_fee', { network, electrum })
-  },
   async broadcast(psbt, network, receive, change, electrum) {
     return await invoke('broadcast', { psbt, network, receive, change, electrum })
   },
   async enumerate(network) {
     return await invoke('enumerate', { network })
+  },
+  async estimateFee(network, electrum) {
+    return await invoke('estimate_fee', { network, electrum })
+  },
+  async isDescriptor(descriptor) {
+    return await invoke('is_descriptor', { descriptor })
+  },
+  async isDescriptorForNetwork(descriptor, network) {
+    return await invoke('is_descriptor_for_network', { descriptor, network })
   },
   async sign(psbt, network, deviceType) {
     return await invoke('sign', { psbt, network, deviceType })
