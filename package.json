@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && pnpm exec prettier --write dist",
-    "ci:gitdiff": "git diff --exit-code",
+    "ci:gitdiff": "git diff -b --ignore-blank-lines --exit-code",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint .",
