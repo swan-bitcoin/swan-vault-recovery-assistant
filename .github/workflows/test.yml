@@ -1,0 +1,37 @@
+name: CI
+
+# Controls when the workflow will run
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  unit-test:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+
+      - name: set up rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: install dependencies
+        run: HUSKY=0 pnpm install --frozen-lockfile
+
+      - name: run unit tests
+        run: pnpm test:unit
