@@ -68,6 +68,9 @@ importers:
       pure-rand:
         specifier: ^6.1.0
         version: 6.1.0
+      selenium-webdriver:
+        specifier: ^4.25.0
+        version: 4.25.0
       tailwindcss:
         specifier: ^3.4.13
         version: 3.4.13
@@ -104,6 +107,10 @@ packages:
     resolution:
       { integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw== }
     engines: { node: '>=10' }
+
+  '@bazel/runfiles@5.8.1':
+    resolution:
+      { integrity: sha512-NDdfpdQ6rZlylgv++iMn5FkObC/QlBQvipinGLSOguTYpRywmieOyJ29XHvUilspwTFSILWpoE9CqMGkHXug1g== }
 
   '@esbuild/aix-ppc64@0.21.5':
     resolution:
@@ -1492,6 +1499,10 @@ packages:
       { integrity: sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g== }
     engines: { node: '>= 4' }
 
+  immediate@3.0.6:
+    resolution:
+      { integrity: sha512-XXOFtyqDjNDAQxVfYxuF7g9Il/IbWmmlQg2MYKOH8ExIT1qg6xc4zyS3HaEEATgs1btfzxq15ciUiY7gjSXRGQ== }
+
   import-fresh@3.3.0:
     resolution:
       { integrity: sha512-veYYhQa+D1QBKznvhUHxb8faxlrwUnxseDAbAp457E0wLNio2bOSKnjYDhMj+YiAq61xrMGhQk9iXVk5FzgQMw== }
@@ -1604,6 +1615,10 @@ packages:
       { integrity: sha512-P2bSOMAc/ciLz6DzgjVlGJP9+BrJWu5UDGK70C2iweC5QBIeFf0ZXRvGjEj2uYgrY2MkAAhsSWHDWlFtEroZWw== }
     engines: { node: '>=0.6.0' }
 
+  jszip@3.10.1:
+    resolution:
+      { integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g== }
+
   keyv@4.5.4:
     resolution:
       { integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw== }
@@ -1612,6 +1627,10 @@ packages:
     resolution:
       { integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ== }
     engines: { node: '>= 0.8.0' }
+
+  lie@3.3.0:
+    resolution:
+      { integrity: sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ== }
 
   lilconfig@2.1.0:
     resolution:
@@ -1806,6 +1825,10 @@ packages:
   package-json-from-dist@1.0.1:
     resolution:
       { integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw== }
+
+  pako@1.0.11:
+    resolution:
+      { integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw== }
 
   parent-module@1.0.1:
     resolution:
@@ -2041,6 +2064,11 @@ packages:
     resolution:
       { integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg== }
 
+  selenium-webdriver@4.25.0:
+    resolution:
+      { integrity: sha512-zl9IX93caOT8wbcCpZzAkEtYa+hNgJ4C5GUN8uhpzggqRLvsg1asfKi0p1uNZC8buYVvsBZbx8S+9MjVAjs4oA== }
+    engines: { node: '>= 14.21.0' }
+
   semver@5.7.2:
     resolution:
       { integrity: sha512-cBznnQ9KjJqU67B52RMC65CMarK2600WFnbkcaiwWq3xy/5haFJlshgnpjovMVJ+Hff49d8GEn0b87C5pDQ10g== }
@@ -2051,6 +2079,10 @@ packages:
       { integrity: sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A== }
     engines: { node: '>=10' }
     hasBin: true
+
+  setimmediate@1.0.5:
+    resolution:
+      { integrity: sha512-MATJdZp8sLqDl/68LfQmbP8zKPLQNV6BIZoIgrscFDQ+RsvK/BxeDQOgyxKKoh0y/8h3BqVFnCqQ/gd+reiIXA== }
 
   sha.js@2.4.11:
     resolution:
@@ -2213,6 +2245,11 @@ packages:
     resolution:
       { integrity: sha512-n1cw8k1k0x4pgA2+9XrOkFydTerNcJ1zWCO5Nn9scWHTD+5tp8dghT2x1uduQePZTZgd3Tupf+x9BxJjeJi77Q== }
     engines: { node: '>=14.0.0' }
+
+  tmp@0.2.3:
+    resolution:
+      { integrity: sha512-nZD7m9iCPC5g0pYmcaxogYKggSfLsdxl8of3Q/oIbqCqLLIO9IAF0GWjX1z9NZRHPiXv8Wex4yDCaZsgEw0Y8w== }
+    engines: { node: '>=14.14' }
 
   to-regex-range@5.0.1:
     resolution:
@@ -2420,6 +2457,19 @@ packages:
     resolution:
       { integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ== }
 
+  ws@8.18.0:
+    resolution:
+      { integrity: sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw== }
+    engines: { node: '>=10.0.0' }
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   xtend@4.0.2:
     resolution:
       { integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ== }
@@ -2443,6 +2493,8 @@ packages:
 
 snapshots:
   '@alloc/quick-lru@5.2.0': {}
+
+  '@bazel/runfiles@5.8.1': {}
 
   '@esbuild/aix-ppc64@0.21.5':
     optional: true
@@ -3490,6 +3542,8 @@ snapshots:
 
   ignore@5.3.2: {}
 
+  immediate@3.0.6: {}
+
   import-fresh@3.3.0:
     dependencies:
       parent-module: 1.0.1
@@ -3566,6 +3620,13 @@ snapshots:
       json-schema: 0.4.0
       verror: 1.10.0
 
+  jszip@3.10.1:
+    dependencies:
+      lie: 3.3.0
+      pako: 1.0.11
+      readable-stream: 2.3.8
+      setimmediate: 1.0.5
+
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
@@ -3574,6 +3635,10 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  lie@3.3.0:
+    dependencies:
+      immediate: 3.0.6
 
   lilconfig@2.1.0: {}
 
@@ -3710,6 +3775,8 @@ snapshots:
       p-limit: 3.1.0
 
   package-json-from-dist@1.0.1: {}
+
+  pako@1.0.11: {}
 
   parent-module@1.0.1:
     dependencies:
@@ -3909,9 +3976,21 @@ snapshots:
 
   safer-buffer@2.1.2: {}
 
+  selenium-webdriver@4.25.0:
+    dependencies:
+      '@bazel/runfiles': 5.8.1
+      jszip: 3.10.1
+      tmp: 0.2.3
+      ws: 8.18.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   semver@5.7.2: {}
 
   semver@7.6.3: {}
+
+  setimmediate@1.0.5: {}
 
   sha.js@2.4.11:
     dependencies:
@@ -4064,6 +4143,8 @@ snapshots:
   tinyrainbow@1.2.0: {}
 
   tinyspy@3.0.2: {}
+
+  tmp@0.2.3: {}
 
   to-regex-range@5.0.1:
     dependencies:
@@ -4236,6 +4317,8 @@ snapshots:
 
   wrappy@1.0.2:
     optional: true
+
+  ws@8.18.0: {}
 
   xtend@4.0.2: {}
 
