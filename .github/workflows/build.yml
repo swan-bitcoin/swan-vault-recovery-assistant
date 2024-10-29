@@ -16,7 +16,7 @@ jobs:
         isPR:
           - ${{github.event_name == 'pull_request'}}
         allBundles:
-          - ${{github.event.label.name == 'all bundles'}}
+          - ${{contains(github.event.pull_request.labels.*.name, 'all bundles')}}
         exclude:
           - isPR: true
             allBundles: false
