@@ -812,6 +812,11 @@ html {
 .btn:disabled {
   pointer-events: none;
 }
+.btn-square {
+  height: 3rem;
+  width: 3rem;
+  padding: 0px;
+}
 :where(.btn:is(input[type='checkbox'])),
 :where(.btn:is(input[type='radio'])) {
   width: auto;
@@ -2220,9 +2225,24 @@ html {
   padding-right: 0.75rem;
   font-size: 0.875rem;
 }
+.btn-square:where(.btn-xs) {
+  height: 1.5rem;
+  width: 1.5rem;
+  padding: 0px;
+}
 .btn-square:where(.btn-sm) {
   height: 2rem;
   width: 2rem;
+  padding: 0px;
+}
+.btn-square:where(.btn-md) {
+  height: 3rem;
+  width: 3rem;
+  padding: 0px;
+}
+.btn-square:where(.btn-lg) {
+  height: 4rem;
+  width: 4rem;
   padding: 0px;
 }
 .btn-circle:where(.btn-sm) {
@@ -2569,8 +2589,15 @@ html {
   right: auto;
   bottom: auto;
 }
+.tooltip-accent {
+  --tooltip-color: var(--fallback-a, oklch(var(--a) / 1));
+  --tooltip-text-color: var(--fallback-ac, oklch(var(--ac) / 1));
+}
 .absolute {
   position: absolute;
+}
+.relative {
+  position: relative;
 }
 .sticky {
   position: sticky;
@@ -2697,6 +2724,10 @@ html {
 }
 .overflow-x-auto {
   overflow-x: auto;
+.space-x-2 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 0;
+  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
+  margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
 .break-all {
   word-break: break-all;
@@ -2711,6 +2742,9 @@ html {
 .bg-base-300 {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity)));
+}
+.fill-current {
+  fill: currentColor;
 }
 .stroke-current {
   stroke: currentColor;
@@ -2741,6 +2775,17 @@ html {
   --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.duration-300 {
+  transition-duration: 300ms;
+}
+.ease-in-out {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
 @keyframes enter {
   from {
     opacity: var(--tw-enter-opacity, 1);
@@ -2755,6 +2800,12 @@ html {
       scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
+.duration-300 {
+  animation-duration: 300ms;
+}
+.ease-in-out {
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
 
 :root:has(input.dev-mode-toggle:checked) .dev-only {
   display: block;
@@ -2762,6 +2813,10 @@ html {
 
 .dev-only {
   display: none;
+}
+
+.copied {
+  transform: scale(1.1); /* Enlarges, for example, icons when added */
 }
 
 .checked\:bg-blue-500:checked {

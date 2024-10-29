@@ -9,3 +9,7 @@
 .dev-only {
   @apply hidden;
 }
+
+.copied {
+  transform: scale(1.1); /* Enlarges, for example, icons when added */
+}
