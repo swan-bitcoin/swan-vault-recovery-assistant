@@ -63,6 +63,82 @@ sudo apt install webkit2gtk-driver
 cargo install tauri-driver
 ```
 
+`````````
+
+$ pnpm create wdio .
+.../192d9118f51-29f047                   |  +11 +
+.../192d9118f51-29f047                   | Progress: resolved 11, reused 10, downloaded 1, added 11, done
+
+                 -:...........................-:.
+                 +                              +
+              `` +      `...`        `...`      + `
+            ./+/ +    .:://:::`    `::///::`  ` + ++/.
+           .+oo+ +    /:+ooo+-/    /-+ooo+-/ ./ + +oo+.
+           -ooo+ +    /-+ooo+-/    /-+ooo+-/ .: + +ooo.
+            -+o+ +    `::///:-`    `::///::`    + +o+-
+             ``. /.     `````        `````     .: .``
+                  .----------------------------.
+           `-::::::::::::::::::::::::::::::::::::::::-`
+          .+oooo/:------------------------------:/oooo+.
+      `.--/oooo-                                  :oooo/--.`
+    .::-``:oooo`                                  .oooo-``-::.
+  ./-`    -oooo`--.: :.--                         .oooo-    `-/.
+ -/`    `-/oooo////////////////////////////////////oooo/.`    `/-
+`+`   `/+oooooooooooooooooooooooooooooooooooooooooooooooo+:`   .+`
+-/    +o/.:oooooooooooooooooooooooooooooooooooooooooooo:-/o/    +.
+-/   .o+  -oooosoooososssssooooo------------------:oooo- `oo`   +.
+-/   .o+  -oooodooohyyssosshoooo`                 .oooo-  oo.   +.
+-/   .o+  -oooodooysdooooooyyooo` `.--.``     .:::-oooo-  oo.   +.
+-/   .o+  -oooodoyyodsoooooyyooo.//-..-:/:.`.//.`./oooo-  oo.   +.
+-/   .o+  -oooohsyoooyysssysoooo+-`     `-:::.    .oooo-  oo.   +.
+-/   .o+  -ooooosooooooosooooooo+//////////////////oooo-  oo.   +.
+-/   .o+  -oooooooooooooooooooooooooooooooooooooooooooo-  oo.   +.
+-/   .o+  -oooooooooooooooooooooooooooooooooooooooooooo-  oo.   +.
+-+////o+` -oooo---:///:----://::------------------:oooo- `oo////+-
++ooooooo/`-oooo``:-```.:`.:.`.+/-    .::::::::::` .oooo-`+ooooooo+
+oooooooo+`-oooo`-- `/` .:+  -/-`/`   .::::::::::  .oooo-.+oooooooo
++-/+://-/ -oooo-`:`.o-`:.:-````.:    .///:``````  -oooo-`/-//:+:-+
+: :..--:-:.+ooo+/://o+/-.-:////:-....-::::-....--/+ooo+.:.:--.-- /
+- /./`-:-` .:///+/ooooo/+///////////////+++ooooo/+///:. .-:.`+./ :
+:-:/.           :`ooooo`/`              .:.ooooo :           ./---
+                :`ooooo`/`              .:.ooooo :
+                :`ooooo./`              .:-ooooo :
+                :`ooooo./`              .:-ooooo :
+            `...:-+++++:/.              ./:+++++-:...`
+           :-.````````/../              /.-:````````.:-
+          -/::::::::://:/+             `+/:+::::::::::+.
+          :oooooooooooo++/              +++oooooooooooo-
+
+                           Webdriver.IO
+              Next-gen browser and mobile automation
+                    test framework for Node.js
+
+
+Installing @wdio/cli to initialize project...
+✔ Success!
+
+===============================
+🤖 WDIO Configuration Wizard 🧙
+===============================
+
+✔ A project named "tempura" was detected at "/home/turkycat/scratch/swan/tempura", correct? yes
+✔ What type of testing would you like to do? E2E Testing - of Web or Mobile Applications
+✔ Where is your automation backend located? On my local machine
+✔ Which environment you would like to automate? Web - web applications in the browser
+✔ With which browser should we start?
+✔ Which framework do you want to use? Mocha (https://mochajs.org/)
+✔ Do you want to use Typescript to write tests? yes
+✔ Do you want WebdriverIO to autogenerate some test files? yes
+✔ What should be the location of your spec files? /home/turkycat/scratch/swan/tempura/test/specs/**/*.ts
+✔ Do you want to use page objects (https://martinfowler.com/bliki/PageObject.html)? yes
+✔ Where are your page objects located? /home/turkycat/scratch/swan/tempura/test/pageobjects/**/*.ts
+✔ Which reporter do you want to use?
+✔ Do you want to add a plugin to your test setup?
+✔ Would you like to include Visual Testing to your setup? For more information see https://webdriver.io/docs/visual-testing! no
+✔ Do you want to add a service to your test setup?
+✔ Do you want me to run `pnpm install` no
+`````````
+
 ### run the application
 
 1. checkout this repo and cd into it
