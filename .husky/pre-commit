@@ -17,7 +17,7 @@ git stash -q --keep-index
 pnpm build
 
 # 4. Stage the generated build products
-git update-index --add dist/**/*.*
+git update-index --add $(find dist -name '*.*')
 
 # 5. Return the non-generated files and stash to their original state
 git apply --whitespace=nowarn --allow-empty < .tmp.stash.$$
