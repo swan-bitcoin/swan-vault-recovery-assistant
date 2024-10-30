@@ -205,13 +205,13 @@ fn get_hwi() -> Result<Command, TempuraError> {
 
 fn get_wallet(
   network: Network,
-  receive: String,
+  receive_str: String,
   change: Option<String>,
 ) -> Result<bdk::Wallet<MemoryDatabase>, TempuraError> {
   let secp = Secp256k1::new();
   let network: bdk::bitcoin::Network = network.into();
   let receive = resolve!(
-    receive.into_wallet_descriptor(&secp, network),
+    receive_str.into_wallet_descriptor(&secp, network),
     TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
   );
   let change = match change {
@@ -219,7 +219,21 @@ fn get_wallet(
       change.into_wallet_descriptor(&secp, network),
       TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
     )),
-    None => None,
+    None => {
+      match receive.0.is_multipath() && receive.0.has_wildcard() {
+        true => None,
+        false => {
+          let new_change = receive_str.replace("/0/*", "/1/*");
+          match new_change == receive_str {
+            true => None,
+            false => Some(resolve!(
+              new_change.into_wallet_descriptor(&secp, network),
+              TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+            ))
+          }
+        }
+      }
+    }
   };
 
   Ok(resolve!(
