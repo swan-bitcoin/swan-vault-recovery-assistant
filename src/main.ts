@@ -164,6 +164,35 @@ async function getAddress() {
     DOM.tempMessage.textContent = 'Address retrieved successfully!'
     const tempuraBubble = createConversationBubble(Address({ address }))
     DOM.conversation.appendChild(tempuraBubble)
+
+    // Attach click event to the copy button
+    const copyButton = tempuraBubble.querySelector<HTMLButtonElement>('#copy-address-button')
+    if (copyButton) {
+      copyButton.addEventListener('click', () => {
+        toClipboard(address)
+          .then(() => {
+            // Change the tooltip text
+            const tooltip = copyButton.closest('.tooltip')
+            tooltip.setAttribute('data-tip', 'Copied')
+
+            // Show a checkmark within the copy icon
+            const copyIcon = copyButton.querySelector('#copy-icon')
+            copyIcon.classList.add('copied') // animation effect
+            const checkmark = copyIcon.querySelector('#checkmark')
+            checkmark.classList.remove('hidden')
+
+            // Reset after delay
+            setTimeout(() => {
+              tooltip.setAttribute('data-tip', 'Copy')
+              checkmark.classList.add('hidden')
+              copyIcon.classList.remove('copied')
+            }, 2000)
+          })
+          .catch(() => {
+            DOM.tempMessage.textContent = 'Failed to copy address to clipboard'
+          })
+      })
+    }
   } catch (e: unknown) {
     handleError(e)
   }
