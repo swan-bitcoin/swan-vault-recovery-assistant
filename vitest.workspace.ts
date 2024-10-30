@@ -17,9 +17,9 @@ export default defineWorkspace([
           singleThread: true,
         },
       },
-      name: 'integration',
+      name: 'scenario',
       include: ['**/test/*.test.ts'],
-      setupFiles: ['./test/setup.integration.ts'],
+      setupFiles: ['./test/setup.scenario.ts'],
     },
   },
 ])

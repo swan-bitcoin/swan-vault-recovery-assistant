@@ -50,7 +50,7 @@ beforeAll(
     }
 
     log('-----------------------------------------')
-    log('initiating regtest integration test')
+    log('initiating regtest scenario test')
     log('using prng seed:', seed)
     log('-----------------------------------------')
 
