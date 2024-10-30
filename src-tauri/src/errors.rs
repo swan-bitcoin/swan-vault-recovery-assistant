@@ -30,6 +30,7 @@ pub enum TempuraErrorType {
   PsbtError,
   PsbtSignError,
   TransactionError,
+  TransactionsError,
   WalletSyncError,
   #[default]
   UnknownError,
@@ -53,6 +54,7 @@ impl std::fmt::Display for TempuraErrorType {
       TempuraErrorType::PsbtError => write!(f, "PsbtError"),
       TempuraErrorType::PsbtSignError => write!(f, "PsbtSignError"),
       TempuraErrorType::TransactionError => write!(f, "TransactionError"),
+      TempuraErrorType::TransactionsError => write!(f, "TransactionsError"),
       TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
       TempuraErrorType::UnknownError => write!(f, "UnknownError"),
     }
