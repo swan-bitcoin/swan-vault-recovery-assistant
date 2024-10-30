@@ -167,6 +167,7 @@
             <div class="card-actions justify-end mb-6">
               <button type="button" class="btn btn-outline btn-primary btn-sm" id="new-address-button">New Address</button>
               <button type="button" class="btn btn-primary btn-sm" id="fetch-balance-button">Fetch Balance</button>
+              <button type="button" class="btn btn-primary btn-sm" id="fetch-transactions-button">Fetch Transactions</button>
             </div>
           </div>
         </div>
@@ -238,5 +239,38 @@
         <p>&copy; 2024 Tempura. All rights reserved.</p>
       </div>
     </footer>
+
+    <!-- Transactions Modal -->
+    <dialog id="transactions-modal" class="modal">
+      <div class="modal-box w-11/12 max-w-5xl">
+        <h3 class="text-lg font-bold">Transactions</h3>
+        <div class="w-9/12 h-96 overflow-x-auto">
+          <table class="table table-xs table-pin-rows">
+            <thead>
+              <tr>
+                <th>Txid</th>
+                <th>Sent</th>
+                <th>Received</th>
+                <th>Fee</th>
+              </tr>
+            </thead>
+            <tbody id="transactions-body">
+              <tr>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal-action">
+          <form method="dialog">
+            <!-- if there is a button in form, it will close the modal -->
+            <button class="btn">Close</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
   </body>
 </html>

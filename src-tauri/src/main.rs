@@ -45,6 +45,74 @@ impl From<bdk::wallet::AddressInfo> for AddressInfo {
   }
 }
 
+#[derive(Default, Serialize, Deserialize, Type)]
+pub struct TxIn {
+  pub txid: String,
+  pub vout: u32,
+}
+
+impl From<&bdk::bitcoin::blockdata::transaction::TxIn> for TxIn {
+  fn from(i: &bdk::bitcoin::blockdata::transaction::TxIn) -> Self {
+    TxIn {
+      txid: i.previous_output.txid.to_string(),
+      vout: i.previous_output.vout,
+    }
+  }
+}
+
+#[derive(Default, Serialize, Deserialize, Type)]
+pub struct TxOut {
+  pub address: Option<String>,
+  pub script: String,
+  pub amount: String,
+}
+
+impl From<&bdk::bitcoin::blockdata::transaction::TxOut> for TxOut {
+  fn from(o: &bdk::bitcoin::blockdata::transaction::TxOut) -> Self {
+    TxOut {
+      address: None,
+      script: o.script_pubkey.to_asm_string(),
+      amount: o.value.to_string(),
+    }
+  }
+}
+
+#[derive(Default, Serialize, Deserialize, Type)]
+pub struct Transaction {
+  pub version: i32,
+  pub locktime: u32,
+  pub ins: Vec<TxIn>,
+  pub outs: Vec<TxOut>,
+  pub txid: String,
+  pub received: String,
+  pub sent: String,
+  pub fee: String,
+  pub confirmation_height: Option<u32>,
+}
+
+impl TryFrom<&bdk::TransactionDetails> for Transaction {
+  type Error = &'static str;
+
+  fn try_from(td: &bdk::TransactionDetails) -> Result<Self, Self::Error> {
+    match &td.transaction {
+      None => Err("Required raw transaction data not present"),
+      Some(tx) => {
+        Ok(Transaction {
+          version: tx.version.into(),
+          locktime: tx.lock_time.to_consensus_u32(),
+          ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
+          outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
+          txid: td.txid.to_string(),
+          received: td.received.to_string(),
+          sent: td.sent.to_string(),
+          fee: td.fee.unwrap().to_string(),
+          confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
+        })
+      }
+    }
+  }
+}
+
 // this type is copied from BDK so that we can specta-derive it,
 // but unfortunately u64 is not supported, so we must convert to string.
 #[derive(Default, Serialize, Deserialize, Type)]
@@ -430,6 +498,41 @@ async fn sweep(
   })
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn transactions(
+  network: String,
+  receive: String,
+  change: Option<String>,
+  electrum: Option<String>,
+) -> Result<Vec<Transaction>, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let blockchain = get_blockchain(network, electrum)?;
+  let wallet = get_wallet(network, receive, change)?;
+
+  // Execute blocking wallet sync and balance retrieval in a separate thread context.
+  tokio::task::block_in_place(|| {
+    resolve!(
+      wallet.sync(&blockchain, SyncOptions::default()),
+      TempuraErrorType::WalletSyncError
+    );
+
+    let tds = resolve!(wallet.list_transactions(true), TempuraErrorType::TransactionsError);
+    tds.into_iter().map(|td| {
+      let mut t = resolve!(TryInto::<Transaction>::try_into(&td), TempuraErrorType::TransactionsError);
+
+      // Populating addresses requires the network, so can't be done in the main `try_into`
+      let bdk_tx = resolve!(td.transaction.ok_or("Missing required raw transaction"), TempuraErrorType::TransactionsError);
+      (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
+        let script = bdk_tx.output[x].script_pubkey.as_script();
+        o.address = bdk::bitcoin::Address::from_script(script, network.into()).ok().map(|a| a.to_string());
+      });
+      Ok(t)
+    }).collect()
+  })
+}
+
+
 /**
  * entrypoint
  */
@@ -445,7 +548,8 @@ fn main() {
       is_descriptor,
       is_descriptor_for_network,
       sign,
-      sweep
+      sweep,
+      transactions,
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}

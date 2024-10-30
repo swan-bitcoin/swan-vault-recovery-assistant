@@ -100,7 +100,21 @@ const commands = {
   async sweep(address, feeRate, network, receive, change, electrum) {
     return await invoke('sweep', { address, feeRate, network, receive, change, electrum })
   },
+  async transactions(network, receive, change, electrum) {
+    return await invoke('transactions', { network, receive, change, electrum })
+  },
 }
+const TxRow = (transaction) => {
+  return `
+      <tr>
+        <td>${transaction.txid}</td>
+        <td>${transaction.sent}</td>
+        <td>${transaction.received}</td>
+        <td>${transaction.fee}</td>
+      </tr>
+    `
+}
+const Transactions = (transactions) => transactions.map(TxRow).join('\n')
 const Success = (text) => `
 <div class="flex gap-1 items-center">
   <svg
@@ -343,6 +357,23 @@ async function getBalance() {
     handleError(e)
   }
 }
+async function getTransactions() {
+  const { recv, change, electrum, network } = getInputs()
+  require2(recv, 'Receive Descriptor')
+  DOM.tempMessage.textContent = 'Fetching transactions ...'
+  try {
+    const userBubble = createConversationBubble('Show me my transactions', true)
+    DOM.conversation.appendChild(userBubble)
+    const transactions = await commands.transactions(network, recv, change, electrum)
+    DOM.txModal.showModal()
+    DOM.txBody.innerHTML = Transactions(transactions)
+    DOM.tempMessage.textContent = 'Transactions fetched successfully!'
+    const tempuraBubble = createConversationBubble(`${transactions.length} transactions fetched`)
+    DOM.conversation.appendChild(tempuraBubble)
+  } catch (e) {
+    handleError(e)
+  }
+}
 async function getAddress() {
   const { recv, electrum, network } = getInputs()
   require2(recv, 'Receive Descriptor')
@@ -458,6 +489,8 @@ window.addEventListener('DOMContentLoaded', () => {
   let tempMessage = void 0
   try {
     tempMessage = requireDomElement('#temporary-message')
+    const txBody = requireDomElement('#transactions-body')
+    const txModal = requireDomElement('#transactions-modal')
     const conversation = requireDomElement('#conversation')
     const addressInput = requireDomElement('#address-input')
     const changeInput = requireDomElement('#change-input')
@@ -472,6 +505,8 @@ window.addEventListener('DOMContentLoaded', () => {
       electrumInput,
       feeRateInput,
       tempMessage,
+      txBody,
+      txModal,
       conversation,
       networkRadios,
       psbtTextArea,
@@ -484,6 +519,10 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement('#fetch-balance-button').addEventListener('click', (e) => {
       e.preventDefault()
       getBalance()
+    })
+    requireDomElement('#fetch-transactions-button').addEventListener('click', (e) => {
+      e.preventDefault()
+      getTransactions()
     })
     requireDomElement('#new-address-button').addEventListener('click', (e) => {
       e.preventDefault()

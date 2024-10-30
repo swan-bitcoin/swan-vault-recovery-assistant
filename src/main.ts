@@ -1,6 +1,6 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, type TempuraError } from './bindings'
-import { Address, Balance, Success } from './components'
+import { Address, Balance, Success, Transactions } from './components'
 import { createConversationBubble } from './helpers'
 import { getDevice, getDeviceMessage, getDevicePrompt, getSignMessageAndPsbt } from './parsing'
 
@@ -10,6 +10,8 @@ let DOM: {
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
   tempMessage: HTMLDivElement
+  txBody: HTMLTableSectionElement
+  txModal: HTMLDialogElement
   conversation: HTMLDivElement
   networkRadios: NodeListOf<HTMLInputElement>
   psbtTextArea: HTMLTextAreaElement
@@ -125,6 +127,25 @@ async function getBalance() {
         unconfirmed: balance.untrusted_pending,
       })
     )
+    DOM.conversation.appendChild(tempuraBubble)
+  } catch (e: unknown) {
+    handleError(e)
+  }
+}
+
+async function getTransactions() {
+  const { recv, change, electrum, network } = getInputs()
+  require(recv, 'Receive Descriptor')
+  DOM.tempMessage.textContent = 'Fetching transactions ...'
+
+  try {
+    const userBubble = createConversationBubble('Show me my transactions', true)
+    DOM.conversation.appendChild(userBubble)
+    const transactions = await commands.transactions(network, recv, change, electrum)
+    DOM.txModal.showModal()
+    DOM.txBody.innerHTML = Transactions(transactions)
+    DOM.tempMessage.textContent = 'Transactions fetched successfully!'
+    const tempuraBubble = createConversationBubble(`${transactions.length} transactions fetched`)
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
@@ -260,6 +281,8 @@ window.addEventListener('DOMContentLoaded', () => {
   let tempMessage: HTMLDivElement | undefined = undefined
   try {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
+    const txBody = requireDomElement<HTMLTableSectionElement>('#transactions-body')
+    const txModal = requireDomElement<HTMLDialogElement>('#transactions-modal')
     const conversation = requireDomElement<HTMLDivElement>('#conversation')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
@@ -275,6 +298,8 @@ window.addEventListener('DOMContentLoaded', () => {
       electrumInput,
       feeRateInput,
       tempMessage,
+      txBody,
+      txModal,
       conversation,
       networkRadios,
       psbtTextArea,
@@ -289,6 +314,11 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement<HTMLButtonElement>('#fetch-balance-button').addEventListener('click', (e) => {
       e.preventDefault()
       getBalance()
+    })
+
+    requireDomElement<HTMLButtonElement>('#fetch-transactions-button').addEventListener('click', (e) => {
+      e.preventDefault()
+      getTransactions()
     })
 
     requireDomElement<HTMLButtonElement>('#new-address-button').addEventListener('click', (e) => {

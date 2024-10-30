@@ -36,6 +36,9 @@ async sign(psbt: string, network: string, deviceType: string) : Promise<string> 
 },
 async sweep(address: string, feeRate: number, network: string, receive: string, change: string | null, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, receive, change, electrum });
+},
+async transactions(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Transaction[]> {
+    return await TAURI_INVOKE("transactions", { network, receive, change, electrum });
 }
 }
 
@@ -74,6 +77,9 @@ untrusted_pending: string;
 confirmed: string }
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null }
 export type TempuraError = { error_type: string; message: string }
+export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }
+export type TxIn = { txid: string; vout: number }
+export type TxOut = { address: string | null; script: string; amount: string }
 
 /** tauri-specta globals **/
 
