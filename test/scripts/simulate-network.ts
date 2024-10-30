@@ -1,17 +1,13 @@
-import { exec } from 'child_process'
 import RegtestClient from 'test/util/regtest.client'
 import { generateKey, getAddress, keyToDescriptor, mnemonicToKey } from '../util/bitcoin'
+import { BITCOIN_RPC_ERROR_CODE, ONE_SECOND } from '../util/constants'
+import { ensureDockerStack } from '../util/container'
 
-const CONTAINER_NAME = 'tempura-fulcrum'
 const DEFAULT_WALLET_MNEMONIC = 'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine'
 
 // time
-const ONE_SECOND = 1_000
 const MINIMUM_BLOCK_INTERVAL_MS = 10 * ONE_SECOND
 const MAXIMUM_BLOCK_INTERVAL_MS = 30 * ONE_SECOND
-
-// error codes
-const ERROR_CODE_INSUFFICIENT_FUNDS = -6
 
 const client = new RegtestClient()
 
@@ -20,52 +16,6 @@ function log(message: string, ...args: any): void {
 }
 function logSeparator(): void {
   log('-------------------------------------------------------')
-}
-
-function execCommand(command: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    log('executing command:', command)
-    const process = exec(command, (error) => {
-      if (error) {
-        reject(`error executing command: ${error.message}`)
-      }
-
-      process.stdout?.on('data', (data) => {
-        log('process stdout:', data.toString())
-      })
-      process.stderr?.on('data', (data) => {
-        log('process stderr:', data.toString())
-      })
-
-      resolve()
-    })
-  })
-}
-
-async function isContainerRunning(containerName: string): Promise<boolean> {
-  log(`checking if '${containerName}' is running`)
-  try {
-    await execCommand(`docker inspect -f '{{.State.Running}}' ${containerName}`)
-    log(`'${containerName}' is running`)
-    return true
-  } catch (error) {
-    log(`'${containerName}' is not running`)
-    return false
-  }
-}
-
-async function waitForContainer(containerName: string, timeout: number = 30 * ONE_SECOND): Promise<void> {
-  const start = Date.now()
-  while (Date.now() - start < timeout) {
-    try {
-      await isContainerRunning(containerName)
-      return
-    } catch (error) {
-      log(`Waiting for ${containerName} to be running...`)
-      await new Promise((resolve) => setTimeout(resolve, 2 * ONE_SECOND))
-    }
-  }
-  throw new Error(`'${containerName}' did not start within ${timeout / ONE_SECOND} seconds. Check your docker logs.`)
 }
 
 async function simulateBlock(address: string, numTransactions?: number): Promise<void> {
@@ -79,7 +29,7 @@ async function simulateBlock(address: string, numTransactions?: number): Promise
     try {
       await client.sendToAddress(address, amount)
     } catch (e) {
-      if (e.code === ERROR_CODE_INSUFFICIENT_FUNDS) {
+      if (e.code === BITCOIN_RPC_ERROR_CODE.INSUFFICIENT_FUNDS) {
         log('insufficient funds to continue sending to address, mining a block')
         await client.mineBlocks(1)
         continue
@@ -96,12 +46,7 @@ async function main() {
   logSeparator()
   log('initializing network...')
   logSeparator()
-  if (!(await isContainerRunning(CONTAINER_NAME))) {
-    log('the docker stack does not appear to be running, attempting to start it...')
-    await execCommand('docker compose up -d')
-    await waitForContainer(CONTAINER_NAME)
-    log('the docker stack appears to be running. you may find the logs from `docker compose logs -f` useful.')
-  }
+  await ensureDockerStack()
 
   await client.initialize()
   const info = await client.getBlockchainInfo()
