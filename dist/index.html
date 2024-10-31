@@ -67,7 +67,7 @@
               <span class="text-4xl">🍤</span>
             </div>
             <div class="chat-bubble chat-bubble-primary" id="temporary-message">
-              Hi there! To start, enter your descriptors.
+              Hi there! To start, enter your wallet configuration.
             </div>
           </div>
         </div>
@@ -82,22 +82,37 @@
             <!-- Receive descriptor -->
             <div class="form-control mb-3">
               <div class="label justify-normal gap-2">
-                <label class="label-text">Receive Descriptor</label>
+                <label class="label-text">Wallet Configuration</label>
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
                     class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
                   >
-                    A receive descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
-                    <code>/0/*</code> and a checksum.
+                    Enter a receive or combined descriptor. For Swan Vault recovery, use the "Wallet Configuration"
+                    descriptor under "Advanced Wallet Information". Receive descriptors typically start with
+                    <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code> and a checksum; combined descriptors
+                    end with <code>/&lt;0;1&gt;/*</code> and a checksum.
                   </div>
                 </div>
               </div>
-              <input class="input input-bordered" id="receive-input" type="text" />
+              <label class="input input-bordered flex items-center gap-3" id="receive-input-container">
+                <input id="receive-input" class="grow" type="text" />
+                <svg
+                  id="receive-input-checkmark"
+                  class="invisible opacity-0 transition-opacity duration-200 ease-in-out"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path d="M6 12l4 4L18 8" stroke="green" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </label>
             </div>
 
             <!-- Change descriptor -->
-            <div class="form-control mb-3">
+            <div class="form-control mb-3 dev-only">
               <div class="label justify-normal gap-2">
                 <label class="label-text">Change Descriptor</label>
                 <div class="group">
@@ -105,12 +120,13 @@
                   <div
                     class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
                   >
-                    A change descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
-                    <code>/1/*</code> and a checksum.
+                    You only need to enter a change descriptor if it does not end in <code>/1/*</code>. By default, Tempura
+                    automatically derives the change descriptor from your receive descriptor if it ends with
+                    <code>/1/*</code>, which is the most common format.
                   </div>
                 </div>
               </div>
-              <input class="input input-bordered" id="change-input" type="text" />
+              <input class="input w-full" id="change-input" type="text" />
             </div>
 
             <!-- Custom Electrum server -->
