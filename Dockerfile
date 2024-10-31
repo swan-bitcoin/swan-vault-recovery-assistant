@@ -19,7 +19,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y \
   build-essential \
   curl \
-  wget \
   file \
   libwebkit2gtk-4.1-dev \
   libssl-dev \
