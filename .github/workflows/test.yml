@@ -3,9 +3,9 @@ name: CI
 # Controls when the workflow will run
 on:
   push:
-    branches: [jdf/xvfb-scenario-suite-ci]
-  # pull_request:
-  #   types: [opened, synchronize]
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
   unit-test:
@@ -67,8 +67,41 @@ jobs:
       - name: install project dependencies
         run: HUSKY=0 pnpm install --frozen-lockfile
 
+      - name: restore cargo cache
+        id: restore-cargo-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+            !src-tauri/target/release/hwi
+            !src-tauri/target/release/tempura
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/test.yml') }}
+
       - name: install the tauri driver if necessary
-        run: cargo install tauri-driver
+        run: |
+          if ! command -v tauri-driver &> /dev/null; then
+            cargo install tauri-driver
+          fi
+
+      - name: build tempura
+        run: pnpm tauri build --no-bundle
+
+      - name: save cargo cache
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+            !src-tauri/target/release/hwi
+            !src-tauri/target/release/tempura
+          key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
       - name: run the tests
-        run: xvfb-run -a pnpm test:scenario
+        run: TEMPURA_SKIP_SCENARIO_BUILD=1 xvfb-run -a pnpm test:scenario

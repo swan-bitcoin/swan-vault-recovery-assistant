@@ -5,7 +5,6 @@ import * as crypto from 'crypto'
 import { afterAll, beforeAll, should } from 'vitest'
 import { spawn, spawnSync } from 'child_process'
 import { Builder, By, Capabilities } from 'selenium-webdriver'
-// import { webkit } from 'playwright'
 
 function log(message: string, ...args: any): void {
   console.log('[TEST][SETUP]', message, ...args)
@@ -65,24 +64,27 @@ function hashFiles(paths: string[]): string {
 }
 
 beforeAll(async () => {
-  // perform a build if the hash file doesn't exist (first run) or if the source files have changed
-  let currentHash
-  let shouldBuild = !fs.existsSync(hashFile)
-  if (!shouldBuild) {
-    const previousHash = fs.readFileSync(hashFile, 'utf8')
-
-    // gen the the frontend 'dist' contents and hash the source directories
-    await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
-    currentHash = hashFiles(sourcePaths)
-    shouldBuild = currentHash !== previousHash
-  }
-
-  if (shouldBuild) {
-    log('build files have changed, building...')
-    await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
-    fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
+  if (process.env.TEMPURA_SKIP_SCENARIO_BUILD) {
+    log('TEMPURA_SKIP_SCENARIO_BUILD is set- skipping build.')
   } else {
-    log('build will be skipped because source files have not changed')
+    // perform a build if the hash file doesn't exist (first run) or if the source files have changed
+    let currentHash
+    let shouldBuild = !fs.existsSync(hashFile)
+    if (!shouldBuild) {
+      const previousHash = fs.readFileSync(hashFile, 'utf8')
+
+      // gen the the frontend 'dist' contents and hash the source directories
+      await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
+      currentHash = hashFiles(sourcePaths)
+      shouldBuild = currentHash !== previousHash
+    }
+
+    if (shouldBuild) {
+      await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
+      fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
+    } else {
+      log('build will be skipped because source files have not changed')
+    }
   }
 
   tauriDriver = spawn(path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver'), [], {
@@ -90,14 +92,9 @@ beforeAll(async () => {
     stdio: 'inherit',
   })
 
-  // const browser = await webkit.launch({ headless: true })
-  // const context = await browser.newContext()
-  // const page = await context.newPage()
-
   const capabilities = new Capabilities()
   capabilities.set('tauri:options', { application })
   capabilities.setLoggingPrefs({ browser: 'ALL', driver: 'ALL', server: 'ALL' })
-  // capabilities.setBrowserName('playwright-webkit')
   capabilities.setBrowserName('wry')
 
   // start the webdriver client
