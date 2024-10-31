@@ -1,7 +1,7 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import { createConversationBubble } from './helpers'
+import { createConversationBubble, isChangeDescriptor } from './helpers'
 import { getDevice, getDeviceMessage, getDevicePrompt, getSignMessageAndPsbt } from './parsing'
 
 let DOM: {
@@ -37,6 +37,53 @@ function handleError(e: unknown) {
   }
 
   DOM.tempMessage.textContent = 'An unknown error occurred'
+}
+
+const validateDescriptor = async () => {
+  const descriptor = DOM.receiveInput.value
+  const network = Array.from(DOM.networkRadios).find((radio) => radio.checked).value
+  const standardWalletActions = document.getElementById('standard-wallet-actions')
+  const recoveryOptionsCard = document.getElementById('recovery-options-card')
+
+  if (!descriptor) {
+    DOM.tempMessage.textContent = 'Wallet configuration is missing!'
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
+
+  // Check if the descriptor is a change descriptor
+  if (isChangeDescriptor(descriptor)) {
+    DOM.tempMessage.textContent = 'You are trying to use a change descriptor! Please provide a receive descriptor instead.'
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
+
+  try {
+    const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
+    if (!isValidDescriptor) {
+      DOM.tempMessage.textContent =
+        'Descriptor is fine but it is for the wrong network. Switch to Advanced Mode to change the network!'
+      DOM.receiveInput.classList.add('textarea-error')
+      DOM.receiveInput.classList.remove('textarea-success')
+      return false
+    }
+
+    // Descriptor is valid, show now wallet actions and recovery options card (one way switch)
+    DOM.receiveInput.classList.add('textarea-success')
+    DOM.receiveInput.classList.remove('textarea-error')
+    DOM.tempMessage.textContent =
+      'Your wallet configuration is valid. You can now fetch your balance and perform other actions.'
+    recoveryOptionsCard.classList.remove('hidden')
+    standardWalletActions.classList.remove('hidden')
+    return true
+  } catch (error) {
+    handleError(error)
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
 }
 
 type Inputs = {
@@ -79,7 +126,8 @@ function require(value: unknown, itemName: string) {
 
 async function broadcast() {
   const { recv, change, electrum, network, psbt } = getInputs()
-  require(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   require(psbt, 'PSBT')
 
   DOM.tempMessage.textContent = 'Please wait...'
@@ -113,7 +161,8 @@ async function enumerate() {
 
 async function getBalance() {
   const { recv, change, electrum, network } = getInputs()
-  require(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching balance ...'
 
   try {
@@ -135,7 +184,8 @@ async function getBalance() {
 
 async function getTransactions() {
   const { recv, change, electrum, network } = getInputs()
-  require(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching transactions ...'
 
   try {
@@ -154,8 +204,8 @@ async function getTransactions() {
 
 async function getAddress() {
   const { recv, electrum, network } = getInputs()
-  require(recv, 'Receive Descriptor')
-
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
   try {
     const userBubble = createConversationBubble('Give me an address!', true)
@@ -271,7 +321,8 @@ async function sweep() {
   const inputs = getInputs()
   const { address, recv, change, electrum, network } = inputs
   let { feeRate } = inputs
-  require(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   require(address, 'Address')
 
   DOM.tempMessage.textContent = 'Please wait...'
@@ -383,6 +434,13 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement<HTMLButtonElement>('#enumerate-button').addEventListener('click', (e) => {
       e.preventDefault()
       enumerate()
+    })
+
+    // Add event listeners for validation of descriptor
+    receiveInput.addEventListener('blur', validateDescriptor)
+    receiveInput.addEventListener('input', validateDescriptor)
+    DOM.networkRadios.forEach((radio) => {
+      radio.addEventListener('change', validateDescriptor)
     })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
