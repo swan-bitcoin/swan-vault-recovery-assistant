@@ -2768,6 +2768,10 @@ html {
   --tw-text-opacity: 1;
   color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
 }
+.text-success {
+  --tw-text-opacity: 1;
+  color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));
+}
 .opacity-50 {
   opacity: 0.5;
 }

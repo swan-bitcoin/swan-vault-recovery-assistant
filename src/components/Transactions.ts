@@ -1,12 +1,13 @@
 import { Transaction } from '../bindings'
+import { Sats } from '.'
 
 const TxRow = (transaction: Transaction) => {
   return `
       <tr>
         <td>${transaction.txid}</td>
-        <td>${transaction.sent}</td>
-        <td>${transaction.received}</td>
-        <td>${transaction.fee}</td>
+        <td>${Sats(transaction.sent)}</td>
+        <td class="${Number(transaction.received) > 0 ? 'text-success' : ''}">${Sats(transaction.received)}</td>
+        <td>${Sats(transaction.fee)}</td>
       </tr>
     `
 }

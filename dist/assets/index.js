@@ -104,13 +104,24 @@ const commands = {
     return await invoke('transactions', { network, receive, change, electrum })
   },
 }
+const DECIMAL_SEP = Number(1.1).toLocaleString().slice(1, 2)
+const Sats = (sats) => {
+  const satsStr = Math.round(Number(sats)).toString().padStart(9, '0')
+  const btcStr = Number.parseInt(satsStr.slice(0, -8)).toLocaleString() + DECIMAL_SEP
+  const combinedStr = btcStr + satsStr.slice(-8, -6) + ' ' + satsStr.slice(-6, -3) + ' ' + satsStr.slice(-3)
+  const firstNonZeroIndex = combinedStr.search(/[1-9]/)
+  const splitIndex = firstNonZeroIndex === -1 ? combinedStr.length : firstNonZeroIndex
+  const leading = combinedStr.slice(0, splitIndex)
+  const trailing = combinedStr.slice(splitIndex)
+  return `₿<span class="opacity-50">${leading}</span>${trailing}`
+}
 const TxRow = (transaction) => {
   return `
       <tr>
         <td>${transaction.txid}</td>
-        <td>${transaction.sent}</td>
-        <td>${transaction.received}</td>
-        <td>${transaction.fee}</td>
+        <td>${Sats(transaction.sent)}</td>
+        <td class="${Number(transaction.received) > 0 ? 'text-success' : ''}">${Sats(transaction.received)}</td>
+        <td>${Sats(transaction.fee)}</td>
       </tr>
     `
 }
@@ -135,11 +146,11 @@ const Balance = ({ confirmed, unconfirmed }) => {
   return `
       <h1>Your Balance</h1>
       <div class="stat">
-        <div class="stat-value">${confirmed} sats</div>
+        <div class="stat-value">${Sats(confirmed)}</div>
         <div class="stat-desc">Confirmed</div>
       </div>
       <div class="stat">
-        <div class="stat-value">${unconfirmed} sats</div>
+        <div class="stat-value">${Sats(unconfirmed)}</div>
         <div class="stat-desc">Unconfirmed</div>
       </div>
     `
