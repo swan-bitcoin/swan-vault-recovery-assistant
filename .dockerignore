@@ -7,8 +7,6 @@ dist
 node_modules
 README.md
 src-tauri/target
-test
-src/**/*.test.ts
 
 # hwi binaries used locally
 src-tauri/hwi**

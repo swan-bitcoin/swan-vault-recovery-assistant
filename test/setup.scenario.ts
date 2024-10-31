@@ -6,6 +6,10 @@ import { afterAll, beforeAll, should } from 'vitest'
 import { spawn, spawnSync } from 'child_process'
 import { Builder, By, Capabilities } from 'selenium-webdriver'
 
+function log(message: string, ...args: any): void {
+  console.log('[TEST][SETUP]', message, ...args)
+}
+
 export let driver
 let tauriDriver
 
@@ -34,6 +38,8 @@ function hashFiles(paths: string[]): string {
   const hash = crypto.createHash('sha256')
 
   function hashPath(p: string) {
+    if (!fs.existsSync(p)) return
+
     const stat = fs.statSync(p)
     if (stat.isFile()) {
       const content = fs.readFileSync(p)
@@ -58,23 +64,27 @@ function hashFiles(paths: string[]): string {
 }
 
 beforeAll(async () => {
-  // perform a build if the hash file doesn't exist (first run) or if the source files have changed
-  let currentHash
-  let shouldBuild = !fs.existsSync(hashFile)
-  if (!shouldBuild) {
-    const previousHash = fs.readFileSync(hashFile, 'utf8')
-
-    // gen the the frontend 'dist' contents and hash the source directories
-    await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
-    currentHash = hashFiles(sourcePaths)
-    shouldBuild = currentHash !== previousHash
-  }
-
-  if (shouldBuild) {
-    await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
-    fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
+  if (process.env.TEMPURA_SKIP_SCENARIO_BUILD) {
+    log('TEMPURA_SKIP_SCENARIO_BUILD is set- skipping build.')
   } else {
-    console.log('build will be skipped because source files have not changed')
+    // perform a build if the hash file doesn't exist (first run) or if the source files have changed
+    let currentHash
+    let shouldBuild = !fs.existsSync(hashFile)
+    if (!shouldBuild) {
+      const previousHash = fs.readFileSync(hashFile, 'utf8')
+
+      // gen the the frontend 'dist' contents and hash the source directories
+      await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
+      currentHash = hashFiles(sourcePaths)
+      shouldBuild = currentHash !== previousHash
+    }
+
+    if (shouldBuild) {
+      await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
+      fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
+    } else {
+      log('build will be skipped because source files have not changed')
+    }
   }
 
   tauriDriver = spawn(path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver'), [], {
@@ -84,6 +94,7 @@ beforeAll(async () => {
 
   const capabilities = new Capabilities()
   capabilities.set('tauri:options', { application })
+  capabilities.setLoggingPrefs({ browser: 'ALL', driver: 'ALL', server: 'ALL' })
   capabilities.setBrowserName('wry')
 
   // start the webdriver client

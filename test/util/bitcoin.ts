@@ -1,11 +1,13 @@
-import bitcoin, { networks } from 'bitcoinjs-lib'
+import bitcoin from 'bitcoinjs-lib'
 import { BIP32Factory } from 'bip32'
 import * as ecc from 'tiny-secp256k1'
 const bip32 = BIP32Factory(ecc)
 import * as bip39 from 'bip39'
 
-const DERIVATION_PATH_WPKH_TICK = "m/84'/1'/0'"
-const DERIVATION_PATH_WPKH_H = DERIVATION_PATH_WPKH_TICK.replace(/'/g, 'h')
+const DERIVATION_PATH_BIP84_PRIME = "m/84'/1'/0'"
+const DERIVATION_PATH_WPKH_H = DERIVATION_PATH_BIP84_PRIME.replace(/'/g, 'h')
+const DERIVATION_PATH_BIP48_PRIME = "m/48'/1'/0'/2'"
+const DERIVATION_PATH_BIP48_H = DERIVATION_PATH_BIP48_PRIME.replace(/'/g, 'h')
 
 export type Key = {
   master: {
@@ -20,7 +22,7 @@ export type Key = {
 
 export function mnemonicToKey(mnemonic: string): Key {
   const master = bip32.fromSeed(bip39.mnemonicToSeedSync(mnemonic), bitcoin.networks.regtest)
-  const derived = master.derivePath(DERIVATION_PATH_WPKH_TICK)
+  const derived = master.derivePath(DERIVATION_PATH_BIP84_PRIME)
   return {
     master: {
       fingerprint: master.fingerprint.toString('hex'),
@@ -36,7 +38,7 @@ export function mnemonicToKey(mnemonic: string): Key {
 export function xprvToKey(xprv: string): Key {
   const master = bip32.fromBase58(xprv, bitcoin.networks.regtest)
 
-  const derived = master.derivePath(DERIVATION_PATH_WPKH_TICK)
+  const derived = master.derivePath(DERIVATION_PATH_BIP84_PRIME)
   return {
     master: {
       fingerprint: master.fingerprint.toString('hex'),
@@ -53,7 +55,7 @@ export const generateKey = (): Key => {
   // this should go without saying, but dont use this for a real wallet ya dingus
   const seed = bitcoin.crypto.sha256(Buffer.from(Math.random().toString()))
   const master = bip32.fromSeed(seed, bitcoin.networks.regtest)
-  const derived = master.derivePath(DERIVATION_PATH_WPKH_TICK)
+  const derived = master.derivePath(DERIVATION_PATH_BIP84_PRIME)
   return {
     master: {
       fingerprint: master.fingerprint.toString('hex'),
@@ -77,6 +79,6 @@ export const getAddress = (key: Key, path?: string): string => {
 }
 
 export const keyToDescriptor = (key: Key, pub: boolean = true): string => {
-  const meta = DERIVATION_PATH_WPKH_TICK.replace(/^m/, key.master.fingerprint)
+  const meta = DERIVATION_PATH_BIP84_PRIME.replace(/^m/, key.master.fingerprint)
   return `wpkh([${meta}]${pub ? key.derived.tpub : key.derived.tprv}/0/*)`
 }

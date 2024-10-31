@@ -52,6 +52,21 @@ rustup update
 
 3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory after cloning this repository. Download the HWI binaries from [HWI's github releases page](https://github.com/bitcoin-core/HWI/releases) -- this project was last verified against v3.1.0 on 10/16/2024.
 
+4. other system dependencies
+
+linux systems need these packages
+
+```bash
+apt-get update && apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+to run the scenario tests, you'll need the tauri driver and the webkit driver
+
+```bash
+sudo apt install webkit2gtk-driver
+cargo install tauri-driver
+```
+
 ### run the application
 
 1. checkout this repo and cd into it
