@@ -8,6 +8,7 @@ const TxRow = (transaction: Transaction) => {
         <td>${Sats(transaction.sent)}</td>
         <td class="${Number(transaction.received) > 0 ? 'text-success' : ''}">${Sats(transaction.received)}</td>
         <td>${Sats(transaction.fee)}</td>
+        <td>${transaction.confirmation_height || 'Unconfirmed'}</td>
       </tr>
     `
 }
