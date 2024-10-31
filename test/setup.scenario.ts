@@ -65,7 +65,7 @@ function hashFiles(paths: string[]): string {
 }
 
 beforeAll(async () => {
-  // perform a build if the hash file doesn't exist (first run) or if the source files have changed
+  //perform a build if the hash file doesn't exist (first run) or if the source files have changed
   let currentHash
   let shouldBuild = !fs.existsSync(hashFile)
   if (!shouldBuild) {
@@ -84,6 +84,8 @@ beforeAll(async () => {
   } else {
     log('build will be skipped because source files have not changed')
   }
+
+  log('display variable:', process.env.DISPLAY)
 
   tauriDriver = spawn(path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver'), [], {
     // stdio: ['ignore', process.stdout, process.stderr],
