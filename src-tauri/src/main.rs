@@ -96,19 +96,17 @@ impl TryFrom<&bdk::TransactionDetails> for Transaction {
   fn try_from(td: &bdk::TransactionDetails) -> Result<Self, Self::Error> {
     match &td.transaction {
       None => Err("Required raw transaction data not present"),
-      Some(tx) => {
-        Ok(Transaction {
-          version: tx.version.into(),
-          locktime: tx.lock_time.to_consensus_u32(),
-          ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
-          outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
-          txid: td.txid.to_string(),
-          received: td.received.to_string(),
-          sent: td.sent.to_string(),
-          fee: td.fee.unwrap().to_string(),
-          confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
-        })
-      }
+      Some(tx) => Ok(Transaction {
+        version: tx.version.into(),
+        locktime: tx.lock_time.to_consensus_u32(),
+        ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
+        outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
+        txid: td.txid.to_string(),
+        received: td.received.to_string(),
+        sent: td.sent.to_string(),
+        fee: td.fee.unwrap().to_string(),
+        confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
+      }),
     }
   }
 }
@@ -219,21 +217,19 @@ fn get_wallet(
       change.into_wallet_descriptor(&secp, network),
       TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
     )),
-    None => {
-      match receive.0.is_multipath() && receive.0.has_wildcard() {
-        true => None,
-        false => {
-          let new_change = receive_str.replace("/0/*", "/1/*");
-          match new_change == receive_str {
-            true => None,
-            false => Some(resolve!(
-              new_change.into_wallet_descriptor(&secp, network),
-              TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-            ))
-          }
+    None => match receive.0.is_multipath() && receive.0.has_wildcard() {
+      true => None,
+      false => {
+        let new_change = receive_str.replace("/0/*", "/1/*");
+        match new_change == receive_str {
+          true => None,
+          false => Some(resolve!(
+            new_change.into_wallet_descriptor(&secp, network),
+            TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+          )),
         }
       }
-    }
+    },
   };
 
   Ok(resolve!(
@@ -531,21 +527,34 @@ async fn transactions(
       TempuraErrorType::WalletSyncError
     );
 
-    let tds = resolve!(wallet.list_transactions(true), TempuraErrorType::TransactionsError);
-    tds.into_iter().map(|td| {
-      let mut t = resolve!(TryInto::<Transaction>::try_into(&td), TempuraErrorType::TransactionsError);
+    let tds = resolve!(
+      wallet.list_transactions(true),
+      TempuraErrorType::TransactionsError
+    );
+    tds
+      .into_iter()
+      .map(|td| {
+        let mut t = resolve!(
+          TryInto::<Transaction>::try_into(&td),
+          TempuraErrorType::TransactionsError
+        );
 
-      // Populating addresses requires the network, so can't be done in the main `try_into`
-      let bdk_tx = resolve!(td.transaction.ok_or("Missing required raw transaction"), TempuraErrorType::TransactionsError);
-      (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
-        let script = bdk_tx.output[x].script_pubkey.as_script();
-        o.address = bdk::bitcoin::Address::from_script(script, network.into()).ok().map(|a| a.to_string());
-      });
-      Ok(t)
-    }).collect()
+        // Populating addresses requires the network, so can't be done in the main `try_into`
+        let bdk_tx = resolve!(
+          td.transaction.ok_or("Missing required raw transaction"),
+          TempuraErrorType::TransactionsError
+        );
+        (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
+          let script = bdk_tx.output[x].script_pubkey.as_script();
+          o.address = bdk::bitcoin::Address::from_script(script, network.into())
+            .ok()
+            .map(|a| a.to_string());
+        });
+        Ok(t)
+      })
+      .collect()
   })
 }
-
 
 /**
  * entrypoint
