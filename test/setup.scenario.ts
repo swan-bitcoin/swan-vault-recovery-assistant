@@ -64,8 +64,8 @@ function hashFiles(paths: string[]): string {
 }
 
 beforeAll(async () => {
-  if (process.env.TEMPURA_SKIP_SCENARIO_BUILD) {
-    log('TEMPURA_SKIP_SCENARIO_BUILD is set- skipping build.')
+  if (process.env.TEMPURA_SCENARIO_SKIP_BUILD) {
+    log('TEMPURA_SCENARIO_SKIP_BUILD is set- skipping build.')
   } else {
     // perform a build if the hash file doesn't exist (first run) or if the source files have changed
     let currentHash

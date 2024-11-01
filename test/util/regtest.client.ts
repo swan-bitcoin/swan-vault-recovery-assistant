@@ -1,4 +1,5 @@
 import Client from 'bitcoin-core'
+import { BITCOIN_RPC_ERROR_CODE } from './constants'
 
 const defaultClientParameters = {
   agentOptions: undefined,
@@ -98,6 +99,44 @@ export default class RegtestClient extends Client {
       balance = await this.getBalance()
       log(`new wallet balance: ${balance}. more funds will be available with each new block mined.`)
     }
+  }
+
+  async ensureEstimateSmartFee(): Promise<void> {
+    const address = await this.getNewAddress({ address_type: 'bech32' })
+
+    const generateTransactions = async (address: string, numTransactions?: number) => {
+      const transactions = numTransactions ?? Math.floor(Math.random() * 10)
+      log(`simulating ${transactions} transaction${transactions === 1 ? '' : 's'} in this block`)
+      for (let i = 0; i < transactions; i++) {
+        const amount = Math.random().toFixed(8)
+        log(`creating transaction sending amount ${amount}`)
+
+        try {
+          await this.sendToAddress(address, amount)
+        } catch (e) {
+          if (e.code === BITCOIN_RPC_ERROR_CODE.INSUFFICIENT_FUNDS) {
+            log('insufficient funds to continue sending to address, mining a block')
+            await this.mineBlocks(1)
+            continue
+          }
+          log('unknown error sending to address', JSON.stringify(e))
+          return
+        }
+      }
+    }
+
+    let feeRate: number | undefined
+    do {
+      const fee = await this.estimateSmartFee(1)
+      if (fee.errors) {
+        log('could not estimate fee', fee.errors)
+        log('generating some transactions to increase tx history')
+        await generateTransactions(address, 10)
+        await this.mineBlocks(1)
+        continue
+      }
+      feeRate = Number(fee.feerate)
+    } while (!feeRate || Number.isNaN(feeRate))
   }
 
   async getDescriptor(type: DescriptorType): Promise<string | undefined> {
