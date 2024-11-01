@@ -220,11 +220,18 @@ fn get_wallet(
     None => match receive.0.is_multipath() && receive.0.has_wildcard() {
       true => None,
       false => {
-        let new_change = receive_str.replace("/0/*", "/1/*");
-        match new_change == receive_str {
+        let change = receive_str.replace("/0/*", "/1/*");
+        let change = match change.rfind("#") {
+          Some(i) => {
+            let (change, _) = change.split_at(i);
+            change.to_string()
+          }
+          None => change,
+        };
+        match change == receive_str {
           true => None,
           false => Some(resolve!(
-            new_change.into_wallet_descriptor(&secp, network),
+            change.into_wallet_descriptor(&secp, network),
             TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
           )),
         }
@@ -239,7 +246,7 @@ fn get_wallet(
       network,
       bdk::database::MemoryDatabase::default()
     ),
-    TempuraErrorType::ClientError
+    TempuraErrorType::WalletError
   ))
 }
 
