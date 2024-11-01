@@ -31,6 +31,7 @@
     "@eslint/js": "^9.13.0",
     "@tauri-apps/cli": ">=2.0.0",
     "@types/node": "^22.7.4",
+    "@types/selenium-webdriver": "^4.1.27",
     "autoprefixer": "^10.4.20",
     "bip32": "^4.0.0",
     "bip39": "^3.1.0",

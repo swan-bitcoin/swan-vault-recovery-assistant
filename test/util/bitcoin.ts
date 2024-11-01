@@ -78,7 +78,37 @@ export const getAddress = (key: Key, path?: string): string => {
   return address!
 }
 
-export const keyToDescriptor = (key: Key, pub: boolean = true): string => {
-  const meta = DERIVATION_PATH_BIP84_PRIME.replace(/^m/, key.master.fingerprint)
-  return `wpkh([${meta}]${pub ? key.derived.tpub : key.derived.tprv}/0/*)`
+type DescriptorOptions = {
+  prefixPath?: string
+  postfixPath?: string
+  pub?: boolean
+}
+
+export const keyToDescriptor = (key: Key, options?: DescriptorOptions): string => {
+  const prefixPath = options?.prefixPath ?? DERIVATION_PATH_BIP84_PRIME
+  const postfixPath = options?.postfixPath ?? '/0/*'
+  const pub = options?.pub ?? true
+
+  const meta = prefixPath ? prefixPath.replace(/^m/, key.master.fingerprint) : key.master.fingerprint
+  return `wpkh([${meta}]${pub ? key.derived.tpub : key.derived.tprv}${postfixPath})`
+}
+
+type MultisigDescriptorOptions = DescriptorOptions & {
+  quorum?: number
+  sorted?: boolean
+}
+
+export const keysToDescriptor = (keys: Key[], options?: MultisigDescriptorOptions): string => {
+  const prefixPath = options?.prefixPath ?? DERIVATION_PATH_BIP48_PRIME
+  const postfixPath = options?.postfixPath ?? '/0/*'
+  const pub = options?.pub ?? true
+  const quorum = (options?.quorum ?? keys.length <= 1) ? keys.length : keys.length - 1
+  const sorted = options?.sorted ?? false
+
+  return `wsh(${sorted ? 'sortedmulti' : 'multi'}(${quorum},${keys
+    .map((key) => {
+      const meta = prefixPath ? prefixPath.replace(/^m/, key.master.fingerprint) : key.master.fingerprint
+      return `[${meta}]${pub ? key.derived.tpub : key.derived.tprv}${postfixPath}`
+    })
+    .join(',')}))`
 }
