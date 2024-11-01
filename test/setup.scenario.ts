@@ -4,13 +4,13 @@ import path from 'path'
 import * as crypto from 'crypto'
 import { afterAll, beforeAll, should } from 'vitest'
 import { spawn, spawnSync } from 'child_process'
-import { Builder, By, Capabilities } from 'selenium-webdriver'
+import { Builder, Capabilities, WebDriver } from 'selenium-webdriver'
 
 function log(message: string, ...args: any): void {
   console.log('[TEST][SETUP]', message, ...args)
 }
 
-export let driver
+export let driver: WebDriver
 let tauriDriver
 
 const application = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release', 'tempura')

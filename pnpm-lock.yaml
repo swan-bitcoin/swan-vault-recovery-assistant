@@ -26,6 +26,9 @@ importers:
       '@types/node':
         specifier: ^22.7.4
         version: 22.7.4
+      '@types/selenium-webdriver':
+        specifier: ^4.1.27
+        version: 4.1.27
       autoprefixer:
         specifier: ^10.4.20
         version: 10.4.20(postcss@8.4.47)
@@ -760,6 +763,14 @@ packages:
   '@types/node@22.7.4':
     resolution:
       { integrity: sha512-y+NPi1rFzDs1NdQHHToqeiX2TIS79SWEAw9GYhkkx8bD0ChpfqC+n2j5OXOCpzfojBEBt6DnEnnG9MY0zk1XLg== }
+
+  '@types/selenium-webdriver@4.1.27':
+    resolution:
+      { integrity: sha512-ALqsj8D7Swb6MnBQuAQ58J3KC3yh6fLGtAmpBmnZX8j+0kmP7NaLt56CuzBw2W2bXPrvHFTgn8iekOQFUKXEQA== }
+
+  '@types/ws@8.5.12':
+    resolution:
+      { integrity: sha512-3tPRkv1EtkDpzlgyKyI8pGsGZAGPEaXeu0DOj5DI25Ja91bdAYddYHbADRYVrZMRbfW+1l5YwXVDKohDJNQxkQ== }
 
   '@typescript-eslint/eslint-plugin@8.11.0':
     resolution:
@@ -2844,6 +2855,15 @@ snapshots:
   '@types/node@22.7.4':
     dependencies:
       undici-types: 6.19.8
+
+  '@types/selenium-webdriver@4.1.27':
+    dependencies:
+      '@types/node': 22.7.4
+      '@types/ws': 8.5.12
+
+  '@types/ws@8.5.12':
+    dependencies:
+      '@types/node': 22.7.4
 
   '@typescript-eslint/eslint-plugin@8.11.0(@typescript-eslint/parser@8.11.0(eslint@9.13.0(jiti@1.21.6))(typescript@5.6.2))(eslint@9.13.0(jiti@1.21.6))(typescript@5.6.2)':
     dependencies:
