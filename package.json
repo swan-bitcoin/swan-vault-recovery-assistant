@@ -58,6 +58,7 @@
     "vitest": "^2.1.2"
   },
   "nano-staged": {
-    "*.{js,json,yml,yaml,html,md,css,ts}": "pnpm exec prettier --write"
+    "*.{js,json,yml,yaml,html,md,css,ts}": "pnpm exec prettier --write",
+    "*.rs": "rustfmt"
   }
 }
