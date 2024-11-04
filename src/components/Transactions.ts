@@ -1,10 +1,10 @@
 import { Transaction } from '../bindings'
-import { Sats } from '.'
+import { CopyButtonXs, Sats } from '.'
 
 const TxRow = (transaction: Transaction) => {
   return `
       <tr>
-        <td>${transaction.txid}</td>
+        <td>${CopyButtonXs(transaction.txid)}${transaction.txid}</td>
         <td>${Sats(transaction.sent)}</td>
         <td class="${Number(transaction.received) > 0 ? 'text-success' : ''}">${Sats(transaction.received)}</td>
         <td>${Sats(transaction.fee)}</td>

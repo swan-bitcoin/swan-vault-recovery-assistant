@@ -190,6 +190,35 @@ async function getBalance() {
   }
 }
 
+function instrumentCopyButtons(parent: HTMLElement) {
+  parent.querySelectorAll<HTMLButtonElement>('button[name=copy]').forEach((copyButton) => {
+    copyButton.addEventListener('click', () => {
+      toClipboard(copyButton.getAttribute('value'))
+        .then(() => {
+          // Change the tooltip text
+          const tooltip = copyButton.closest('.tooltip')
+          tooltip.setAttribute('data-tip', 'Copied')
+
+          // Show a checkmark within the copy icon
+          const copyIcon = copyButton.querySelector('#copy-icon')
+          copyIcon.classList.add('copied') // animation effect
+          const checkmark = copyIcon.querySelector('#checkmark')
+          checkmark.classList.remove('hidden')
+
+          // Reset after delay
+          setTimeout(() => {
+            tooltip.setAttribute('data-tip', 'Copy')
+            checkmark.classList.add('hidden')
+            copyIcon.classList.remove('copied')
+          }, 2000)
+        })
+        .catch(() => {
+          DOM.tempMessage.textContent = `Failed to copy ${copyButton.getAttribute('value')} to clipboard`
+        })
+    })
+  })
+}
+
 async function getTransactions() {
   const { recv, change, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
@@ -205,6 +234,7 @@ async function getTransactions() {
     DOM.tempMessage.textContent = 'Transactions fetched successfully!'
     const tempuraBubble = createConversationBubble(`${transactions.length} transactions fetched`)
     DOM.conversation.appendChild(tempuraBubble)
+    instrumentCopyButtons(DOM.txBody)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -222,35 +252,7 @@ async function getAddress() {
     DOM.tempMessage.textContent = 'Address retrieved successfully!'
     const tempuraBubble = createConversationBubble(Address({ address }))
     DOM.conversation.appendChild(tempuraBubble)
-
-    // Attach click event to the copy button
-    const copyButton = tempuraBubble.querySelector<HTMLButtonElement>('#copy-address-button')
-    if (copyButton) {
-      copyButton.addEventListener('click', () => {
-        toClipboard(address)
-          .then(() => {
-            // Change the tooltip text
-            const tooltip = copyButton.closest('.tooltip')
-            tooltip.setAttribute('data-tip', 'Copied')
-
-            // Show a checkmark within the copy icon
-            const copyIcon = copyButton.querySelector('#copy-icon')
-            copyIcon.classList.add('copied') // animation effect
-            const checkmark = copyIcon.querySelector('#checkmark')
-            checkmark.classList.remove('hidden')
-
-            // Reset after delay
-            setTimeout(() => {
-              tooltip.setAttribute('data-tip', 'Copy')
-              checkmark.classList.add('hidden')
-              copyIcon.classList.remove('copied')
-            }, 2000)
-          })
-          .catch(() => {
-            DOM.tempMessage.textContent = 'Failed to copy address to clipboard'
-          })
-      })
-    }
+    instrumentCopyButtons(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
   }

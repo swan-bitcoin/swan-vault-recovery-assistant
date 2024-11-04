@@ -2245,6 +2245,13 @@ html {
   --togglehandleborder: 0 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset,
     var(--handleoffsetcalculator) 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset;
 }
+.btn-xs {
+  height: 1.5rem;
+  min-height: 1.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  font-size: 0.75rem;
+}
 .btn-sm {
   height: 2rem;
   min-height: 2rem;
@@ -2270,6 +2277,12 @@ html {
 .btn-square:where(.btn-lg) {
   height: 4rem;
   width: 4rem;
+  padding: 0px;
+}
+.btn-circle:where(.btn-xs) {
+  height: 1.5rem;
+  width: 1.5rem;
+  border-radius: 9999px;
   padding: 0px;
 }
 .btn-circle:where(.btn-sm) {
@@ -2677,6 +2690,9 @@ html {
 .hidden {
   display: none;
 }
+.h-3 {
+  height: 0.75rem;
+}
 .h-36 {
   height: 9rem;
 }
@@ -2697,6 +2713,9 @@ html {
 }
 .w-2\/5 {
   width: 40%;
+}
+.w-3 {
+  width: 0.75rem;
 }
 .w-3\/12 {
   width: 25%;
@@ -2724,6 +2743,10 @@ html {
 }
 .flex-grow {
   flex-grow: 1;
+}
+.transform {
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x))
+    skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 .cursor-pointer {
   cursor: pointer;
