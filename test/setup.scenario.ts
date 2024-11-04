@@ -64,6 +64,10 @@ function hashFiles(paths: string[]): string {
 }
 
 beforeAll(async () => {
+  if (os.platform() === 'darwin') {
+    throw new Error('Platform tests are not supported on MacOS. Refer to the README for instructions.')
+  }
+
   if (process.env.TEMPURA_SCENARIO_SKIP_BUILD) {
     log('TEMPURA_SCENARIO_SKIP_BUILD is set- skipping build.')
   } else {
