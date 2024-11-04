@@ -90,8 +90,8 @@
                   >
                     Enter a receive or combined descriptor. For Swan Vault recovery, use the "Wallet Configuration"
                     descriptor under "Advanced Wallet Information". Receive descriptors typically start with
-                    <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code> and a checksum; combined descriptors
-                    end with <code>/&lt;0;1&gt;/*</code> and a checksum.
+                    <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code>; combined descriptors end with
+                    <code>/&lt;0;1&gt;/*</code>.
                   </div>
                 </div>
               </div>
@@ -161,7 +161,7 @@
                   <span class="label-text ml-2">Bitcoin</span>
                 </label>
                 <label class="label cursor-pointer">
-                  <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
+                  <input id="testnet" value="testnet" type="radio" name="network" class="radio bg-green-500" />
                   <span class="label-text ml-2">Testnet</span>
                 </label>
                 <label class="label cursor-pointer">
@@ -194,13 +194,7 @@
             <div class="form-control mb-5">
               <label class="label">Fee Rate (optional)</label>
               <div class="flex items-center gap-2">
-                <input
-                  class="input input-bordered w-3/12 inline-flex"
-                  id="feerate-input"
-                  type="number"
-                  step="1"
-                  min="5"
-                />
+                <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
                 <label class="label inline-flex" for="feerate-input">sats/vB</label>
                 <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
               </div>

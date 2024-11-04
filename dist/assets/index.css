@@ -2148,6 +2148,15 @@ html {
   border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity)));
   outline-color: var(--fallback-su, oklch(var(--su) / 1));
 }
+.textarea-warning {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+}
+.textarea-warning:focus {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+  outline-color: var(--fallback-wa, oklch(var(--wa) / 1));
+}
 .textarea-error {
   --tw-border-opacity: 1;
   border-color: var(--fallback-er, oklch(var(--er) / var(--tw-border-opacity)));
@@ -2771,6 +2780,10 @@ html {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity)));
 }
+.bg-green-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(34 197 94 / var(--tw-bg-opacity));
+}
 .fill-current {
   fill: currentColor;
 }
@@ -2871,11 +2884,6 @@ html {
 .checked\:bg-blue-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity));
-}
-
-.checked\:bg-green-500:checked {
-  --tw-bg-opacity: 1;
-  background-color: rgb(34 197 94 / var(--tw-bg-opacity));
 }
 
 .checked\:bg-orange-500:checked {
