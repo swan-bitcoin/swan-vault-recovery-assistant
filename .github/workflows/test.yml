@@ -104,4 +104,4 @@ jobs:
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
       - name: run the tests
-        run: TEMPURA_SKIP_SCENARIO_BUILD=1 xvfb-run -a pnpm test:scenario
+        run: TEMPURA_SCENARIO_SKIP_BUILD=1 xvfb-run -a pnpm test:scenario
