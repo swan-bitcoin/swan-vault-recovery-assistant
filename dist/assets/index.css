@@ -2148,6 +2148,15 @@ html {
   border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity)));
   outline-color: var(--fallback-su, oklch(var(--su) / 1));
 }
+.textarea-warning {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+}
+.textarea-warning:focus {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+  outline-color: var(--fallback-wa, oklch(var(--wa) / 1));
+}
 .textarea-error {
   --tw-border-opacity: 1;
   border-color: var(--fallback-er, oklch(var(--er) / var(--tw-border-opacity)));

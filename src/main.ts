@@ -49,15 +49,7 @@ const validateDescriptor = async () => {
     DOM.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.receiveInput.classList.add('textarea-error')
     DOM.receiveInput.classList.remove('textarea-success')
-    return false
-  }
-
-  // TODO: Show dialog box here to ask user to confirm if they want to use a change descriptor
-  // Check if the descriptor is a change descriptor
-  if (isChangeDescriptor(descriptor)) {
-    DOM.tempMessage.textContent = 'You are trying to use a change descriptor! Please provide a receive descriptor instead.'
-    DOM.receiveInput.classList.add('textarea-error')
-    DOM.receiveInput.classList.remove('textarea-success')
+    DOM.receiveInput.classList.remove('textarea-warning')
     return false
   }
 
@@ -68,12 +60,26 @@ const validateDescriptor = async () => {
         'Descriptor is fine but it is for the wrong network. Switch to Advanced Mode to change the network!'
       DOM.receiveInput.classList.add('textarea-error')
       DOM.receiveInput.classList.remove('textarea-success')
+      DOM.receiveInput.classList.remove('textarea-warning')
       return false
+    }
+
+    // Warning for change descriptor
+    if (isChangeDescriptor(descriptor)) {
+      DOM.tempMessage.textContent =
+        'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
+      DOM.receiveInput.classList.add('textarea-warning')
+      DOM.receiveInput.classList.remove('textarea-success')
+      DOM.receiveInput.classList.remove('textarea-error')
+      recoveryOptionsCard.classList.remove('hidden')
+      standardWalletActions.classList.remove('hidden')
+      return true
     }
 
     // Descriptor is valid, show now wallet actions and recovery options card (one way switch)
     DOM.receiveInput.classList.add('textarea-success')
     DOM.receiveInput.classList.remove('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-warning')
     DOM.tempMessage.textContent =
       'Your wallet configuration is valid. You can now fetch your balance and perform other actions.'
     recoveryOptionsCard.classList.remove('hidden')
@@ -83,6 +89,7 @@ const validateDescriptor = async () => {
     handleError(error)
     DOM.receiveInput.classList.add('textarea-error')
     DOM.receiveInput.classList.remove('textarea-success')
+    DOM.receiveInput.classList.remove('textarea-warning')
     return false
   }
 }
