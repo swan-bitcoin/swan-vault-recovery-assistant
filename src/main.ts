@@ -52,6 +52,7 @@ const validateDescriptor = async () => {
     return false
   }
 
+  // TODO: Show dialog box here to ask user to confirm if they want to use a change descriptor
   // Check if the descriptor is a change descriptor
   if (isChangeDescriptor(descriptor)) {
     DOM.tempMessage.textContent = 'You are trying to use a change descriptor! Please provide a receive descriptor instead.'
