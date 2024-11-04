@@ -1,4 +1,4 @@
-name: CI
+name: Automated Tests
 
 # Controls when the workflow will run
 on:
@@ -6,6 +6,12 @@ on:
     branches: [master]
   pull_request:
     types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'target branch name'
+        required: true
+        default: 'master'
 
 jobs:
   unit-test:
@@ -14,6 +20,8 @@ jobs:
     steps:
       - name: checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref }}
 
       - name: set up rust
         uses: actions-rs/toolchain@v1
@@ -42,6 +50,8 @@ jobs:
     steps:
       - name: checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref }}
 
       - name: set up rust
         uses: actions-rs/toolchain@v1
