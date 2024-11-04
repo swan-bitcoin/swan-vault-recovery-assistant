@@ -136,7 +136,7 @@ describe('recovery path, user', function () {
       /Your wallet configuration is valid. You can now fetch your balance and perform other actions./
     )
     await inputs.fetchBalance.click()
-    await sleep(200)
+    await sleep(500)
 
     const stats = await outputs.conversation.findElements(By.css('.stat'))
     expect(stats.length).toBe(2)
