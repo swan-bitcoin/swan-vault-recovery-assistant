@@ -11,7 +11,7 @@ git checkout dist
 
 # 2. Make the working directory match the stage
 git diff --full-index --binary > .tmp.stash.$$
-git stash -q --keep-index
+git apply -R --whitespace=nowarn --allow-empty < .tmp.stash.$$
 
 # 3. Generate build products
 pnpm build
@@ -21,7 +21,6 @@ git update-index --add $(find dist -name '*.*')
 
 # 5. Return the non-generated files and stash to their original state
 git apply --whitespace=nowarn --allow-empty < .tmp.stash.$$
-git stash drop -q
 
 # 6. Cleanup
 rm .tmp.stash.$$
