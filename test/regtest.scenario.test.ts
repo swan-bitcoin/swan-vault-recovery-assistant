@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { driver } from './setup.scenario'
 import prand from 'pure-rand'
 import { ensureDockerStack } from './util/container'
-import { generateKey, getAddress, Key, keysToDescriptor, keyToDescriptor } from './util/bitcoin'
+import { generateKey, getAddress, Key, keysToDescriptor, keyToDescriptor, signAllInputs } from './util/bitcoin'
 
 const log = (message: string, ...args: any[]): void => {
   console.log('[TEST][REGTEST_SCENARIO]', message, ...args)
@@ -76,6 +76,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(receiveDescriptor).toBeTruthy()
     changeDescriptor = keysToDescriptor(keys, { postfixPath: '/1/*' })
     expect(changeDescriptor).toBeTruthy()
+    log('scenario keys', keys)
     log('scenario test descriptors', { receiveDescriptor, changeDescriptor })
 
     destinationKey = generateKey()
@@ -83,6 +84,17 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     destinationAddress = await getAddress(destinationKey, '0/0')
     log('destination address', destinationAddress)
   })
+
+  const expectAnAddress = async () => {
+    await inputs.newAddress.click()
+    await sleepQuickly()
+    expect(await outputs.temporaryMessage.getText()).toMatch(/Address retrieved successfully!/)
+    const elements = await outputs.conversation.findElements(By.css('.break-all'))
+    expect(elements.length).toBeGreaterThan(0)
+    const address = await elements[elements.length - 1].getText()
+    expect(address).toMatch(/^bcrt1/)
+    return address
+  }
 
   const expectLatestBalance = async (confirmed: string, unconfirmed: string): Promise<void> => {
     expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
@@ -94,15 +106,11 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(unconfirmedValue).toContain(unconfirmed)
   }
 
-  const expectAnAddress = async () => {
-    await inputs.newAddress.click()
-    await sleepQuickly()
-    expect(await outputs.temporaryMessage.getText()).toMatch(/Address retrieved successfully!/)
-    const elements = await outputs.conversation.findElements(By.css('.break-all'))
+  const expectLatestMessageToMatch = async (regex: RegExp) => {
+    const elements = await outputs.conversation.findElements(By.css('.chat'))
     expect(elements.length).toBeGreaterThan(0)
-    const address = await elements[elements.length - 1].getText()
-    expect(address).toMatch(/^bcrt1/)
-    return address
+    const latestMessage = await elements[elements.length - 1].getText()
+    expect(latestMessage).toMatch(regex)
   }
 
   it('can locate all the expected elements', async () => {
@@ -141,6 +149,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.psbt).toBeTruthy()
     inputs.sweep = await driver.findElement(By.id('sweep-button'))
     expect(inputs.sweep).toBeTruthy()
+    inputs.broadcast = await driver.findElement(By.id('broadcast-button'))
+    expect(inputs.broadcast).toBeTruthy()
 
     // outputs
     outputs.conversation = await driver.findElement(By.id('conversation'))
@@ -254,14 +264,35 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   it('can get a PSBT for signing without inserting a fee rate', async () => {
     const feeText = await inputs.feeRate.getText()
     expect(feeText).toBe('')
-    let psbtText = await inputs.psbt.getAttribute('value')
-    expect(psbtText).toBe('')
+    psbt = await inputs.psbt.getAttribute('value')
+    expect(psbt).toBe('')
 
     await inputs.address.sendKeys(destinationAddress)
 
     await inputs.sweep.click()
     await sleepQuickly()
-    psbtText = await inputs.psbt.getAttribute('value')
-    expect(psbtText).toMatch(/^cHNid/)
+    psbt = await inputs.psbt.getAttribute('value')
+    expect(psbt).toMatch(/^cHNid/)
+    log('generated PSBT:', psbt)
+  })
+
+  it('can paste in a PSBT with a single signature', async () => {
+    psbt = signAllInputs(keys[0], psbt)
+    await inputs.psbt.clear()
+    await inputs.psbt.sendKeys(psbt)
+    await inputs.broadcast.click()
+    await sleepQuickly()
+    // TODO: this is the current error message, but it's not very helpful. We should iterate here
+    // and try to inform the user why the broadcast failed
+    expect(await outputs.temporaryMessage.getText()).toMatch(/^PsbtError: Failed to finalize PSBT/)
+  })
+
+  it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
+    psbt = signAllInputs(keys[1], psbt)
+    await inputs.psbt.clear()
+    await inputs.psbt.sendKeys(psbt)
+    await inputs.broadcast.click()
+    await sleepQuickly()
+    expectLatestMessageToMatch(/Broadcast successful!/)
   })
 })
