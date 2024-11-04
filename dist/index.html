@@ -67,7 +67,7 @@
               <span class="text-4xl">🍤</span>
             </div>
             <div class="chat-bubble chat-bubble-primary" id="temporary-message">
-              Hi there! To start, enter your descriptors.
+              Hi there! To start, enter your wallet configuration.
             </div>
           </div>
         </div>
@@ -82,22 +82,29 @@
             <!-- Receive descriptor -->
             <div class="form-control mb-3">
               <div class="label justify-normal gap-2">
-                <label class="label-text">Receive Descriptor</label>
+                <label class="label-text">Wallet Configuration (Descriptor)</label>
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
                     class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
                   >
-                    A receive descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
-                    <code>/0/*</code> and a checksum.
+                    Enter a receive or combined descriptor. For Swan Vault recovery, use the "Wallet Configuration"
+                    descriptor under "Advanced Wallet Information". Receive descriptors typically start with
+                    <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code> and a checksum; combined descriptors
+                    end with <code>/&lt;0;1&gt;/*</code> and a checksum.
                   </div>
                 </div>
               </div>
-              <input class="input input-bordered" id="receive-input" type="text" />
+              <label class="form-control">
+                <textarea
+                  id="receive-input"
+                  class="textarea textarea-bordered textarea-md h-36 break-all w-full leading-normal transition-border-color duration-500 ease-in-out"
+                ></textarea>
+              </label>
             </div>
 
             <!-- Change descriptor -->
-            <div class="form-control mb-3">
+            <div class="form-control mb-3 dev-only">
               <div class="label justify-normal gap-2">
                 <label class="label-text">Change Descriptor</label>
                 <div class="group">
@@ -105,12 +112,13 @@
                   <div
                     class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
                   >
-                    A change descriptor may start with <code>wsh</code> or <code>wphk</code> and typically ends with
-                    <code>/1/*</code> and a checksum.
+                    You only need to enter a change descriptor if it does not end in <code>/1/*</code>. By default, Tempura
+                    automatically derives the change descriptor from your receive descriptor if it ends with
+                    <code>/1/*</code>, which is the most common format.
                   </div>
                 </div>
               </div>
-              <input class="input input-bordered" id="change-input" type="text" />
+              <input class="input w-full" id="change-input" type="text" />
             </div>
 
             <!-- Custom Electrum server -->
@@ -164,7 +172,7 @@
             </div>
 
             <!-- Buttons: Fetch balance, New address -->
-            <div class="card-actions justify-end mb-6">
+            <div class="card-actions justify-end mb-6 hidden" id="standard-wallet-actions">
               <button type="button" class="btn btn-outline btn-primary btn-sm" id="new-address-button">New Address</button>
               <button type="button" class="btn btn-primary btn-sm" id="fetch-balance-button">Fetch Balance</button>
               <button type="button" class="btn btn-primary btn-sm" id="fetch-transactions-button">Fetch Transactions</button>
@@ -173,61 +181,59 @@
         </div>
 
         <!-- Second Card: Send Transaction  -->
-        <div class="card bg-base-300 shadow-xl card-compact">
+        <div class="card bg-base-300 shadow-xl card-compact hidden" id="recovery-options-card">
           <div class="card-body">
-            <h2 class="card-title">Send Transaction</h2>
-            <form id="transaction-form">
-              <!-- Destination address -->
-              <div class="form-control mb-3">
-                <label class="label">Destination Address</label>
-                <input class="input input-bordered" id="address-input" type="text" placeholder="bc1q..." />
-              </div>
+            <h2 class="card-title">Recovery Options</h2>
+            <!-- Destination address -->
+            <div class="form-control mb-3">
+              <label class="label">Destination Address</label>
+              <input class="input input-bordered" id="address-input" type="text" placeholder="bc1q..." />
+            </div>
 
-              <!-- Fee rate -->
-              <div class="form-control mb-5">
-                <label class="label">Fee Rate</label>
-                <div class="flex items-center gap-2">
-                  <input
-                    class="input input-bordered w-3/12 inline-flex"
-                    id="feerate-input"
-                    type="number"
-                    step="1"
-                    value="5"
-                    min="5"
-                  />
-                  <label class="label inline-flex" for="feerate-input">sats/vB</label>
-                  <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
-                </div>
+            <!-- Fee rate -->
+            <div class="form-control mb-5">
+              <label class="label">Fee Rate</label>
+              <div class="flex items-center gap-2">
+                <input
+                  class="input input-bordered w-3/12 inline-flex"
+                  id="feerate-input"
+                  type="number"
+                  step="1"
+                  value="5"
+                  min="5"
+                />
+                <label class="label inline-flex" for="feerate-input">sats/vB</label>
+                <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
               </div>
+            </div>
 
-              <!-- Sweep button -->
-              <div class="card-actions justify-end mb-6">
-                <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
-              </div>
+            <!-- Sweep button -->
+            <div class="card-actions justify-end mb-6">
+              <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
+            </div>
 
-              <!-- PSBT textarea -->
-              <div class="form-control mb-3">
-                <label class="label">PSBT</label>
-                <textarea
-                  class="textarea textarea-bordered h-40"
-                  id="psbt-textarea"
-                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
-                ></textarea>
-              </div>
+            <!-- PSBT textarea -->
+            <div class="form-control mb-3">
+              <label class="label">PSBT</label>
+              <textarea
+                class="textarea textarea-bordered h-40"
+                id="psbt-textarea"
+                placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+              ></textarea>
+            </div>
 
-              <!-- PSBT controls -->
-              <div class="card-actions justify-end mb-6">
-                <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
-                <button class="btn btn-outline btn-sm dev-only" type="button" id="copy-psbt-button">Copy PSBT</button>
-                <button class="btn btn-outline btn-sm dev-only" type="button" id="paste-psbt-button">Paste PSBT</button>
-              </div>
+            <!-- PSBT controls -->
+            <div class="card-actions justify-end mb-6">
+              <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
+              <button class="btn btn-outline btn-sm dev-only" type="button" id="copy-psbt-button">Copy PSBT</button>
+              <button class="btn btn-outline btn-sm dev-only" type="button" id="paste-psbt-button">Paste PSBT</button>
+            </div>
 
-              <!-- Device & Broadcast controls -->
-              <div class="card-actions mb-6 justify-center">
-                <button class="btn btn-warning" type="button" id="sign-message-button">Sign</button>
-                <button class="btn btn-secondary" type="button" id="broadcast-button">Broadcast</button>
-              </div>
-            </form>
+            <!-- Device & Broadcast controls -->
+            <div class="card-actions mb-6 justify-center">
+              <button class="btn btn-warning" type="button" id="sign-message-button">Sign</button>
+              <button class="btn btn-secondary" type="button" id="broadcast-button">Broadcast</button>
+            </div>
           </div>
         </div>
       </div>

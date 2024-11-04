@@ -193,6 +193,10 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   showConversation()
   return chatContainer
 }
+const isChangeDescriptor = (descriptor) => {
+  const changePattern = /\/1\/\*\)\)#\w+$/
+  return changePattern.test(descriptor)
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -307,6 +311,46 @@ function handleError(e) {
   }
   DOM.tempMessage.textContent = 'An unknown error occurred'
 }
+const validateDescriptor = async () => {
+  const descriptor = DOM.receiveInput.value
+  const network = Array.from(DOM.networkRadios).find((radio) => radio.checked).value
+  const standardWalletActions = document.getElementById('standard-wallet-actions')
+  const recoveryOptionsCard = document.getElementById('recovery-options-card')
+  if (!descriptor) {
+    DOM.tempMessage.textContent = 'Wallet configuration is missing!'
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
+  if (isChangeDescriptor(descriptor)) {
+    DOM.tempMessage.textContent = 'You are trying to use a change descriptor! Please provide a receive descriptor instead.'
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
+  try {
+    const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
+    if (!isValidDescriptor) {
+      DOM.tempMessage.textContent =
+        'Descriptor is fine but it is for the wrong network. Switch to Advanced Mode to change the network!'
+      DOM.receiveInput.classList.add('textarea-error')
+      DOM.receiveInput.classList.remove('textarea-success')
+      return false
+    }
+    DOM.receiveInput.classList.add('textarea-success')
+    DOM.receiveInput.classList.remove('textarea-error')
+    DOM.tempMessage.textContent =
+      'Your wallet configuration is valid. You can now fetch your balance and perform other actions.'
+    recoveryOptionsCard.classList.remove('hidden')
+    standardWalletActions.classList.remove('hidden')
+    return true
+  } catch (error) {
+    handleError(error)
+    DOM.receiveInput.classList.add('textarea-error')
+    DOM.receiveInput.classList.remove('textarea-success')
+    return false
+  }
+}
 function getInputs() {
   var _a, _b, _c
   const address = DOM.addressInput.value.trim()
@@ -335,7 +379,8 @@ function require2(value, itemName) {
 }
 async function broadcast() {
   const { recv, change, electrum, network, psbt } = getInputs()
-  require2(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
@@ -365,7 +410,8 @@ async function enumerate() {
 }
 async function getBalance() {
   const { recv, change, electrum, network } = getInputs()
-  require2(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching balance ...'
   try {
     const userBubble = createConversationBubble('What is my balance?', true)
@@ -385,7 +431,8 @@ async function getBalance() {
 }
 async function getTransactions() {
   const { recv, change, electrum, network } = getInputs()
-  require2(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching transactions ...'
   try {
     const userBubble = createConversationBubble('Show me my transactions', true)
@@ -402,7 +449,8 @@ async function getTransactions() {
 }
 async function getAddress() {
   const { recv, electrum, network } = getInputs()
-  require2(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
   try {
     const userBubble = createConversationBubble('Give me an address!', true)
@@ -503,7 +551,8 @@ async function sweep() {
   const inputs = getInputs()
   const { address, recv, change, electrum, network } = inputs
   let { feeRate } = inputs
-  require2(recv, 'Receive Descriptor')
+  const isValid = await validateDescriptor()
+  if (!isValid) return
   require2(address, 'Address')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
@@ -599,6 +648,11 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement('#enumerate-button').addEventListener('click', (e) => {
       e.preventDefault()
       enumerate()
+    })
+    receiveInput.addEventListener('blur', validateDescriptor)
+    receiveInput.addEventListener('input', validateDescriptor)
+    DOM.networkRadios.forEach((radio) => {
+      radio.addEventListener('change', validateDescriptor)
     })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')

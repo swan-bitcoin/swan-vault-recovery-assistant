@@ -132,9 +132,11 @@ describe('recovery path, user', function () {
 
   it('fetches a balance of zero for a brand new wallet', async () => {
     await inputs.receive.sendKeys(descriptor)
+    expect(await outputs.temporaryMessage.getText()).toMatch(
+      /Your wallet configuration is valid. You can now fetch your balance and perform other actions./
+    )
     await inputs.fetchBalance.click()
-    await sleep(200)
-    expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
+    await sleep(500)
 
     const stats = await outputs.conversation.findElements(By.css('.stat'))
     expect(stats.length).toBe(2)
