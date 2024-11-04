@@ -60,14 +60,7 @@ linux systems need these packages
 apt-get update && apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
-to run the scenario tests, you'll need the tauri driver and the webkit driver
-
-```bash
-sudo apt install webkit2gtk-driver
-cargo install tauri-driver
-```
-
-### run the application
+### Run the application
 
 1. checkout this repo and cd into it
 
@@ -88,7 +81,22 @@ $ pnpm install
 (venv) $ pnpm tauri dev
 ```
 
-## Simulating a 'regtest' bitcoin network
+## Testing
+
+### Automated testing
+
+`pnpm test` will run both the unit and scenario tests. The scenario tests have further requirements (see below). run `pnpm test:unit` for unit tests only.
+
+#### Scenario tests
+
+to run the scenario tests, you'll need the tauri driver and the webkit driver. The common linux steps are below as of this writing; refer to [this guide for the latest steps](https://jonaskruckenberg.github.io/tauri-docs-wip/development/testing.html#prerequisites) for both linux and windows. MacOS is not currently supported.
+
+```bash
+sudo apt install webkit2gtk-driver
+cargo install tauri-driver
+```
+
+### Manual testing with a simulated 'regtest' bitcoin network
 
 Verify you have docker installed
 
