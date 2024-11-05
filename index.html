@@ -161,7 +161,7 @@
                   <span class="label-text ml-2">Bitcoin</span>
                 </label>
                 <label class="label cursor-pointer">
-                  <input id="testnet" value="testnet" type="radio" name="network" class="radio bg-green-500" />
+                  <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
                   <span class="label-text ml-2">Testnet</span>
                 </label>
                 <label class="label cursor-pointer">
@@ -247,28 +247,21 @@
           <table class="table table-xs table-pin-rows">
             <thead>
               <tr>
-                <th class="font-bold">Txid</th>
-                <th class="font-bold">Sent</th>
-                <th class="font-bold">Received</th>
-                <th class="font-bold">Fee</th>
-                <th class="font-bold">Confirmed In</th>
+                <th>Type</th>
+                <th>Txid</th>
+                <th></th>
+                <th>Amount</th>
+                <th>Fee</th>
+                <th>Confirmed in Block</th>
               </tr>
             </thead>
-            <tbody id="transactions-body">
-              <tr>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-                <td></td>
-              </tr>
-            </tbody>
+            <tbody id="transactions-body"></tbody>
           </table>
         </div>
         <div class="modal-action">
           <form method="dialog">
             <!-- if there is a button in form, it will close the modal -->
-            <button class="btn">Close</button>
+            <button class="btn btn-sm">Close</button>
           </form>
         </div>
       </div>

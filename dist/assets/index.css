@@ -1026,6 +1026,12 @@ html {
     --glass-border-opacity: 15%;
   }
 
+  .btn-link:hover {
+    border-color: transparent;
+    background-color: transparent;
+    text-decoration-line: underline;
+  }
+
   .btn-outline:hover {
     --tw-border-opacity: 1;
     border-color: var(--fallback-bc, oklch(var(--bc) / var(--tw-border-opacity)));
@@ -1613,6 +1619,22 @@ html {
 .btn.glass.btn-active {
   --glass-opacity: 25%;
   --glass-border-opacity: 15%;
+}
+.btn-link {
+  border-color: transparent;
+  background-color: transparent;
+  --tw-text-opacity: 1;
+  color: var(--fallback-p, oklch(var(--p) / var(--tw-text-opacity)));
+  text-decoration-line: underline;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  outline-color: currentColor;
+}
+.btn-link.btn-active {
+  border-color: transparent;
+  background-color: transparent;
+  text-decoration-line: underline;
 }
 .btn-outline {
   border-color: currentColor;
@@ -2642,6 +2664,18 @@ html {
   --tooltip-color: var(--fallback-a, oklch(var(--a) / 1));
   --tooltip-text-color: var(--fallback-ac, oklch(var(--ac) / 1));
 }
+.tooltip-info {
+  --tooltip-color: var(--fallback-in, oklch(var(--in) / 1));
+  --tooltip-text-color: var(--fallback-inc, oklch(var(--inc) / 1));
+}
+.tooltip-success {
+  --tooltip-color: var(--fallback-su, oklch(var(--su) / 1));
+  --tooltip-text-color: var(--fallback-suc, oklch(var(--suc) / 1));
+}
+.tooltip-warning {
+  --tooltip-color: var(--fallback-wa, oklch(var(--wa) / 1));
+  --tooltip-text-color: var(--fallback-wac, oklch(var(--wac) / 1));
+}
 .absolute {
   position: absolute;
 }
@@ -2803,10 +2837,6 @@ html {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity)));
 }
-.bg-green-500 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(34 197 94 / var(--tw-bg-opacity));
-}
 .fill-current {
   fill: currentColor;
 }
@@ -2837,9 +2867,17 @@ html {
   --tw-text-opacity: 1;
   color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
 }
+.text-info {
+  --tw-text-opacity: 1;
+  color: var(--fallback-in, oklch(var(--in) / var(--tw-text-opacity)));
+}
 .text-success {
   --tw-text-opacity: 1;
   color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));
+}
+.text-warning {
+  --tw-text-opacity: 1;
+  color: var(--fallback-wa, oklch(var(--wa) / var(--tw-text-opacity)));
 }
 .opacity-50 {
   opacity: 0.5;
@@ -2907,6 +2945,11 @@ html {
 .checked\:bg-blue-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity));
+}
+
+.checked\:bg-green-500:checked {
+  --tw-bg-opacity: 1;
+  background-color: rgb(34 197 94 / var(--tw-bg-opacity));
 }
 
 .checked\:bg-orange-500:checked {
