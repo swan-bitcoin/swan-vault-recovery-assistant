@@ -489,8 +489,16 @@ async function getTransactions() {
     DOM.txModal.showModal()
     DOM.txBody.innerHTML = Transactions(transactions)
     DOM.tempMessage.textContent = 'Transactions fetched successfully!'
-    const tempuraBubble = createConversationBubble(`${transactions.length} transactions fetched`)
+    const tempuraBubble = createConversationBubble(
+      `${transactions.length} transactions fetched <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>`
+    )
     DOM.conversation.appendChild(tempuraBubble)
+    const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
+    showListButton == null
+      ? void 0
+      : showListButton.addEventListener('click', () => {
+          DOM.txModal.showModal()
+        })
     instrumentCopyButtons(DOM.txBody)
   } catch (e) {
     handleError(e)
