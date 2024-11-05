@@ -337,7 +337,10 @@ async function sweep() {
 
   DOM.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(`Create a transaction (PSBT) sending all wallet funds to ${address}`, true)
+    const userBubble = createConversationBubble(
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all">${address}</span>`,
+      true
+    )
     DOM.conversation.appendChild(userBubble)
     feeRate = feeRate || (await commands.estimateFee(network, electrum))
     const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
