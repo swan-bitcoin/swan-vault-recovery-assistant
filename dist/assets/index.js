@@ -141,12 +141,49 @@ const Sats = (sats) => {
   const trailing = combinedStr.slice(splitIndex)
   return `₿<span class="opacity-50">${leading}</span>${trailing}`
 }
+const receivedIcon = `
+<div class="tooltip tooltip-success tooltip-right" data-tip="Received">
+  <div class="text-success">
+    <svg xmlns="http://www.w3.org/2000/svg" x-bind:width="size" x-bind:height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" x-bind:stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" stroke-width="2">
+      <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z"></path>
+      <path d="M12 17v-6"></path>
+      <path d="M9.5 14.5l2.5 2.5l2.5 -2.5"></path>
+    </svg>
+  </div>
+</div>
+`
+const sentIcon = `
+<div class="tooltip tooltip-warning tooltip-right" data-tip="Sent">
+  <div class="text-warning">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
+      <path d="M15 10l-4 4l6 6l4 -16l-18 7l4 2l2 6l3 -4"></path>
+    </svg>
+  </div>
+</div>
+`
+const selfTransferIcon = `
+<div class="tooltip tooltip-info tooltip-right" data-tip="Self-transfer">
+  <div class="text-info">
+    <svg xmlns="http://www.w3.org/2000/svg" x-bind:width="size" x-bind:height="size" viewBox="0 0 24 24" fill="none" stroke="currentColor" x-bind:stroke-width="stroke" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" stroke-width="2">
+      <path d="M9 11l-4 4l4 4m-4 -4h11a4 4 0 0 0 0 -8h-1"></path>
+    </svg>
+  </div>
+</div>
+`
 const TxRow = (transaction) => {
+  const transactionType =
+    transaction.sent === transaction.fee ? 'selfTransfer' : Number(transaction.received) > 0 ? 'received' : 'sent'
   return `
       <tr>
-        <td>${CopyButtonXs(transaction.txid)}${transaction.txid}</td>
-        <td>${Sats(transaction.sent)}</td>
-        <td class="${Number(transaction.received) > 0 ? 'text-success' : ''}">${Sats(transaction.received)}</td>
+        <td>
+          ${transactionType === 'selfTransfer' ? selfTransferIcon : transactionType === 'sent' ? sentIcon : receivedIcon}
+        </td>
+        <td>${transaction.txid}</td>
+        <td>${CopyButtonXs(transaction.txid)}</td>
+        <td>
+          ${transactionType === 'selfTransfer' ? '' : transactionType === 'sent' ? Sats(transaction.sent) : Sats(transaction.received)}
+        </td>
         <td>${Sats(transaction.fee)}</td>
         <td>${transaction.confirmation_height || 'Unconfirmed'}</td>
       </tr>
