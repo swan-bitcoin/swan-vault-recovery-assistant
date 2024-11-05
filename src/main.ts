@@ -2,7 +2,7 @@ import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps
 import { commands, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
 import { createConversationBubble, isChangeDescriptor } from './helpers'
-import { getDevice, getDeviceMessage, getDevicePrompt, getSignMessageAndPsbt } from './parsing'
+import { getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
 
 let DOM: {
   addressInput: HTMLInputElement
@@ -335,6 +335,23 @@ async function sign() {
   }
 }
 
+async function psbtStatus() {
+  const { psbt, recv, change, network } = getInputs()
+  require(psbt, 'PSBT')
+
+  DOM.tempMessage.textContent = 'Please wait...'
+  try {
+    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    DOM.conversation.appendChild(userBubble)
+    const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
+    const tempuraBubble = createConversationBubble(Success(message))
+    DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
+    DOM.conversation.appendChild(tempuraBubble)
+  } catch (e: unknown) {
+    handleError(e)
+  }
+}
+
 async function sweep() {
   const inputs = getInputs()
   const { address, recv, change, electrum, network } = inputs
@@ -425,6 +442,11 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement<HTMLButtonElement>('#new-address-button').addEventListener('click', (e) => {
       e.preventDefault()
       getAddress()
+    })
+
+    requireDomElement<HTMLButtonElement>('#psbt-status-button').addEventListener('click', (e) => {
+      e.preventDefault()
+      psbtStatus()
     })
 
     requireDomElement<HTMLButtonElement>('#sweep-button').addEventListener('click', (e) => {

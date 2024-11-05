@@ -88,6 +88,21 @@ export const getAddress = (key: Key, path?: string): string => {
   return address!
 }
 
+export const getMsAddress = (keys: Key[], path?: string): string => {
+  const rdkeys = rederiveKeys(keys, DERIVATION_PATH_BIP48_PRIME)
+  const pubs = rdkeys.map((key) => bip32.fromBase58(key.derived.tpub, bitcoin.networks.regtest))
+  const dpubs = path ? pubs.map((pub) => pub.derivePath(path)) : pubs
+  const { address } = bitcoin.payments.p2wsh({
+    redeem: bitcoin.payments.p2ms({
+      m: dpubs.length - 1,
+      pubkeys: dpubs.map((dpub) => dpub.publicKey),
+      network: bitcoin.networks.regtest,
+    }),
+    network: bitcoin.networks.regtest,
+  })
+  return address!
+}
+
 type DescriptorOptions = {
   prefixPath?: string
   postfixPath?: string

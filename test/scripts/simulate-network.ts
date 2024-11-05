@@ -1,9 +1,11 @@
 import RegtestClient from 'test/util/regtest.client'
-import { generateKey, getAddress, keyToDescriptor, mnemonicToKey } from '../util/bitcoin'
+import { generateKey, getAddress, getMsAddress, keysToDescriptor, keyToDescriptor, mnemonicToKey } from '../util/bitcoin'
 import { BITCOIN_RPC_ERROR_CODE, ONE_SECOND } from '../util/constants'
 import { ensureDockerStack } from '../util/container'
 
-const DEFAULT_WALLET_MNEMONIC = 'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine'
+const DEFAULT_WALLET_MNEMONIC1 = 'ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost ghost machine'
+const DEFAULT_WALLET_MNEMONIC2 = 'keen keen keen keen keen keen keen keen keen keen keen join'
+const DEFAULT_WALLET_MNEMONIC3 = 'coffee coffee coffee coffee coffee coffee coffee coffee coffee coffee coffee blast'
 
 // time
 const MINIMUM_BLOCK_INTERVAL_MS = 10 * ONE_SECOND
@@ -77,24 +79,38 @@ async function main() {
   // create a couple wallets
   log('creating a couple wallets for convenience...')
   logSeparator()
-  const key = mnemonicToKey(DEFAULT_WALLET_MNEMONIC)
-  const pub = keyToDescriptor(key)
-  const prv = keyToDescriptor(key, false)
-  log(`STATIC funded wallet mnemonic: '${DEFAULT_WALLET_MNEMONIC}'`)
-  log('STATIC funded wallet descriptor (public):', pub)
-  log('STATIC funded wallet descriptor (private):', prv)
-  const address = await getAddress(key, '0/0')
-  log('STATIC funded wallet address', address)
+  const ssfKey = mnemonicToKey(DEFAULT_WALLET_MNEMONIC1)
+  const ssfPub = keyToDescriptor(ssfKey)
+  const ssfPrv = keyToDescriptor(ssfKey, { pub: false })
+  log(`STATIC funded singlesig wallet mnemonic: '${DEFAULT_WALLET_MNEMONIC1}'`)
+  log('STATIC funded singlesig wallet descriptor (public):', ssfPub)
+  log('STATIC funded singlesig wallet descriptor (private):', ssfPrv)
+  const ssfAddress = await getAddress(ssfKey, '0/0')
+  log('STATIC funded singlesig wallet address', ssfAddress)
+  await client.sendToAddressAndConfirm(ssfAddress, 10)
   logSeparator()
-  await client.sendToAddressAndConfirm(address, 10)
 
-  const key2 = generateKey()
-  const pub2 = keyToDescriptor(key2)
-  const prv2 = keyToDescriptor(key2, false)
-  log('unfunded wallet descriptor (public):', pub2)
-  log('unfunded wallet descriptor (private):', prv2)
-  const address2 = await getAddress(key2, '0/0')
-  log('unfunded wallet address', address2)
+  const msfMnemonics = [DEFAULT_WALLET_MNEMONIC1, DEFAULT_WALLET_MNEMONIC2, DEFAULT_WALLET_MNEMONIC3]
+  const msfKey2 = mnemonicToKey(msfMnemonics[1])
+  const msfKey3 = mnemonicToKey(msfMnemonics[2])
+  const msfKeys = [ssfKey, msfKey2, msfKey3]
+  const msfPub = keysToDescriptor(msfKeys)
+  const msfPrv = keysToDescriptor(msfKeys, { pub: false })
+  log(`STATIC funded multisig wallet mnemonics: [\n${msfMnemonics.map((m) => `  '${m}'`).join(',\n')}\n]`)
+  log('STATIC funded multisig wallet descriptor (public):', msfPub)
+  log('STATIC funded multisig wallet descriptor (private):', msfPrv)
+  const address3 = await getMsAddress(msfKeys, '0/0')
+  log('STATIC funded multisig wallet address', address3)
+  await client.sendToAddressAndConfirm(address3, 10)
+  logSeparator()
+
+  const ssuKey = generateKey()
+  const ssuPub = keyToDescriptor(ssuKey)
+  const ssuPrv = keyToDescriptor(ssuKey, { pub: false })
+  log('unfunded wallet descriptor (public):', ssuPub)
+  log('unfunded wallet descriptor (private):', ssuPrv)
+  const ssuAddress = await getAddress(ssuKey, '0/0')
+  log('unfunded wallet address', ssuAddress)
   logSeparator()
   logSeparator()
   log('                  ~~ NETWORK READY ~~')
