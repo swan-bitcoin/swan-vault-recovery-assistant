@@ -161,6 +161,13 @@ impl PsbtDetails {
   }
 }
 
+#[derive(Debug, Serialize, Deserialize, Type)]
+enum PsbtSigningStatus {
+  Unsigned,
+  PartiallySigned,
+  FullySigned,
+}
+
 /**
  * utilities
  */
@@ -454,6 +461,41 @@ async fn is_descriptor_for_network(
 
 #[tauri::command]
 #[specta::specta]
+async fn psbt_status(
+  psbt: String,
+  network: String,
+  receive: String,
+  change: Option<String>,
+) -> Result<PsbtSigningStatus, TempuraError> {
+  let psbt = resolve!(
+    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
+    TempuraErrorType::PsbtError
+  );
+  let network = Network::from_str(&network)?;
+  let wallet = get_wallet(network, receive, change)?;
+
+  // suceeds if the PSBT is already finalized or the given wallet is able to finalize it
+  match wallet.finalize_psbt(&mut psbt.clone(), bdk::SignOptions::default()) {
+    Ok(true) => {
+      return Ok(PsbtSigningStatus::FullySigned);
+    }
+    _ => {}
+  }
+
+  for input in &psbt.inputs {
+    if !input.partial_sigs.is_empty()
+      || !input.tap_script_sigs.is_empty()
+      || input.tap_key_sig.is_some()
+    {
+      return Ok(PsbtSigningStatus::PartiallySigned);
+    }
+  }
+
+  Ok(PsbtSigningStatus::Unsigned)
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn sign(psbt: String, network: String, device_type: String) -> Result<String, TempuraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
@@ -577,6 +619,7 @@ fn main() {
       estimate_fee,
       is_descriptor,
       is_descriptor_for_network,
+      psbt_status,
       sign,
       sweep,
       transactions,

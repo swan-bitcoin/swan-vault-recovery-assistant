@@ -31,6 +31,9 @@ async isDescriptor(descriptor: string) : Promise<boolean> {
 async isDescriptorForNetwork(descriptor: string, network: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_descriptor_for_network", { descriptor, network });
 },
+async psbtStatus(psbt: string, network: string, receive: string, change: string | null) : Promise<PsbtSigningStatus> {
+    return await TAURI_INVOKE("psbt_status", { psbt, network, receive, change });
+},
 async sign(psbt: string, network: string, deviceType: string) : Promise<string> {
     return await TAURI_INVOKE("sign", { psbt, network, deviceType });
 },
@@ -76,6 +79,7 @@ untrusted_pending: string;
  */
 confirmed: string }
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null }
+export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"
 export type TempuraError = { error_type: string; message: string }
 export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }
 export type TxIn = { txid: string; vout: number }

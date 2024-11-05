@@ -94,6 +94,9 @@ const commands = {
   async isDescriptorForNetwork(descriptor, network) {
     return await invoke('is_descriptor_for_network', { descriptor, network })
   },
+  async psbtStatus(psbt, network, receive, change) {
+    return await invoke('psbt_status', { psbt, network, receive, change })
+  },
   async sign(psbt, network, deviceType) {
     return await invoke('sign', { psbt, network, deviceType })
   },
@@ -261,6 +264,24 @@ function getDevicePrompt(val) {
     return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'
+}
+function getPsbtStatusMessage(status) {
+  let detail
+  switch (status) {
+    case 'Unsigned':
+      detail = 'unsigned and not ready to be broadcast'
+      break
+    case 'PartiallySigned':
+      detail = 'partially signed, but not ready to be broadcast'
+      break
+    case 'FullySigned':
+      detail = 'fully signed and ready to be broadcast'
+      break
+    default:
+      detail = 'in an unknown state'
+      break
+  }
+  return `This PSBT is ${detail}`
 }
 function getSignMessageAndPsbt(val) {
   const signResponse = parseSignResponse(val)
@@ -575,6 +596,21 @@ async function sign() {
     handleError(e)
   }
 }
+async function psbtStatus() {
+  const { psbt, recv, change, network } = getInputs()
+  require2(psbt, 'PSBT')
+  DOM.tempMessage.textContent = 'Please wait...'
+  try {
+    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    DOM.conversation.appendChild(userBubble)
+    const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
+    const tempuraBubble = createConversationBubble(Success(message))
+    DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
+    DOM.conversation.appendChild(tempuraBubble)
+  } catch (e) {
+    handleError(e)
+  }
+}
 async function sweep() {
   const inputs = getInputs()
   const { address, recv, change, electrum, network } = inputs
@@ -652,6 +688,10 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement('#new-address-button').addEventListener('click', (e) => {
       e.preventDefault()
       getAddress()
+    })
+    requireDomElement('#psbt-status-button').addEventListener('click', (e) => {
+      e.preventDefault()
+      psbtStatus()
     })
     requireDomElement('#sweep-button').addEventListener('click', (e) => {
       e.preventDefault()

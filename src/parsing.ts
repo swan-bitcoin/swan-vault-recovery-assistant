@@ -1,3 +1,5 @@
+import { PsbtSigningStatus } from './bindings'
+
 type Device = {
   type: string
   model: string
@@ -68,6 +70,25 @@ export function getDevicePrompt(val: unknown): string {
     return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'
+}
+
+export function getPsbtStatusMessage(status: PsbtSigningStatus) {
+  let detail
+  switch (status) {
+    case 'Unsigned':
+      detail = 'unsigned and not ready to be broadcast'
+      break
+    case 'PartiallySigned':
+      detail = 'partially signed, but not ready to be broadcast'
+      break
+    case 'FullySigned':
+      detail = 'fully signed and ready to be broadcast'
+      break
+    default:
+      detail = 'in an unknown state'
+      break
+  }
+  return `This PSBT is ${detail}`
 }
 
 export function getSignMessageAndPsbt(val: unknown): {
