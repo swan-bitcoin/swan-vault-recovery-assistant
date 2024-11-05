@@ -2664,6 +2664,18 @@ html {
   --tooltip-color: var(--fallback-a, oklch(var(--a) / 1));
   --tooltip-text-color: var(--fallback-ac, oklch(var(--ac) / 1));
 }
+.tooltip-info {
+  --tooltip-color: var(--fallback-in, oklch(var(--in) / 1));
+  --tooltip-text-color: var(--fallback-inc, oklch(var(--inc) / 1));
+}
+.tooltip-success {
+  --tooltip-color: var(--fallback-su, oklch(var(--su) / 1));
+  --tooltip-text-color: var(--fallback-suc, oklch(var(--suc) / 1));
+}
+.tooltip-warning {
+  --tooltip-color: var(--fallback-wa, oklch(var(--wa) / 1));
+  --tooltip-text-color: var(--fallback-wac, oklch(var(--wac) / 1));
+}
 .absolute {
   position: absolute;
 }
@@ -2859,9 +2871,17 @@ html {
   --tw-text-opacity: 1;
   color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
 }
+.text-info {
+  --tw-text-opacity: 1;
+  color: var(--fallback-in, oklch(var(--in) / var(--tw-text-opacity)));
+}
 .text-success {
   --tw-text-opacity: 1;
   color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));
+}
+.text-warning {
+  --tw-text-opacity: 1;
+  color: var(--fallback-wa, oklch(var(--wa) / var(--tw-text-opacity)));
 }
 .opacity-50 {
   opacity: 0.5;
