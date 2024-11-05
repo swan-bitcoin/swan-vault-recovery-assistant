@@ -4,15 +4,18 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import { driver } from './setup.scenario'
 import prand from 'pure-rand'
 import { ensureDockerStack } from './util/container'
-import { generateKey, getAddress, Key, keysToDescriptor, keyToDescriptor } from './util/bitcoin'
+import { generateKey, getAddress, Key, keysToDescriptor, keyToDescriptor, signAllInputs } from './util/bitcoin'
+import clipboardy from 'clipboardy'
 
 const log = (message: string, ...args: any[]): void => {
   console.log('[TEST][REGTEST_SCENARIO]', message, ...args)
 }
 
-const QUICK_TIMEOUT_MS = 500
+const UI_TIMEOUT_MS = 500
+const BITCOIN_NETWORK_TIMEOUT_MS = 3000
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
-const sleepQuickly = () => sleep(QUICK_TIMEOUT_MS)
+const sleepForUI = () => sleep(UI_TIMEOUT_MS)
+const sleepForBitcoinNetwork = () => sleep(BITCOIN_NETWORK_TIMEOUT_MS)
 
 const seed = Number(process.env.TEMPURA_SCENARIO_RANDOM_SEED) || Date.now() ^ (Math.random() * 0x100000000)
 const prng = prand.xoroshiro128plus(seed)
@@ -76,6 +79,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(receiveDescriptor).toBeTruthy()
     changeDescriptor = keysToDescriptor(keys, { postfixPath: '/1/*' })
     expect(changeDescriptor).toBeTruthy()
+    log('scenario keys', keys)
     log('scenario test descriptors', { receiveDescriptor, changeDescriptor })
 
     destinationKey = generateKey()
@@ -84,25 +88,35 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     log('destination address', destinationAddress)
   })
 
-  const expectLatestBalance = async (confirmed: string, unconfirmed: string): Promise<void> => {
-    expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
-    const stats = await outputs.conversation.findElements(By.css('.stat'))
-    expect(stats.length).toBeGreaterThan(1)
-    const confirmedValue = await stats[stats.length - 2].findElement(By.css('.stat-value')).getText()
-    expect(confirmedValue).toContain(confirmed)
-    const unconfirmedValue = await stats[stats.length - 1].findElement(By.css('.stat-value')).getText()
-    expect(unconfirmedValue).toContain(unconfirmed)
-  }
-
   const expectAnAddress = async () => {
     await inputs.newAddress.click()
-    await sleepQuickly()
+    await sleepForUI()
     expect(await outputs.temporaryMessage.getText()).toMatch(/Address retrieved successfully!/)
-    const elements = await outputs.conversation.findElements(By.css('.break-all'))
+    const elements = await outputs.conversation.findElements(By.className('break-all'))
     expect(elements.length).toBeGreaterThan(0)
     const address = await elements[elements.length - 1].getText()
     expect(address).toMatch(/^bcrt1/)
     return address
+  }
+
+  const expectLatestBalance = async (confirmed: string, unconfirmed: string): Promise<void> => {
+    await inputs.fetchBalance.click()
+    await sleepForUI()
+    expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
+    const stats = await outputs.conversation.findElements(By.className('stat'))
+    expect(stats.length).toBeGreaterThan(1)
+    const confirmedValue = await stats[stats.length - 2].findElement(By.className('stat-value')).getText()
+    expect(confirmedValue).toContain(confirmed)
+    const unconfirmedValue = await stats[stats.length - 1].findElement(By.className('stat-value')).getText()
+    expect(unconfirmedValue).toContain(unconfirmed)
+  }
+
+  const expectLatestMessageToMatch = async (regex: RegExp) => {
+    await sleepForUI()
+    const elements = await outputs.conversation.findElements(By.className('chat-bubble'))
+    expect(elements.length).toBeGreaterThan(0)
+    const latestMessage = await elements[elements.length - 1].getText()
+    expect(latestMessage).toMatch(regex)
   }
 
   it('can locate all the expected elements', async () => {
@@ -141,6 +155,12 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.psbt).toBeTruthy()
     inputs.sweep = await driver.findElement(By.id('sweep-button'))
     expect(inputs.sweep).toBeTruthy()
+    inputs.copy = await driver.findElement(By.id('copy-psbt-button'))
+    expect(inputs.copy).toBeTruthy()
+    inputs.paste = await driver.findElement(By.id('paste-psbt-button'))
+    expect(inputs.paste).toBeTruthy()
+    inputs.broadcast = await driver.findElement(By.id('broadcast-button'))
+    expect(inputs.broadcast).toBeTruthy()
 
     // outputs
     outputs.conversation = await driver.findElement(By.id('conversation'))
@@ -190,8 +210,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see a balance of zero for a brand new wallet', async () => {
     await inputs.receive.sendKeys(receiveDescriptor)
-    await inputs.fetchBalance.click()
-    await sleepQuickly()
     await expectLatestBalance('0.00 000 000', '0.00 000 000')
   })
 
@@ -206,20 +224,16 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     receiveAmount = getRandom(10, 2000) / 100
     receiveAmountFixed = receiveAmount.toFixed(2)
     await client.sendToAddress(address, receiveAmount)
-    await sleep(3000)
+    await sleepForBitcoinNetwork()
   })
 
   it('can see an updated unconfirmed balance after receiving sats', async () => {
-    await inputs.fetchBalance.click()
-    await sleepQuickly()
     await expectLatestBalance('0.00 000 000', `${receiveAmountFixed} 000 000`)
   })
 
   it('can see an updated confirmed balance after a block is mined', async () => {
     await client.mineBlocks(1)
-    await sleepQuickly()
-    await inputs.fetchBalance.click()
-    await sleepQuickly()
+    await sleepForBitcoinNetwork()
     await expectLatestBalance(`${receiveAmountFixed} 000 000`, '0.00 000 000')
   })
 
@@ -232,9 +246,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     changeAmount = getRandom(10, 2000) / 100
     changeAmountFixed = changeAmount.toFixed(2)
     await client.sendToAddressAndConfirm(address, changeAmount)
-    await sleepQuickly()
-    await inputs.fetchBalance.click()
-    await sleepQuickly()
+    await sleepForBitcoinNetwork()
     await expectLatestBalance(`${changeAmountFixed} 000 000`, '0.00 000 000')
   })
 
@@ -243,8 +255,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   it('can use the receive descriptor only to see the balance of both receive and change', async () => {
     await inputs.receive.clear()
     await inputs.receive.sendKeys(receiveDescriptor)
-    await inputs.fetchBalance.click()
-    await sleepQuickly()
     fullWalletBalance = receiveAmount + changeAmount
     fullWalletBalanceFixed = fullWalletBalance.toFixed(2)
     await expectLatestBalance(`${fullWalletBalanceFixed} 000 000`, '0.00 000 000')
@@ -254,14 +264,44 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   it('can get a PSBT for signing without inserting a fee rate', async () => {
     const feeText = await inputs.feeRate.getText()
     expect(feeText).toBe('')
-    let psbtText = await inputs.psbt.getAttribute('value')
-    expect(psbtText).toBe('')
+    psbt = await inputs.psbt.getAttribute('value')
+    expect(psbt).toBe('')
 
     await inputs.address.sendKeys(destinationAddress)
 
     await inputs.sweep.click()
-    await sleepQuickly()
-    psbtText = await inputs.psbt.getAttribute('value')
-    expect(psbtText).toMatch(/^cHNid/)
+    await sleepForUI()
+    await inputs.copy.click()
+    psbt = await clipboardy.read()
+    expect(psbt).toMatch(/^cHNid/)
+    log('sweep psbt', psbt)
+  })
+
+  // BETTER TODO: psbt info feature pending
+  // it('can paste in a PSBT with a single signature', async () => {
+  //   psbt = signAllInputs(keys[0], psbt)
+  //   await inputs.psbt.clear()
+  //   await inputs.psbt.sendKeys(psbt)
+  //   await inputs.broadcast.click()
+  //   await sleepQuickly()
+  //   // TODO: this is the current error message, but it's not very helpful. We should iterate here
+  //   // and try to inform the user why the broadcast failed
+  //   expect(await outputs.temporaryMessage.getText()).toMatch(/^PsbtError: Failed to finalize PSBT/)
+  // })
+
+  it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
+    psbt = signAllInputs(keys[0], psbt)
+    psbt = signAllInputs(keys[1], psbt)
+    log('twice-signed psbt', psbt)
+    await clipboardy.write(psbt)
+    await inputs.paste.click()
+    await inputs.broadcast.click()
+    await sleepForUI()
+    expectLatestMessageToMatch(/Broadcast successful!/)
+  })
+
+  it('can see the balance updated after the transaction is broadcast', async () => {
+    await sleepForBitcoinNetwork()
+    await expectLatestBalance('0.00 000 000', '0.00 000 000')
   })
 })
