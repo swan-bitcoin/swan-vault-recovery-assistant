@@ -382,7 +382,7 @@ async fn broadcast(
   ) {
     return Err(TempuraError::new(
       TempuraErrorType::PsbtError,
-      "Failed to finalize PSBT",
+      "Failed to finalize the PSBT for broadcast, it may be missing required signatures.",
     ));
   }
 
@@ -482,6 +482,8 @@ async fn psbt_status(
     _ => {}
   }
 
+  // it is possible that the PSBT's spending conditions are actually satisfied,
+  // but the given wallet is unable to finalize it.
   for input in &psbt.inputs {
     if !input.partial_sigs.is_empty()
       || !input.tap_script_sigs.is_empty()
