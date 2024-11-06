@@ -395,13 +395,18 @@ async fn broadcast(
 
 #[tauri::command]
 #[specta::specta]
-async fn estimate_fee(network: String, electrum: Option<String>) -> Result<f32, TempuraError> {
+async fn estimate_fee(
+  network: String,
+  electrum: Option<String>,
+  blocks: Option<u32>,
+) -> Result<f32, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
+  let blocks = blocks.unwrap_or(1) as usize;
 
   // BDK may panic here when the electrum server returns a value that it doesn't expect.
   let result = std::panic::catch_unwind(|| {
-    bdk::blockchain::Blockchain::estimate_fee(&blockchain, 1).map(|f| f.as_sat_per_vb())
+    bdk::blockchain::Blockchain::estimate_fee(&blockchain, blocks).map(|f| f.as_sat_per_vb())
   });
 
   match result {
@@ -526,6 +531,13 @@ async fn sweep(
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let wallet = get_wallet(network, receive, change)?;
+
+  if fee_rate < 0.0 {
+    return Err(TempuraError::new(
+      TempuraErrorType::FeeRateError,
+      "Fee rate must be a positive number",
+    ));
+  }
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {
