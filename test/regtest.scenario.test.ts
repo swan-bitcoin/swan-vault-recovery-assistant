@@ -17,6 +17,9 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const sleepForUI = () => sleep(UI_TIMEOUT_MS)
 const sleepForBitcoinNetwork = () => sleep(BITCOIN_NETWORK_TIMEOUT_MS)
 
+const REGEX_BALANCE_NONZERO = /(?!0\.00 000 000)(\d\.\d{2} \d{3} \d{3})$/
+const REGEX_BALANCE_ZERO = /0\.00 000 000$/
+
 const seed = Number(process.env.TEMPURA_SCENARIO_RANDOM_SEED) || Date.now() ^ (Math.random() * 0x100000000)
 const prng = prand.xoroshiro128plus(seed)
 const getRandom = (low: number, high: number): number => {
@@ -99,16 +102,16 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     return address
   }
 
-  const expectLatestBalance = async (confirmed: string, unconfirmed: string): Promise<void> => {
+  const expectLatestBalance = async (confirmed: RegExp, unconfirmed: RegExp): Promise<void> => {
     await inputs.fetchBalance.click()
     await sleepForUI()
     expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
     const stats = await outputs.conversation.findElements(By.className('stat'))
     expect(stats.length).toBeGreaterThan(1)
     const confirmedValue = await stats[stats.length - 2].findElement(By.className('stat-value')).getText()
-    expect(confirmedValue).toContain(confirmed)
+    expect(confirmedValue).toMatch(confirmed)
     const unconfirmedValue = await stats[stats.length - 1].findElement(By.className('stat-value')).getText()
-    expect(unconfirmedValue).toContain(unconfirmed)
+    expect(unconfirmedValue).toMatch(unconfirmed)
   }
 
   const expectLatestMessageToMatch = async (regex: RegExp) => {
@@ -153,6 +156,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.address).toBeTruthy()
     inputs.psbt = await driver.findElement(By.id('psbt-textarea'))
     expect(inputs.psbt).toBeTruthy()
+    inputs.psbtStatus = await driver.findElement(By.id('psbt-status-button'))
+    expect(inputs.psbtStatus).toBeTruthy()
     inputs.sweep = await driver.findElement(By.id('sweep-button'))
     expect(inputs.sweep).toBeTruthy()
     inputs.copy = await driver.findElement(By.id('copy-psbt-button'))
@@ -171,8 +176,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see the receive descriptor box in simple mode', async () => {
     expect(await inputs.receive.isDisplayed()).toBe(true)
-    // TODO - though we probably want a different test suite for UX behaviors
-    // expect(await inputs.change.isDisplayed()).toBe(false)
+    expect(await inputs.change.isDisplayed()).toBe(false)
   })
 
   it('cannot see the advanced options in simple mode', async () => {
@@ -210,7 +214,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see a balance of zero for a brand new wallet', async () => {
     await inputs.receive.sendKeys(receiveDescriptor)
-    await expectLatestBalance('0.00 000 000', '0.00 000 000')
+    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
   })
 
   let address: string
@@ -228,13 +232,13 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   })
 
   it('can see an updated unconfirmed balance after receiving sats', async () => {
-    await expectLatestBalance('0.00 000 000', `${receiveAmountFixed} 000 000`)
+    await expectLatestBalance(REGEX_BALANCE_ZERO, new RegExp(`${receiveAmountFixed} 000 000`))
   })
 
   it('can see an updated confirmed balance after a block is mined', async () => {
     await client.mineBlocks(1)
     await sleepForBitcoinNetwork()
-    await expectLatestBalance(`${receiveAmountFixed} 000 000`, '0.00 000 000')
+    await expectLatestBalance(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   let changeAmount: number
@@ -247,7 +251,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     changeAmountFixed = changeAmount.toFixed(2)
     await client.sendToAddressAndConfirm(address, changeAmount)
     await sleepForBitcoinNetwork()
-    await expectLatestBalance(`${changeAmountFixed} 000 000`, '0.00 000 000')
+    await expectLatestBalance(new RegExp(`${changeAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   let fullWalletBalance: number
@@ -257,7 +261,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.receive.sendKeys(receiveDescriptor)
     fullWalletBalance = receiveAmount + changeAmount
     fullWalletBalanceFixed = fullWalletBalance.toFixed(2)
-    await expectLatestBalance(`${fullWalletBalanceFixed} 000 000`, '0.00 000 000')
+    await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   let psbt: string
@@ -274,34 +278,57 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.copy.click()
     psbt = await clipboardy.read()
     expect(psbt).toMatch(/^cHNid/)
-    log('sweep psbt', psbt)
   })
 
-  // BETTER TODO: psbt info feature pending
-  // it('can paste in a PSBT with a single signature', async () => {
-  //   psbt = signAllInputs(keys[0], psbt)
-  //   await inputs.psbt.clear()
-  //   await inputs.psbt.sendKeys(psbt)
-  //   await inputs.broadcast.click()
-  //   await sleepQuickly()
-  //   // TODO: this is the current error message, but it's not very helpful. We should iterate here
-  //   // and try to inform the user why the broadcast failed
-  //   expect(await outputs.temporaryMessage.getText()).toMatch(/^PsbtError: Failed to finalize PSBT/)
-  // })
+  it("can retrieve a status of 'unsigned' for a newly-created PSBT", async () => {
+    await inputs.psbtStatus.click()
+    await expectLatestMessageToMatch(/This PSBT is unsigned/)
+  })
 
-  it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
+  it('can paste in a PSBT with a single signature, but cannot broadcast it', async () => {
     psbt = signAllInputs(keys[0], psbt)
-    psbt = signAllInputs(keys[1], psbt)
-    log('twice-signed psbt', psbt)
+    log('once-signed psbt', psbt)
     await clipboardy.write(psbt)
     await inputs.paste.click()
     await inputs.broadcast.click()
     await sleepForUI()
-    expectLatestMessageToMatch(/Broadcast successful!/)
+    expect(await outputs.temporaryMessage.getText()).toMatch(/^PsbtError: Failed to finalize the PSBT for broadcast/)
+  })
+
+  it("can retrieve a status of 'partially signed' for the once-signed PSBT", async () => {
+    await inputs.psbtStatus.click()
+    await expectLatestMessageToMatch(/This PSBT is partially signed/)
+  })
+
+  it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
+    psbt = signAllInputs(keys[1], psbt)
+    log('twice-signed psbt', psbt)
+    await clipboardy.write(psbt)
+    await inputs.paste.click()
+    await inputs.psbtStatus.click()
+    await expectLatestMessageToMatch(/This PSBT is fully signed/)
+  })
+
+  it('can broadcast the twice-signed psbt', async () => {
+    await inputs.broadcast.click()
+    await sleepForUI()
+    await expectLatestMessageToMatch(/Broadcast successful!/)
   })
 
   it('can see the balance updated after the transaction is broadcast', async () => {
     await sleepForBitcoinNetwork()
-    await expectLatestBalance('0.00 000 000', '0.00 000 000')
+    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
+  })
+
+  it('can see the unconfirmed balance on the target wallet', async () => {
+    await inputs.receive.clear()
+    await inputs.receive.sendKeys(destinationDescriptor)
+    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_NONZERO)
+  })
+
+  it('can see the confirmed balance on the target wallet after a block is mined', async () => {
+    await client.mineBlocks(1)
+    await sleepForBitcoinNetwork()
+    await expectLatestBalance(REGEX_BALANCE_NONZERO, REGEX_BALANCE_ZERO)
   })
 })
