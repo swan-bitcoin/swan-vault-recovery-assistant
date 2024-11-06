@@ -22,8 +22,8 @@ async broadcast(psbt: string, network: string, receive: string, change: string |
 async enumerate(network: string) : Promise<string> {
     return await TAURI_INVOKE("enumerate", { network });
 },
-async estimateFee(network: string, electrum: string | null) : Promise<number> {
-    return await TAURI_INVOKE("estimate_fee", { network, electrum });
+async estimateFee(network: string, electrum: string | null, blocks: number | null) : Promise<number> {
+    return await TAURI_INVOKE("estimate_fee", { network, electrum, blocks });
 },
 async isDescriptor(descriptor: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_descriptor", { descriptor });

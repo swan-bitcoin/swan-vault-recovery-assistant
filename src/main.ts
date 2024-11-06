@@ -4,6 +4,8 @@ import { Address, Balance, Success, Transactions } from './components'
 import { createConversationBubble, isChangeDescriptor } from './helpers'
 import { getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
 
+const FEE_RATE_WARNING_RATIO = 0.9
+
 let DOM: {
   addressInput: HTMLInputElement
   changeInput: HTMLInputElement
@@ -92,6 +94,43 @@ const validateDescriptor = async () => {
     DOM.receiveInput.classList.remove('textarea-warning')
     return false
   }
+}
+
+type FeeRate = {
+  value: number | null
+  warning?: string
+  failed?: boolean
+}
+
+async function getFeeRate(): Promise<FeeRate> {
+  const { feeRate, network, electrum } = getInputs()
+
+  let estimate: number
+  try {
+    estimate = await commands.estimateFee(network, electrum, 1)
+  } catch {
+    const failed = feeRate === null
+    const warning = failed
+      ? undefined
+      : 'Warning: The specified fee rate could not be checked \
+      against the current network rates. Please double-check \
+      this is the value you wish to use!'
+    return { value: feeRate, warning, failed }
+  }
+
+  if (typeof feeRate !== 'number') {
+    return { value: estimate }
+  }
+  if (feeRate < estimate * FEE_RATE_WARNING_RATIO) {
+    return {
+      value: feeRate,
+      warning:
+        'Warning: The specified fee rate is lower than recommended. \
+        Please double-check this value. Low fee rates may \
+        cause delays in transaction confirmation.',
+    }
+  }
+  return { value: feeRate }
 }
 
 type Inputs = {
@@ -287,7 +326,7 @@ async function estimateFee() {
   DOM.tempMessage.textContent = 'Please wait...'
   try {
     const { electrum, network } = getInputs()
-    const feeRate = await commands.estimateFee(network, electrum)
+    const feeRate = await commands.estimateFee(network, electrum, 1)
     DOM.feeRateInput.value = feeRate.toString()
     DOM.tempMessage.innerHTML = Success('Fee retrieved')
   } catch (e: unknown) {
@@ -355,10 +394,16 @@ async function psbtStatus() {
 async function sweep() {
   const inputs = getInputs()
   const { address, recv, change, electrum, network } = inputs
-  let { feeRate } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
   require(address, 'Address')
+
+  const feeRate = await getFeeRate()
+  if (feeRate.failed) {
+    DOM.tempMessage.textContent =
+      'Unable to automatically estimate a fee for this network. Please enter a fee rate manually.'
+    return
+  }
 
   DOM.tempMessage.textContent = 'Please wait...'
   try {
@@ -367,13 +412,17 @@ async function sweep() {
       true
     )
     DOM.conversation.appendChild(userBubble)
-    feeRate = feeRate || (await commands.estimateFee(network, electrum))
-    const psbt = await commands.sweep(address, feeRate, network, recv, change, electrum)
+    const psbt = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
     DOM.psbtTextArea.value = psbt.psbt
 
     DOM.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
     DOM.conversation.appendChild(tempuraBubble)
+
+    if (feeRate.warning) {
+      const warningBubble = createConversationBubble(feeRate.warning)
+      DOM.conversation.appendChild(warningBubble)
+    }
   } catch (e: unknown) {
     handleError(e)
   }

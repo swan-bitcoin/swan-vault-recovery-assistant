@@ -192,7 +192,20 @@
 
             <!-- Fee rate -->
             <div class="form-control mb-5">
-              <label class="label">Fee Rate (optional)</label>
+              <div class="label justify-normal gap-2">
+                <label class="label">Fee Rate (optional)</label>
+                <div class="group">
+                  <span class="cursor-pointer">ℹ️</span>
+                  <div
+                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                  >
+                    A fee must be paid to miners to include your transaction in a block. The 'fee rate' is the rate at which
+                    the fee increases relative to the transaction's complexity, and is the primary factor a miner uses to
+                    determine the transaction's priority. If you leave this blank, Tempura will attempt to suggest a fee rate
+                    for you.
+                  </div>
+                </div>
+              </div>
               <div class="flex items-center gap-2">
                 <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
                 <label class="label inline-flex" for="feerate-input">sats/vB</label>
