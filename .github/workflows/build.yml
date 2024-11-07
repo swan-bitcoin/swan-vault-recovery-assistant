@@ -27,18 +27,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: swan-bitcoin/actions/actions/checkout@master
 
       - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+        uses: swan-bitcoin/actions/actions-rs/toolchain@master
         with:
           toolchain: stable
           override: true
 
-      - uses: pnpm/action-setup@v4
+      - uses: swan-bitcoin/actions/pnpm/action-setup@master
         with:
           version: 9
-      - uses: actions/setup-node@v4
+      - uses: swan-bitcoin/actions/actions/setup-node@master
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -52,7 +52,7 @@ jobs:
 
       - name: Restore cargo cache
         id: restore-cargo-cache
-        uses: actions/cache/restore@v4
+        uses: swan-bitcoin/actions/actions/cache/restore@master
         with:
           path: |
             ~/.cargo/bin/
@@ -74,7 +74,7 @@ jobs:
         run: pnpm ci:gitdiff
 
       - name: Save cargo cache
-        uses: actions/cache/save@v4
+        uses: swan-bitcoin/actions/actions/cache/save@master
         with:
           path: |
             ~/.cargo/bin/
@@ -92,7 +92,7 @@ jobs:
         # https://jonaskruckenberg.github.io/tauri-docs-wip/building/building-your-application.html#packaging-formats
       - name: Publish artifacts (linux)
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: actions/upload-artifact@v4
+        uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
           name: tempura-linux
           path: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Publish artifacts (macos)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: actions/upload-artifact@v4
+        uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
           name: tempura-macos
           path: |
@@ -111,7 +111,7 @@ jobs:
 
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/upload-artifact@v4
+        uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
           name: tempura-windows
           path: |
