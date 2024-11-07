@@ -448,12 +448,19 @@ async function sweep() {
   DOM.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all">${address}</span>`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate} sats/vB)`,
       true
     )
     DOM.conversation.appendChild(userBubble)
-    const psbt = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
-    DOM.psbtTextArea.value = psbt.psbt
+    const { psbt } = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
+    DOM.psbtTextArea.value = psbt
+
+    // Scroll to psbt area and highlight the psbt creation
+    DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
+    DOM.psbtTextArea.classList.add('textarea-primary')
+    setTimeout(() => {
+      DOM.psbtTextArea.classList.remove('textarea-primary')
+    }, 1500)
 
     DOM.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
