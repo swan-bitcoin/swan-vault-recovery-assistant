@@ -396,6 +396,10 @@ async function sweep() {
   const { address, recv, change, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+  // TODO: Add validateAddress to also provide positive feedback on the address similar to validateDescriptor?
+  if (!address) {
+    DOM.addressInput.classList.add('input-error')
+  }
   require(address, 'Address')
 
   const feeRate = await getFeeRate()
@@ -533,6 +537,11 @@ window.addEventListener('DOMContentLoaded', () => {
     receiveInput.addEventListener('input', validateDescriptor)
     DOM.networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
+    })
+
+    // Remove the red border from the address field due to no address entered when the user enters an address
+    addressInput.addEventListener('input', () => {
+      addressInput.classList.remove('input-error')
     })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')

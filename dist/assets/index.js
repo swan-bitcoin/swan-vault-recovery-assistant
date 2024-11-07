@@ -687,6 +687,9 @@ async function sweep() {
   const { address, recv, change, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+  if (!address) {
+    DOM.addressInput.classList.add('input-error')
+  }
   require2(address, 'Address')
   const feeRate = await getFeeRate()
   if (feeRate.failed) {
@@ -803,6 +806,9 @@ window.addEventListener('DOMContentLoaded', () => {
     receiveInput.addEventListener('input', validateDescriptor)
     DOM.networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
+    })
+    addressInput.addEventListener('input', () => {
+      addressInput.classList.remove('input-error')
     })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
