@@ -1,6 +1,6 @@
 import { PsbtSigningStatus } from './bindings'
 
-type Device = {
+export type Device = {
   type: string
   model: string
   path: string
@@ -73,22 +73,23 @@ export function getDevicePrompt(val: unknown): string {
 }
 
 export function getPsbtStatusMessage(status: PsbtSigningStatus) {
-  let detail
+  let message
   switch (status) {
     case 'Unsigned':
-      detail = 'unsigned and not ready to be broadcast'
+      message = 'The PSBT is unsigned.'
       break
     case 'PartiallySigned':
-      detail = 'partially signed, but not ready to be broadcast'
+      message =
+        'The transaction is partially signed. You need to add the signature from another key before you can broadcast it.'
       break
     case 'FullySigned':
-      detail = 'fully signed and ready to be broadcast'
+      message = 'The transaction is fully signed 🎉. You can broadcast it now.'
       break
     default:
-      detail = 'in an unknown state'
+      message = 'The PSBT is in an unknown state.'
       break
   }
-  return `This PSBT is ${detail}`
+  return message
 }
 
 export function getSignMessageAndPsbt(val: unknown): {

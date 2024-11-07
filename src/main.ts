@@ -1,13 +1,15 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { commands, type TempuraError } from './bindings'
+import { commands, PsbtSigningStatus, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import { createConversationBubble, isChangeDescriptor } from './helpers'
-import { getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
+import { capitalize, createConversationBubble, isChangeDescriptor } from './helpers'
+import { simpleCheckmark } from './icons'
+import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
 let DOM: {
   addressInput: HTMLInputElement
+  broadcastButton: HTMLButtonElement
   changeInput: HTMLInputElement
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
@@ -131,6 +133,36 @@ async function getFeeRate(): Promise<FeeRate> {
     }
   }
   return { value: feeRate }
+}
+
+type UpdatePsbtStatusProps = {
+  psbtStatus: PsbtSigningStatus
+  device: Device
+}
+
+const updatePsbtStatus = ({ psbtStatus, device }: UpdatePsbtStatusProps) => {
+  const psbtStatusElement = document.getElementById('psbt-status')
+
+  // Clear any existing status UI
+  if (psbtStatusElement) {
+    psbtStatusElement.innerHTML = ''
+  }
+
+  // Update the UI based on the PSBT status
+  if (psbtStatus === 'FullySigned') {
+    psbtStatusElement.innerHTML = `
+      <span class="text-success">Fully Signed ${simpleCheckmark}</span>
+    `
+    DOM.broadcastButton.classList.remove('btn-disabled')
+  } else if (psbtStatus === 'PartiallySigned') {
+    const deviceTypeCapitalized = capitalize(device.type)
+    psbtStatusElement.innerHTML = `
+      <span class="text-warning">Partially Signed</span>
+      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+    `
+  } else if (psbtStatus === 'Unsigned') {
+    psbtStatusElement.innerHTML = ''
+  }
 }
 
 type Inputs = {
@@ -334,9 +366,11 @@ async function estimateFee() {
   }
 }
 
-function pastePsbtToClipboard() {
+function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
+      DOM.broadcastButton.classList.remove('btn-disabled')
+
       const trimmed = psbt.trim()
       DOM.psbtTextArea.value = trimmed
       if (!trimmed || !trimmed.startsWith('cHNid')) {
@@ -352,7 +386,7 @@ function pastePsbtToClipboard() {
 }
 
 async function sign() {
-  const { network, psbt } = getInputs()
+  const { psbt, recv, change, network } = getInputs()
   require(psbt, 'PSBT')
 
   DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
@@ -363,12 +397,16 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-
-    DOM.tempMessage.textContent = 'Sign again or broadcast next?'
-    const tempuraBubble = createConversationBubble(message)
+    const tempuraBubble = createConversationBubble(Success('Signature added'))
     DOM.conversation.appendChild(tempuraBubble)
+    // Check the psbt status and adapt UI
+    const psbtStatus = await commands.psbtStatus(responsePsbt, network, recv, change)
+    updatePsbtStatus({ psbtStatus, device })
+    // Give feedback via shrimpy
+    const message = getPsbtStatusMessage(psbtStatus)
+    DOM.tempMessage.textContent = message
   } catch (e: unknown) {
     handleError(e)
   }
@@ -380,10 +418,10 @@ async function psbtStatus() {
 
   DOM.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    const userBubble = createConversationBubble('What is the status of this PSBT?', true)
     DOM.conversation.appendChild(userBubble)
     const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
-    const tempuraBubble = createConversationBubble(Success(message))
+    const tempuraBubble = createConversationBubble(message)
     DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
@@ -396,6 +434,10 @@ async function sweep() {
   const { address, recv, change, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+  // TODO: Add validateAddress to also provide positive feedback on the address similar to validateDescriptor?
+  if (!address) {
+    DOM.addressInput.classList.add('input-error')
+  }
   require(address, 'Address')
 
   const feeRate = await getFeeRate()
@@ -408,12 +450,19 @@ async function sweep() {
   DOM.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all">${address}</span>`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
     DOM.conversation.appendChild(userBubble)
-    const psbt = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
-    DOM.psbtTextArea.value = psbt.psbt
+    const { psbt } = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
+    DOM.psbtTextArea.value = psbt
+
+    // Scroll to psbt area and highlight the psbt creation
+    DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
+    DOM.psbtTextArea.classList.add('textarea-primary')
+    setTimeout(() => {
+      DOM.psbtTextArea.classList.remove('textarea-primary')
+    }, 1500)
 
     DOM.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
@@ -450,6 +499,7 @@ window.addEventListener('DOMContentLoaded', () => {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
     const txBody = requireDomElement<HTMLTableSectionElement>('#transactions-body')
     const txModal = requireDomElement<HTMLDialogElement>('#transactions-modal')
+    const broadcastButton = requireDomElement<HTMLButtonElement>('#broadcast-button')
     const conversation = requireDomElement<HTMLDivElement>('#conversation')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
@@ -461,6 +511,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     DOM = {
       addressInput,
+      broadcastButton,
       changeInput,
       electrumInput,
       feeRateInput,
@@ -510,12 +561,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     requireDomElement<HTMLButtonElement>('#paste-psbt-button').addEventListener('click', (e) => {
       e.preventDefault()
-      pastePsbtToClipboard()
-    })
-
-    requireDomElement<HTMLButtonElement>('#broadcast-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      broadcast()
+      pastePsbtFromClipboard()
     })
 
     requireDomElement<HTMLButtonElement>('#sign-message-button').addEventListener('click', (e) => {
@@ -528,11 +574,25 @@ window.addEventListener('DOMContentLoaded', () => {
       enumerate()
     })
 
+    broadcastButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      broadcast()
+    })
+
     // Add event listeners for validation of descriptor
     receiveInput.addEventListener('blur', validateDescriptor)
     receiveInput.addEventListener('input', validateDescriptor)
-    DOM.networkRadios.forEach((radio) => {
+    networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
+    })
+
+    // Remove the red border from the address field due to no address entered when the user enters an address
+    addressInput.addEventListener('input', () => {
+      addressInput.classList.remove('input-error')
+    })
+
+    psbtTextArea.addEventListener('input', () => {
+      broadcastButton.classList.remove('btn-disabled')
     })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')

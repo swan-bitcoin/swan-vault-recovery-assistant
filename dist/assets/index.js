@@ -174,6 +174,11 @@ const selfTransferIcon = `
   </div>
 </div>
 `
+const simpleCheckmark = `
+<svg class="inline w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12l5 5L20 7"></path>
+</svg>
+`
 const TxRow = (transaction) => {
   const transactionType =
     transaction.sent === transaction.fee ? 'selfTransfer' : Number(transaction.received) > 0 ? 'received' : 'sent'
@@ -254,6 +259,7 @@ const isChangeDescriptor = (descriptor) => {
   const changePattern = /\/1\/\*\)\)#\w+$/
   return changePattern.test(descriptor)
 }
+const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -303,22 +309,23 @@ function getDevicePrompt(val) {
   return 'Make sure only one device is connected.'
 }
 function getPsbtStatusMessage(status) {
-  let detail
+  let message
   switch (status) {
     case 'Unsigned':
-      detail = 'unsigned and not ready to be broadcast'
+      message = 'The PSBT is unsigned.'
       break
     case 'PartiallySigned':
-      detail = 'partially signed, but not ready to be broadcast'
+      message =
+        'The transaction is partially signed. You need to add the signature from another key before you can broadcast it.'
       break
     case 'FullySigned':
-      detail = 'fully signed and ready to be broadcast'
+      message = 'The transaction is fully signed 🎉. You can broadcast it now.'
       break
     default:
-      detail = 'in an unknown state'
+      message = 'The PSBT is in an unknown state.'
       break
   }
-  return `This PSBT is ${detail}`
+  return message
 }
 function getSignMessageAndPsbt(val) {
   const signResponse = parseSignResponse(val)
@@ -458,6 +465,26 @@ async function getFeeRate() {
     }
   }
   return { value: feeRate }
+}
+const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
+  const psbtStatusElement = document.getElementById('psbt-status')
+  if (psbtStatusElement) {
+    psbtStatusElement.innerHTML = ''
+  }
+  if (psbtStatus2 === 'FullySigned') {
+    psbtStatusElement.innerHTML = `
+      <span class="text-success">Fully Signed ${simpleCheckmark}</span>
+    `
+    DOM.broadcastButton.classList.remove('btn-disabled')
+  } else if (psbtStatus2 === 'PartiallySigned') {
+    const deviceTypeCapitalized = capitalize(device.type)
+    psbtStatusElement.innerHTML = `
+      <span class="text-warning">Partially Signed</span>
+      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+    `
+  } else if (psbtStatus2 === 'Unsigned') {
+    psbtStatusElement.innerHTML = ''
+  }
 }
 function getInputs() {
   var _a, _b, _c
@@ -630,9 +657,10 @@ async function estimateFee() {
     handleError(e)
   }
 }
-function pastePsbtToClipboard() {
+function pastePsbtFromClipboard() {
   readText()
     .then((psbt) => {
+      DOM.broadcastButton.classList.remove('btn-disabled')
       const trimmed = psbt.trim()
       DOM.psbtTextArea.value = trimmed
       if (!trimmed || !trimmed.startsWith('cHNid')) {
@@ -647,7 +675,7 @@ function pastePsbtToClipboard() {
     })
 }
 async function sign() {
-  const { network, psbt } = getInputs()
+  const { psbt, recv, change, network } = getInputs()
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
@@ -657,11 +685,14 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-    DOM.tempMessage.textContent = 'Sign again or broadcast next?'
-    const tempuraBubble = createConversationBubble(message)
+    const tempuraBubble = createConversationBubble(Success('Signature added'))
     DOM.conversation.appendChild(tempuraBubble)
+    const psbtStatus2 = await commands.psbtStatus(responsePsbt, network, recv, change)
+    updatePsbtStatus({ psbtStatus: psbtStatus2, device })
+    const message = getPsbtStatusMessage(psbtStatus2)
+    DOM.tempMessage.textContent = message
   } catch (e) {
     handleError(e)
   }
@@ -671,10 +702,10 @@ async function psbtStatus() {
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    const userBubble = createConversationBubble('What is the status of this PSBT?', true)
     DOM.conversation.appendChild(userBubble)
     const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
-    const tempuraBubble = createConversationBubble(Success(message))
+    const tempuraBubble = createConversationBubble(message)
     DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e) {
@@ -686,6 +717,9 @@ async function sweep() {
   const { address, recv, change, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+  if (!address) {
+    DOM.addressInput.classList.add('input-error')
+  }
   require2(address, 'Address')
   const feeRate = await getFeeRate()
   if (feeRate.failed) {
@@ -696,12 +730,17 @@ async function sweep() {
   DOM.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all">${address}</span>`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
     DOM.conversation.appendChild(userBubble)
-    const psbt = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
-    DOM.psbtTextArea.value = psbt.psbt
+    const { psbt } = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
+    DOM.psbtTextArea.value = psbt
+    DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
+    DOM.psbtTextArea.classList.add('textarea-primary')
+    setTimeout(() => {
+      DOM.psbtTextArea.classList.remove('textarea-primary')
+    }, 1500)
     DOM.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
     DOM.conversation.appendChild(tempuraBubble)
@@ -733,6 +772,7 @@ window.addEventListener('DOMContentLoaded', () => {
     tempMessage = requireDomElement('#temporary-message')
     const txBody = requireDomElement('#transactions-body')
     const txModal = requireDomElement('#transactions-modal')
+    const broadcastButton = requireDomElement('#broadcast-button')
     const conversation = requireDomElement('#conversation')
     const addressInput = requireDomElement('#address-input')
     const changeInput = requireDomElement('#change-input')
@@ -743,6 +783,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const receiveInput = requireDomElement('#receive-input')
     DOM = {
       addressInput,
+      broadcastButton,
       changeInput,
       electrumInput,
       feeRateInput,
@@ -784,11 +825,7 @@ window.addEventListener('DOMContentLoaded', () => {
     })
     requireDomElement('#paste-psbt-button').addEventListener('click', (e) => {
       e.preventDefault()
-      pastePsbtToClipboard()
-    })
-    requireDomElement('#broadcast-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      broadcast()
+      pastePsbtFromClipboard()
     })
     requireDomElement('#sign-message-button').addEventListener('click', (e) => {
       e.preventDefault()
@@ -798,10 +835,20 @@ window.addEventListener('DOMContentLoaded', () => {
       e.preventDefault()
       enumerate()
     })
+    broadcastButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      broadcast()
+    })
     receiveInput.addEventListener('blur', validateDescriptor)
     receiveInput.addEventListener('input', validateDescriptor)
-    DOM.networkRadios.forEach((radio) => {
+    networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
+    })
+    addressInput.addEventListener('input', () => {
+      addressInput.classList.remove('input-error')
+    })
+    psbtTextArea.addEventListener('input', () => {
+      broadcastButton.classList.remove('btn-disabled')
     })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')

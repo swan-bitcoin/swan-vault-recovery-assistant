@@ -220,18 +220,20 @@
 
             <!-- PSBT textarea -->
             <div class="form-control mb-3">
-              <label class="label">PSBT</label>
+              <label class="label">Transaction (PSBT)</label>
               <textarea
-                class="textarea textarea-bordered h-40"
+                class="textarea textarea-bordered h-40 leading-normal transition-border-color duration-500 ease-in-out"
                 id="psbt-textarea"
                 placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
               ></textarea>
+              <!-- PSBT Status -->
+              <div class="mt-2 ml-1" id="psbt-status"></div>
             </div>
 
             <!-- PSBT controls -->
             <div class="card-actions justify-end mb-6">
               <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
-              <button class="btn btn-outline btn-sm" type="button" id="psbt-status-button">PSBT Status</button>
+              <button class="btn btn-outline btn-sm dev-only" type="button" id="psbt-status-button">PSBT Status</button>
               <button class="btn btn-outline btn-sm dev-only" type="button" id="copy-psbt-button">Copy PSBT</button>
               <button class="btn btn-outline btn-sm dev-only" type="button" id="paste-psbt-button">Paste PSBT</button>
             </div>
@@ -239,7 +241,7 @@
             <!-- Device & Broadcast controls -->
             <div class="card-actions mb-6 justify-center">
               <button class="btn btn-warning" type="button" id="sign-message-button">Sign</button>
-              <button class="btn btn-secondary" type="button" id="broadcast-button">Broadcast</button>
+              <button class="btn btn-secondary btn-disabled" type="button" id="broadcast-button">Broadcast</button>
             </div>
           </div>
         </div>
