@@ -17,12 +17,12 @@ jobs:
         uses: swan-bitcoin/actions/actions/checkout@master
 
       - name: set up rust
-        uses: swan-bitcoin/actions-rs/toolchain@master
+        uses: swan-bitcoin/actions/actions-rs/toolchain@master
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/pnpm/action-setup@master
+      - uses: swan-bitcoin/actions/pnpm/action-setup@master
         with:
           version: 9
 
@@ -45,12 +45,12 @@ jobs:
         uses: swan-bitcoin/actions/actions/checkout@master
 
       - name: set up rust
-        uses: swan-bitcoin/actions-rs/toolchain@master
+        uses: swan-bitcoin/actions/actions-rs/toolchain@master
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/pnpm/action-setup@master
+      - uses: swan-bitcoin/actions/pnpm/action-setup@master
         with:
           version: 9
 
