@@ -9,6 +9,7 @@ const FEE_RATE_WARNING_RATIO = 0.9
 
 let DOM: {
   addressInput: HTMLInputElement
+  broadcastButton: HTMLButtonElement
   changeInput: HTMLInputElement
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
@@ -152,8 +153,7 @@ const updatePsbtStatus = ({ psbtStatus, device }: UpdatePsbtStatusProps) => {
     psbtStatusElement.innerHTML = `
       <span class="text-success">Fully Signed ${simpleCheckmark}</span>
     `
-    const broadcastButton = document.getElementById('broadcast-button')
-    broadcastButton.classList.remove('btn-disabled')
+    DOM.broadcastButton.classList.remove('btn-disabled')
   } else if (psbtStatus === 'PartiallySigned') {
     const deviceTypeCapitalized = capitalize(device.type)
     psbtStatusElement.innerHTML = `
@@ -366,9 +366,11 @@ async function estimateFee() {
   }
 }
 
-function pastePsbtToClipboard() {
+function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
+      DOM.broadcastButton.classList.remove('btn-disabled')
+
       const trimmed = psbt.trim()
       DOM.psbtTextArea.value = trimmed
       if (!trimmed || !trimmed.startsWith('cHNid')) {
@@ -448,7 +450,7 @@ async function sweep() {
   DOM.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate} sats/vB)`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
     DOM.conversation.appendChild(userBubble)
@@ -497,6 +499,7 @@ window.addEventListener('DOMContentLoaded', () => {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
     const txBody = requireDomElement<HTMLTableSectionElement>('#transactions-body')
     const txModal = requireDomElement<HTMLDialogElement>('#transactions-modal')
+    const broadcastButton = requireDomElement<HTMLButtonElement>('#broadcast-button')
     const conversation = requireDomElement<HTMLDivElement>('#conversation')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
@@ -508,6 +511,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     DOM = {
       addressInput,
+      broadcastButton,
       changeInput,
       electrumInput,
       feeRateInput,
@@ -557,12 +561,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     requireDomElement<HTMLButtonElement>('#paste-psbt-button').addEventListener('click', (e) => {
       e.preventDefault()
-      pastePsbtToClipboard()
-    })
-
-    requireDomElement<HTMLButtonElement>('#broadcast-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      broadcast()
+      pastePsbtFromClipboard()
     })
 
     requireDomElement<HTMLButtonElement>('#sign-message-button').addEventListener('click', (e) => {
@@ -575,16 +574,25 @@ window.addEventListener('DOMContentLoaded', () => {
       enumerate()
     })
 
+    broadcastButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      broadcast()
+    })
+
     // Add event listeners for validation of descriptor
     receiveInput.addEventListener('blur', validateDescriptor)
     receiveInput.addEventListener('input', validateDescriptor)
-    DOM.networkRadios.forEach((radio) => {
+    networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
     })
 
     // Remove the red border from the address field due to no address entered when the user enters an address
     addressInput.addEventListener('input', () => {
       addressInput.classList.remove('input-error')
+    })
+
+    psbtTextArea.addEventListener('input', () => {
+      broadcastButton.classList.remove('btn-disabled')
     })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')

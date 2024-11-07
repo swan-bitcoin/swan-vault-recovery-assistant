@@ -250,7 +250,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     changeAmount = getRandom(10, 2000) / 100
     changeAmountFixed = changeAmount.toFixed(2)
     await client.sendToAddressAndConfirm(address, changeAmount)
-    await sleepForBitcoinNetwork()
     await expectLatestBalance(new RegExp(`${changeAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
@@ -275,6 +274,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
     await inputs.sweep.click()
     await sleepForUI()
+    expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('none') // broadcast button should be disabled
     await inputs.copy.click()
     psbt = await clipboardy.read()
     expect(psbt).toMatch(/^cHNid/)
@@ -282,7 +282,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it("can retrieve a status of 'unsigned' for a newly-created PSBT", async () => {
     await inputs.psbtStatus.click()
-    await expectLatestMessageToMatch(/This PSBT is unsigned/)
+    await expectLatestMessageToMatch(/The PSBT is unsigned/)
   })
 
   it('can paste in a PSBT with a single signature, but cannot broadcast it', async () => {
@@ -290,14 +290,15 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     log('once-signed psbt', psbt)
     await clipboardy.write(psbt)
     await inputs.paste.click()
-    await inputs.broadcast.click()
     await sleepForUI()
-    expect(await outputs.temporaryMessage.getText()).toMatch(/^PsbtError: Failed to finalize the PSBT for broadcast/)
+    expect(await outputs.temporaryMessage.getText()).toMatch(/^PSBT pasted/)
+    expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('auto') // broadcast button should be re-enabled
+    await sleepForUI()
   })
 
   it("can retrieve a status of 'partially signed' for the once-signed PSBT", async () => {
     await inputs.psbtStatus.click()
-    await expectLatestMessageToMatch(/This PSBT is partially signed/)
+    await expectLatestMessageToMatch(/The transaction is partially signed/)
   })
 
   it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
@@ -305,11 +306,13 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     log('twice-signed psbt', psbt)
     await clipboardy.write(psbt)
     await inputs.paste.click()
+    await sleepForUI()
     await inputs.psbtStatus.click()
-    await expectLatestMessageToMatch(/This PSBT is fully signed/)
+    await expectLatestMessageToMatch(/The transaction is fully signed/)
   })
 
   it('can broadcast the twice-signed psbt', async () => {
+    expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('auto') // broadcast button should still be enabled
     await inputs.broadcast.click()
     await sleepForUI()
     await expectLatestMessageToMatch(/Broadcast successful!/)
