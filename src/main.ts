@@ -1,8 +1,9 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { commands, type TempuraError } from './bindings'
+import { commands, PsbtSigningStatus, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import { createConversationBubble, isChangeDescriptor } from './helpers'
-import { getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
+import { capitalize, createConversationBubble, isChangeDescriptor } from './helpers'
+import { simpleCheckmark } from './icons'
+import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
@@ -131,6 +132,37 @@ async function getFeeRate(): Promise<FeeRate> {
     }
   }
   return { value: feeRate }
+}
+
+type UpdatePsbtStatusProps = {
+  psbtStatus: PsbtSigningStatus
+  device: Device
+}
+
+const updatePsbtStatus = ({ psbtStatus, device }: UpdatePsbtStatusProps) => {
+  const psbtStatusElement = document.getElementById('psbt-status')
+
+  // Clear any existing status UI
+  if (psbtStatusElement) {
+    psbtStatusElement.innerHTML = ''
+  }
+
+  // Update the UI based on the PSBT status
+  if (psbtStatus === 'FullySigned') {
+    psbtStatusElement.innerHTML = `
+      <span class="text-success">Fully Signed ${simpleCheckmark}</span>
+    `
+    const broadcastButton = document.getElementById('broadcast-button')
+    broadcastButton.classList.remove('btn-disabled')
+  } else if (psbtStatus === 'PartiallySigned') {
+    const deviceTypeCapitalized = capitalize(device.type)
+    psbtStatusElement.innerHTML = `
+      <span class="text-warning">Partially Signed</span>
+      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+    `
+  } else if (psbtStatus === 'Unsigned') {
+    psbtStatusElement.innerHTML = ''
+  }
 }
 
 type Inputs = {
@@ -352,7 +384,7 @@ function pastePsbtToClipboard() {
 }
 
 async function sign() {
-  const { network, psbt } = getInputs()
+  const { psbt, recv, change, network } = getInputs()
   require(psbt, 'PSBT')
 
   DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
@@ -363,12 +395,16 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-
-    DOM.tempMessage.textContent = 'Sign again or broadcast next?'
-    const tempuraBubble = createConversationBubble(message)
+    const tempuraBubble = createConversationBubble(Success('Signature added'))
     DOM.conversation.appendChild(tempuraBubble)
+    // Check the psbt status and adapt UI
+    const psbtStatus = await commands.psbtStatus(responsePsbt, network, recv, change)
+    updatePsbtStatus({ psbtStatus, device })
+    // Give feedback via shrimpy
+    const message = getPsbtStatusMessage(psbtStatus)
+    DOM.tempMessage.textContent = message
   } catch (e: unknown) {
     handleError(e)
   }
@@ -380,10 +416,10 @@ async function psbtStatus() {
 
   DOM.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    const userBubble = createConversationBubble('What is the status of this PSBT?', true)
     DOM.conversation.appendChild(userBubble)
     const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
-    const tempuraBubble = createConversationBubble(Success(message))
+    const tempuraBubble = createConversationBubble(message)
     DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {

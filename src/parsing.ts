@@ -1,6 +1,6 @@
 import { PsbtSigningStatus } from './bindings'
 
-type Device = {
+export type Device = {
   type: string
   model: string
   path: string

@@ -2731,6 +2731,9 @@ html {
 .block {
   display: block;
 }
+.inline {
+  display: inline;
+}
 .flex {
   display: flex;
 }
@@ -2748,6 +2751,9 @@ html {
 }
 .h-36 {
   height: 9rem;
+}
+.h-4 {
+  height: 1rem;
 }
 .h-40 {
   height: 10rem;
@@ -2772,6 +2778,9 @@ html {
 }
 .w-3\/12 {
   width: 25%;
+}
+.w-4 {
+  width: 1rem;
 }
 .w-6 {
   width: 1.5rem;

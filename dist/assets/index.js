@@ -174,6 +174,11 @@ const selfTransferIcon = `
   </div>
 </div>
 `
+const simpleCheckmark = `
+<svg class="inline w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 12l5 5L20 7"></path>
+</svg>
+`
 const TxRow = (transaction) => {
   const transactionType =
     transaction.sent === transaction.fee ? 'selfTransfer' : Number(transaction.received) > 0 ? 'received' : 'sent'
@@ -254,6 +259,7 @@ const isChangeDescriptor = (descriptor) => {
   const changePattern = /\/1\/\*\)\)#\w+$/
   return changePattern.test(descriptor)
 }
+const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -460,6 +466,27 @@ async function getFeeRate() {
   }
   return { value: feeRate }
 }
+const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
+  const psbtStatusElement = document.getElementById('psbt-status')
+  if (psbtStatusElement) {
+    psbtStatusElement.innerHTML = ''
+  }
+  if (psbtStatus2 === 'FullySigned') {
+    psbtStatusElement.innerHTML = `
+      <span class="text-success">Fully Signed ${simpleCheckmark}</span>
+    `
+    const broadcastButton = document.getElementById('broadcast-button')
+    broadcastButton.classList.remove('btn-disabled')
+  } else if (psbtStatus2 === 'PartiallySigned') {
+    const deviceTypeCapitalized = capitalize(device.type)
+    psbtStatusElement.innerHTML = `
+      <span class="text-warning">Partially Signed</span>
+      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+    `
+  } else if (psbtStatus2 === 'Unsigned') {
+    psbtStatusElement.innerHTML = ''
+  }
+}
 function getInputs() {
   var _a, _b, _c
   const address = DOM.addressInput.value.trim()
@@ -648,7 +675,7 @@ function pastePsbtToClipboard() {
     })
 }
 async function sign() {
-  const { network, psbt } = getInputs()
+  const { psbt, recv, change, network } = getInputs()
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
@@ -658,11 +685,14 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { message, psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-    DOM.tempMessage.textContent = 'Sign again or broadcast next?'
-    const tempuraBubble = createConversationBubble(message)
+    const tempuraBubble = createConversationBubble(Success('Signature added'))
     DOM.conversation.appendChild(tempuraBubble)
+    const psbtStatus2 = await commands.psbtStatus(responsePsbt, network, recv, change)
+    updatePsbtStatus({ psbtStatus: psbtStatus2, device })
+    const message = getPsbtStatusMessage(psbtStatus2)
+    DOM.tempMessage.textContent = message
   } catch (e) {
     handleError(e)
   }
@@ -672,10 +702,10 @@ async function psbtStatus() {
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    const userBubble = createConversationBubble('What is the status of this PSBT?', true)
     DOM.conversation.appendChild(userBubble)
     const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
-    const tempuraBubble = createConversationBubble(Success(message))
+    const tempuraBubble = createConversationBubble(message)
     DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e) {
