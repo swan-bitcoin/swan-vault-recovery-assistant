@@ -2700,6 +2700,9 @@ html {
 .mb-6 {
   margin-bottom: 1.5rem;
 }
+.ml-1 {
+  margin-left: 0.25rem;
+}
 .ml-2 {
   margin-left: 0.5rem;
 }
@@ -2708,6 +2711,9 @@ html {
 }
 .mr-2 {
   margin-right: 0.5rem;
+}
+.mt-2 {
+  margin-top: 0.5rem;
 }
 .mt-5 {
   margin-top: 1.25rem;
