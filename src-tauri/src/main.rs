@@ -232,8 +232,12 @@ fn get_wallet(
   let secp = Secp256k1::new();
   let network: bdk::bitcoin::Network = network.into();
 
-  let receive: bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>;
-  let mut change: Option<bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>> = None;
+  type DescriptorTupleType = (
+    bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>,
+    std::collections::HashMap<bdk::keys::DescriptorPublicKey, bdk::keys::DescriptorSecretKey>,
+  );
+  let receive: DescriptorTupleType;
+  let mut change: Option<DescriptorTupleType> = None;
 
   if let Some(change_descriptor) = &descriptors.change {
     if is_multipath_descriptor(&descriptors.receive) {
@@ -255,20 +259,17 @@ fn get_wallet(
   if let Some((receive_descriptor, change_descriptor)) =
     split_descriptor_if_multipath(&descriptors.receive)?
   {
-    (receive, _) = resolve!(
+    receive = resolve!(
       receive_descriptor.into_wallet_descriptor(&secp, network),
       TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
     );
 
-    change = Some(
-      resolve!(
-        change_descriptor.into_wallet_descriptor(&secp, network),
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-      )
-      .0,
-    );
+    change = Some(resolve!(
+      change_descriptor.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+    ));
   } else {
-    (receive, _) = resolve!(
+    receive = resolve!(
       descriptors.receive.into_wallet_descriptor(&secp, network),
       TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
     );
@@ -276,18 +277,15 @@ fn get_wallet(
 
   // Convert a provided change descriptor
   if let Some(change_descriptor) = &descriptors.change {
-    change = Some(
-      resolve!(
-        change_descriptor.into_wallet_descriptor(&secp, network),
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-      )
-      .0,
-    );
+    change = Some(resolve!(
+      change_descriptor.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+    ));
   }
 
   // handle auto change calculation if not already set
-  if change.is_none() && receive.has_wildcard() && descriptors.auto_change {
-    let receive_str = receive.to_string();
+  if change.is_none() && receive.0.has_wildcard() && descriptors.auto_change {
+    let receive_str = receive.0.to_string();
     let change_str = receive_str.replace("/0/*", "/1/*");
     let change_str = match change_str.rfind("#") {
       Some(i) => {
@@ -298,13 +296,10 @@ fn get_wallet(
     };
     change = match change_str == receive_str {
       true => None,
-      false => Some(
-        resolve!(
-          change_str.into_wallet_descriptor(&secp, network),
-          TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-        )
-        .0,
-      ),
+      false => Some(resolve!(
+        change_str.into_wallet_descriptor(&secp, network),
+        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+      )),
     }
   };
 
