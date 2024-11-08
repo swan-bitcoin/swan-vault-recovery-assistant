@@ -232,61 +232,62 @@ fn get_wallet(
   let secp = Secp256k1::new();
   let network: bdk::bitcoin::Network = network.into();
 
-  // start by resolving the provided required and optional descriptor strings into wallet descriptors
-  let mut receive = resolve!(
-    descriptors.receive.into_wallet_descriptor(&secp, network),
-    TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
-  );
+  let receive: bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>;
+  let mut change: Option<bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>> = None;
 
-  let mut change = match descriptors.change {
-    Some(change) => Some(resolve!(
-      change.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-    )),
-    None => None,
-  };
-
-  // don't allow multipath descriptors for change
-  if let Some((ref change_desc, _)) = change {
-    if change_desc.is_multipath() {
+  if let Some(change_descriptor) = &descriptors.change {
+    if is_multipath_descriptor(&descriptors.receive) {
       return Err(TempuraError::new(
-            TempuraErrorType::DescriptorError(Some(DescriptorType::Change)),
-            "A change descriptor must not be a multipath descriptor. Use this as a receive descriptor instead.",
-        ));
-    }
-  }
-
-  // BDK does not currently support multipath wallet descriptors.
-  // split the multipath descriptor into receive and change descriptors if necessary
-  if receive.0.is_multipath() {
-    let paths = resolve!(
-      receive.0.clone().into_single_descriptors(),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
-    );
-    if paths.len() == 0 || paths.len() > 2 {
-      return Err(TempuraError::new(
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath)),
-        "A multipath descriptor must have either one or two paths",
+        TempuraErrorType::DescriptorError(Some(DescriptorType::Receive)),
+        "A change descriptor must not be provided when using multipath descriptors",
       ));
     }
 
-    receive = resolve!(
-      paths[0].clone().into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
+    if is_multipath_descriptor(change_descriptor) {
+      return Err(TempuraError::new(
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Change)),
+      "A change descriptor must not be a multipath descriptor. Use this as a receive descriptor instead.",
+    ));
+    }
+  }
+
+  // we must handle multipath descriptors first to avoid BDK exceptions. see `split_descriptor_if_multipath`.
+  if let Some((receive_descriptor, change_descriptor)) =
+    split_descriptor_if_multipath(&descriptors.receive)?
+  {
+    (receive, _) = resolve!(
+      receive_descriptor.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
     );
 
-    change = match (change, paths.get(1)) {
-      (None, Some(path)) => Some(resolve!(
-        path.clone().into_wallet_descriptor(&secp, network),
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
-      )),
-      (Some(change), _) => Some(change),
-      (None, None) => None,
-    };
-  };
+    change = Some(
+      resolve!(
+        change_descriptor.into_wallet_descriptor(&secp, network),
+        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+      )
+      .0,
+    );
+  } else {
+    (receive, _) = resolve!(
+      descriptors.receive.into_wallet_descriptor(&secp, network),
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
+    );
+  }
 
-  if change.is_none() && receive.0.has_wildcard() && descriptors.auto_change {
-    let receive_str = receive.0.to_string();
+  // Convert a provided change descriptor
+  if let Some(change_descriptor) = &descriptors.change {
+    change = Some(
+      resolve!(
+        change_descriptor.into_wallet_descriptor(&secp, network),
+        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+      )
+      .0,
+    );
+  }
+
+  // handle auto change calculation if not already set
+  if change.is_none() && receive.has_wildcard() && descriptors.auto_change {
+    let receive_str = receive.to_string();
     let change_str = receive_str.replace("/0/*", "/1/*");
     let change_str = match change_str.rfind("#") {
       Some(i) => {
@@ -297,10 +298,13 @@ fn get_wallet(
     };
     change = match change_str == receive_str {
       true => None,
-      false => Some(resolve!(
-        change_str.into_wallet_descriptor(&secp, network),
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
-      )),
+      false => Some(
+        resolve!(
+          change_str.into_wallet_descriptor(&secp, network),
+          TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+        )
+        .0,
+      ),
     }
   };
 
@@ -313,6 +317,50 @@ fn get_wallet(
     ),
     TempuraErrorType::WalletError
   ))
+}
+
+fn is_multipath_descriptor(descriptor: &str) -> bool {
+  bdk::descriptor::ExtendedDescriptor::from_str(descriptor)
+    .map(|d| d.is_multipath())
+    .unwrap_or(false)
+}
+
+/**
+ * we only pseudo-support multipath descriptors, as BDK does not currently support them.
+ * this function will split a multipath descriptor into two single path descriptors.
+ */
+fn split_descriptor_if_multipath(
+  descriptor: &str,
+) -> Result<Option<(String, String)>, TempuraError> {
+  // we use `from_str` instead of `into_wallet_descriptor` intentionally, the former
+  // does not consider the network when converting. BDK throws exceptions if you try to use
+  // use the latter with a multipath descriptor on mainnet. yet, we should rely on BDK to
+  // perform the conversion rather than parsing the strings manually.
+  let receive = match bdk::descriptor::ExtendedDescriptor::from_str(&descriptor) {
+    Ok(result) => result,
+    Err(_) => return Ok(None),
+  };
+
+  if !receive.is_multipath() {
+    return Ok(None);
+  }
+
+  let paths = resolve!(
+    receive.clone().into_single_descriptors(),
+    TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
+  );
+
+  if paths.len() != 2 {
+    return Err(TempuraError::new(
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath)),
+      "A multipath descriptor must have exactly two paths",
+    ));
+  }
+
+  let receive = paths[0].clone().to_string();
+  let change = paths[1].clone().to_string();
+
+  Ok(Some((receive, change)))
 }
 
 /**
@@ -508,6 +556,9 @@ async fn is_descriptor_for_network(
 ) -> Result<bool, TempuraError> {
   let secp = Secp256k1::new();
   let network: bdk::bitcoin::Network = Network::from_str(&network)?.into();
+  let descriptor =
+    split_descriptor_if_multipath(&descriptor)?.map_or(descriptor, |(receive, _)| receive);
+
   match descriptor.into_wallet_descriptor(&secp, network) {
     Ok(_) => Ok(true),
     Err(e) => match e {

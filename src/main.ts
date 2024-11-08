@@ -90,7 +90,8 @@ const validateDescriptor = async () => {
     recoveryOptionsCard.classList.remove('hidden')
     standardWalletActions.classList.remove('hidden')
     return true
-  } catch {
+  } catch (e: unknown) {
+    console.error(e)
     DOM.tempMessage.textContent = 'Invalid wallet configuration!'
     DOM.receiveInput.classList.add('textarea-error')
     DOM.receiveInput.classList.remove('textarea-success')
