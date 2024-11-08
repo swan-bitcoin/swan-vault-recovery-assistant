@@ -606,6 +606,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     const observer = new MutationObserver(callback)
     observer.observe(conversation, config)
+
+    // Clear messages via button click
+    const clearMessagesBtn = document.getElementById('clear-messages-btn')
+    clearMessagesBtn.addEventListener('click', () => {
+      conversation.innerHTML = ''
+      tempMessage.textContent = 'All messages cleared 🫡'
+      clearMessagesBtn.classList.add('hidden')
+    })
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
     if (tempMessage) {

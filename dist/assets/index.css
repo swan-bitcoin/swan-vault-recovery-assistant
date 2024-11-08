@@ -1026,6 +1026,16 @@ html {
     --glass-border-opacity: 15%;
   }
 
+  .btn-ghost:hover {
+    border-color: transparent;
+  }
+
+  @supports (color: oklch(0% 0 0)) {
+    .btn-ghost:hover {
+      background-color: var(--fallback-bc, oklch(var(--bc) / 0.2));
+    }
+  }
+
   .btn-link:hover {
     border-color: transparent;
     background-color: transparent;
@@ -1619,6 +1629,20 @@ html {
 .btn.glass.btn-active {
   --glass-opacity: 25%;
   --glass-border-opacity: 15%;
+}
+.btn-ghost {
+  border-width: 1px;
+  border-color: transparent;
+  background-color: transparent;
+  color: currentColor;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+  outline-color: currentColor;
+}
+.btn-ghost.btn-active {
+  border-color: transparent;
+  background-color: var(--fallback-bc, oklch(var(--bc) / 0.2));
 }
 .btn-link {
   border-color: transparent;
@@ -2721,6 +2745,9 @@ html {
 }
 .mr-2 {
   margin-right: 0.5rem;
+}
+.mt-12 {
+  margin-top: 3rem;
 }
 .mt-2 {
   margin-top: 0.5rem;

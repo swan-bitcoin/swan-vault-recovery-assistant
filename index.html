@@ -61,7 +61,7 @@
       <div class="flex-col w-2/5 overflow-y-auto no-scrollbar pr-4">
         <div class="card card-normal bg-base-200 shadow-2xl">
           <div class="card-body">
-            <h2 class="card-title justify-between">Chat<button class="btn btn-sm btn-link">Clear Messages</button></h2>
+            <h2 class="card-title">Chat</h2>
             <!-- Persistent conversation -->
             <div id="conversation"></div>
             <!-- Temporary feedback -->
@@ -72,6 +72,9 @@
               <div class="chat-bubble chat-bubble-primary" id="temporary-message">
                 Hi there! To start, enter your wallet configuration.
               </div>
+            </div>
+            <div class="card-actions justify-end">
+              <button id="clear-messages-btn" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">Clear Messages</button>
             </div>
           </div>
         </div>
@@ -196,7 +199,7 @@
 
             <!-- Fee rate -->
             <div class="form-control mb-5">
-              <div class="label justify-normal gap-2">
+              <div class="label justify-normal gap-1">
                 <label class="label">Fee Rate (optional)</label>
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
@@ -255,7 +258,7 @@
     <!-- Footer -->
     <footer id="footer" class="footer bg-base-200 text-base-content p-4">
       <div class="items-center grid-flow-col">
-        <p>&copy; 2024 Tempura. All rights reserved.</p>
+        <p>&copy; 2024 Tempura</p>
       </div>
     </footer>
 

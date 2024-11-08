@@ -241,6 +241,12 @@ const showConversation = () => {
     conversationContainer.classList.remove('hidden')
   }
 }
+const showClearMessagesButton = () => {
+  const clearMessagesButton = document.getElementById('clear-messages-btn')
+  if (clearMessagesButton) {
+    clearMessagesButton.classList.remove('hidden')
+  }
+}
 const createConversationBubble = (content, isUserSpeaking = false) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
@@ -253,6 +259,7 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
   showConversation()
+  showClearMessagesButton()
   return chatContainer
 }
 const isChangeDescriptor = (descriptor) => {
@@ -866,6 +873,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     const observer = new MutationObserver(callback)
     observer.observe(conversation, config)
+    const clearMessagesBtn = document.getElementById('clear-messages-btn')
+    clearMessagesBtn.addEventListener('click', () => {
+      conversation.innerHTML = ''
+      tempMessage.textContent = 'All messages cleared 🫡'
+      clearMessagesBtn.classList.add('hidden')
+    })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
     if (tempMessage) {

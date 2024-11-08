@@ -5,6 +5,13 @@ const showConversation = () => {
   }
 }
 
+const showClearMessagesButton = () => {
+  const clearMessagesButton = document.getElementById('clear-messages-btn')
+  if (clearMessagesButton) {
+    clearMessagesButton.classList.remove('hidden')
+  }
+}
+
 export const createConversationBubble = (content: string, isUserSpeaking: boolean = false): HTMLDivElement => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
@@ -22,5 +29,6 @@ export const createConversationBubble = (content: string, isUserSpeaking: boolea
   chatContainer.appendChild(bubble)
 
   showConversation()
+  showClearMessagesButton()
   return chatContainer
 }
