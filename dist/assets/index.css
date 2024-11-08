@@ -2701,9 +2701,6 @@ html {
 .relative {
   position: relative;
 }
-.sticky {
-  position: sticky;
-}
 .left-full {
   left: 100%;
 }
@@ -2822,6 +2819,9 @@ html {
 .cursor-pointer {
   cursor: pointer;
 }
+.resize {
+  resize: both;
+}
 .grid-flow-col {
   grid-auto-flow: column;
 }
@@ -2857,8 +2857,14 @@ html {
   margin-right: calc(0.5rem * var(--tw-space-x-reverse));
   margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
 }
+.overflow-hidden {
+  overflow: hidden;
+}
 .overflow-x-auto {
   overflow-x: auto;
+}
+.overflow-y-auto {
+  overflow-y: auto;
 }
 .break-all {
   word-break: break-all;
@@ -2888,6 +2894,9 @@ html {
 }
 .p-4 {
   padding: 1rem;
+}
+.pr-4 {
+  padding-right: 1rem;
 }
 .text-4xl {
   font-size: 2.25rem;

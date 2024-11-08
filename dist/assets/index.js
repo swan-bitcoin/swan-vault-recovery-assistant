@@ -857,3 +857,14 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 })
+const adjustMainContentHeight = () => {
+  const navbar = document.getElementById('navbar')
+  const footer = document.getElementById('footer')
+  const mainContent = document.getElementById('main-content')
+  const availableHeight = window.innerHeight - navbar.offsetHeight - footer.offsetHeight
+  console.log('height of navbar + footer: ', navbar.offsetHeight + footer.offsetHeight)
+  mainContent.style.height = `${availableHeight}px`
+  console.log('height of main content: ', availableHeight)
+}
+window.addEventListener('load', adjustMainContentHeight)
+window.addEventListener('resize', adjustMainContentHeight)

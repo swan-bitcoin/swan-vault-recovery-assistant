@@ -10,7 +10,7 @@
 
   <body class="flex flex-col min-h-screen">
     <!-- Navbar -->
-    <nav class="navbar bg-base-200 justify-between">
+    <nav id="navbar" class="navbar bg-base-200 justify-between">
       <div class="ml-6">Tempura</div>
       <!-- Toggles -->
       <div class="flex gap-4">
@@ -55,10 +55,10 @@
     </nav>
 
     <!-- Main content section -->
-    <main class="flex flex-grow p-4">
+    <main id="main-content" class="flex flex-grow overflow-hidden p-4">
       <!-- Chat bubble on the left -->
-      <div class="flex-col w-2/5">
-        <div class="sticky mt-5 top-10">
+      <div class="flex-col w-2/5 overflow-y-auto pr-4">
+        <div class="mt-5 top-10">
           <!-- Persistent conversation -->
           <div id="conversation"></div>
           <!-- Temporary feedback -->
@@ -74,7 +74,7 @@
       </div>
 
       <!-- Cards section -->
-      <div class="flex flex-col w-2/5 gap-4">
+      <div class="flex flex-col w-2/5 overflow-y-auto gap-4 pr-4 ml-6">
         <!-- First Card: Wallet Set Up -->
         <div class="card bg-base-300 shadow-xl card-compact">
           <div class="card-body">
@@ -249,7 +249,7 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer p-4 bg-base-200 text-base-content">
+    <footer id="footer" class="footer bg-base-200 text-base-content p-4">
       <div class="items-center grid-flow-col">
         <p>&copy; 2024 Tempura. All rights reserved.</p>
       </div>
