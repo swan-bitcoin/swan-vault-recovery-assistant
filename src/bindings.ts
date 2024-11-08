@@ -13,11 +13,11 @@ export const commands = {
 async address(network: string, descriptor: string, electrum: string | null) : Promise<AddressInfo> {
     return await TAURI_INVOKE("address", { network, descriptor, electrum });
 },
-async balance(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Balance> {
-    return await TAURI_INVOKE("balance", { network, receive, change, electrum });
+async balance(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Balance> {
+    return await TAURI_INVOKE("balance", { network, descriptors, electrum });
 },
-async broadcast(psbt: string, network: string, receive: string, change: string | null, electrum: string | null) : Promise<null> {
-    return await TAURI_INVOKE("broadcast", { psbt, network, receive, change, electrum });
+async broadcast(psbt: string, network: string, descriptors: Descriptors, electrum: string | null) : Promise<null> {
+    return await TAURI_INVOKE("broadcast", { psbt, network, descriptors, electrum });
 },
 async enumerate(network: string) : Promise<string> {
     return await TAURI_INVOKE("enumerate", { network });
@@ -31,17 +31,17 @@ async isDescriptor(descriptor: string) : Promise<boolean> {
 async isDescriptorForNetwork(descriptor: string, network: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_descriptor_for_network", { descriptor, network });
 },
-async psbtStatus(psbt: string, network: string, receive: string, change: string | null) : Promise<PsbtSigningStatus> {
-    return await TAURI_INVOKE("psbt_status", { psbt, network, receive, change });
+async psbtStatus(psbt: string, network: string, descriptors: Descriptors) : Promise<PsbtSigningStatus> {
+    return await TAURI_INVOKE("psbt_status", { psbt, network, descriptors });
 },
 async sign(psbt: string, network: string, deviceType: string) : Promise<string> {
     return await TAURI_INVOKE("sign", { psbt, network, deviceType });
 },
-async sweep(address: string, feeRate: number, network: string, receive: string, change: string | null, electrum: string | null) : Promise<PsbtDetails> {
-    return await TAURI_INVOKE("sweep", { address, feeRate, network, receive, change, electrum });
+async sweep(address: string, feeRate: number, network: string, descriptors: Descriptors, electrum: string | null) : Promise<PsbtDetails> {
+    return await TAURI_INVOKE("sweep", { address, feeRate, network, descriptors, electrum });
 },
-async transactions(network: string, receive: string, change: string | null, electrum: string | null) : Promise<Transaction[]> {
-    return await TAURI_INVOKE("transactions", { network, receive, change, electrum });
+async transactions(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Transaction[]> {
+    return await TAURI_INVOKE("transactions", { network, descriptors, electrum });
 }
 }
 
@@ -78,6 +78,7 @@ untrusted_pending: string;
  * Confirmed and immediately spendable balance
  */
 confirmed: string }
+export type Descriptors = { receive: string; change: string | null; auto_change: boolean }
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null }
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"
 export type TempuraError = { error_type: string; message: string }

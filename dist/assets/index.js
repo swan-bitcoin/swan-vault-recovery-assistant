@@ -76,11 +76,11 @@ const commands = {
   async address(network, descriptor, electrum) {
     return await invoke('address', { network, descriptor, electrum })
   },
-  async balance(network, receive, change, electrum) {
-    return await invoke('balance', { network, receive, change, electrum })
+  async balance(network, descriptors, electrum) {
+    return await invoke('balance', { network, descriptors, electrum })
   },
-  async broadcast(psbt, network, receive, change, electrum) {
-    return await invoke('broadcast', { psbt, network, receive, change, electrum })
+  async broadcast(psbt, network, descriptors, electrum) {
+    return await invoke('broadcast', { psbt, network, descriptors, electrum })
   },
   async enumerate(network) {
     return await invoke('enumerate', { network })
@@ -94,17 +94,17 @@ const commands = {
   async isDescriptorForNetwork(descriptor, network) {
     return await invoke('is_descriptor_for_network', { descriptor, network })
   },
-  async psbtStatus(psbt, network, receive, change) {
-    return await invoke('psbt_status', { psbt, network, receive, change })
+  async psbtStatus(psbt, network, descriptors) {
+    return await invoke('psbt_status', { psbt, network, descriptors })
   },
   async sign(psbt, network, deviceType) {
     return await invoke('sign', { psbt, network, deviceType })
   },
-  async sweep(address, feeRate, network, receive, change, electrum) {
-    return await invoke('sweep', { address, feeRate, network, receive, change, electrum })
+  async sweep(address, feeRate, network, descriptors, electrum) {
+    return await invoke('sweep', { address, feeRate, network, descriptors, electrum })
   },
-  async transactions(network, receive, change, electrum) {
-    return await invoke('transactions', { network, receive, change, electrum })
+  async transactions(network, descriptors, electrum) {
+    return await invoke('transactions', { network, descriptors, electrum })
   },
 }
 const innerPaths = `
@@ -489,7 +489,8 @@ const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
 function getInputs() {
   var _a, _b, _c
   const address = DOM.addressInput.value.trim()
-  const recv = DOM.receiveInput.value.trim()
+  const autoChange = DOM.changeAutoToggle.checked
+  const receive = DOM.receiveInput.value.trim()
   const change = ((_a = DOM.changeInput) == null ? void 0 : _a.value.trim()) || null
   const electrum = ((_b = DOM.electrumInput) == null ? void 0 : _b.value.trim()) || null
   const feeRate = Number((_c = DOM.feeRateInput) == null ? void 0 : _c.value.trim()) || null
@@ -497,8 +498,11 @@ function getInputs() {
   const psbt = DOM.psbtTextArea.value.trim()
   return {
     address,
-    recv,
-    change,
+    descriptors: {
+      receive,
+      change,
+      auto_change: autoChange,
+    },
     electrum,
     feeRate,
     network,
@@ -513,7 +517,7 @@ function require2(value, itemName) {
   }
 }
 async function broadcast() {
-  const { recv, change, electrum, network, psbt } = getInputs()
+  const { descriptors, electrum, network, psbt } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   require2(psbt, 'PSBT')
@@ -521,7 +525,7 @@ async function broadcast() {
   try {
     const userBubble = createConversationBubble('Broadcast the transaction from this PSBT', true)
     DOM.conversation.appendChild(userBubble)
-    await commands.broadcast(psbt, network, recv, change, electrum)
+    await commands.broadcast(psbt, network, descriptors, electrum)
     const tempuraBubble = createConversationBubble('Broadcast successful!')
     DOM.conversation.appendChild(tempuraBubble)
     DOM.tempMessage.textContent = 'Anything else?'
@@ -544,14 +548,14 @@ async function enumerate() {
   }
 }
 async function getBalance() {
-  const { recv, change, electrum, network } = getInputs()
+  const { descriptors, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching balance ...'
   try {
     const userBubble = createConversationBubble('What is my balance?', true)
     DOM.conversation.appendChild(userBubble)
-    const balance = await commands.balance(network, recv, change, electrum)
+    const balance = await commands.balance(network, descriptors, electrum)
     DOM.tempMessage.textContent = 'Balance fetched successfully!'
     const tempuraBubble = createConversationBubble(
       Balance({
@@ -588,14 +592,14 @@ function instrumentCopyButtons(parent) {
   })
 }
 async function getTransactions() {
-  const { recv, change, electrum, network } = getInputs()
+  const { descriptors, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   DOM.tempMessage.textContent = 'Fetching transactions ...'
   try {
     const userBubble = createConversationBubble('Show me my transactions', true)
     DOM.conversation.appendChild(userBubble)
-    const transactions = await commands.transactions(network, recv, change, electrum)
+    const transactions = await commands.transactions(network, descriptors, electrum)
     DOM.txModal.showModal()
     DOM.txBody.innerHTML = Transactions(transactions)
     DOM.tempMessage.textContent = 'Transactions fetched successfully!'
@@ -615,14 +619,18 @@ async function getTransactions() {
   }
 }
 async function getAddress() {
-  const { recv, electrum, network } = getInputs()
+  const {
+    descriptors: { receive },
+    electrum,
+    network,
+  } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
   try {
     const userBubble = createConversationBubble('Give me an address!', true)
     DOM.conversation.appendChild(userBubble)
-    const { address } = await commands.address(network, recv, electrum)
+    const { address } = await commands.address(network, receive, electrum)
     DOM.tempMessage.textContent = 'Address retrieved successfully!'
     const tempuraBubble = createConversationBubble(Address({ address }))
     DOM.conversation.appendChild(tempuraBubble)
@@ -657,6 +665,14 @@ async function estimateFee() {
     handleError(e)
   }
 }
+function onChangeDescriptorChange(e) {
+  if (e.target === DOM.changeInput) {
+    DOM.changeAutoToggle.checked = false
+  }
+  if (DOM.changeAutoToggle.checked) {
+    DOM.changeInput.value = ''
+  }
+}
 function pastePsbtFromClipboard() {
   readText()
     .then((psbt) => {
@@ -674,8 +690,23 @@ function pastePsbtFromClipboard() {
       DOM.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
+async function psbtStatus() {
+  const { psbt, descriptors, network } = getInputs()
+  require2(psbt, 'PSBT')
+  DOM.tempMessage.textContent = 'Please wait...'
+  try {
+    const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
+    DOM.conversation.appendChild(userBubble)
+    const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, descriptors))
+    const tempuraBubble = createConversationBubble(Success(message))
+    DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
+    DOM.conversation.appendChild(tempuraBubble)
+  } catch (e) {
+    handleError(e)
+  }
+}
 async function sign() {
-  const { psbt, recv, change, network } = getInputs()
+  const { psbt, descriptors, network } = getInputs()
   require2(psbt, 'PSBT')
   DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
@@ -689,7 +720,7 @@ async function sign() {
     DOM.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble(Success('Signature added'))
     DOM.conversation.appendChild(tempuraBubble)
-    const psbtStatus2 = await commands.psbtStatus(responsePsbt, network, recv, change)
+    const psbtStatus2 = await commands.psbtStatus(responsePsbt, network, descriptors)
     updatePsbtStatus({ psbtStatus: psbtStatus2, device })
     const message = getPsbtStatusMessage(psbtStatus2)
     DOM.tempMessage.textContent = message
@@ -697,24 +728,9 @@ async function sign() {
     handleError(e)
   }
 }
-async function psbtStatus() {
-  const { psbt, recv, change, network } = getInputs()
-  require2(psbt, 'PSBT')
-  DOM.tempMessage.textContent = 'Please wait...'
-  try {
-    const userBubble = createConversationBubble('What is the status of this PSBT?', true)
-    DOM.conversation.appendChild(userBubble)
-    const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, recv, change))
-    const tempuraBubble = createConversationBubble(message)
-    DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
-    DOM.conversation.appendChild(tempuraBubble)
-  } catch (e) {
-    handleError(e)
-  }
-}
 async function sweep() {
   const inputs = getInputs()
-  const { address, recv, change, electrum, network } = inputs
+  const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
   if (!address) {
@@ -734,7 +750,7 @@ async function sweep() {
       true
     )
     DOM.conversation.appendChild(userBubble)
-    const { psbt } = await commands.sweep(address, feeRate.value, network, recv, change, electrum)
+    const { psbt } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
     DOM.psbtTextArea.value = psbt
     DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
     DOM.psbtTextArea.classList.add('textarea-primary')
@@ -770,31 +786,50 @@ window.addEventListener('DOMContentLoaded', () => {
   let tempMessage = void 0
   try {
     tempMessage = requireDomElement('#temporary-message')
-    const txBody = requireDomElement('#transactions-body')
-    const txModal = requireDomElement('#transactions-modal')
     const broadcastButton = requireDomElement('#broadcast-button')
-    const conversation = requireDomElement('#conversation')
     const addressInput = requireDomElement('#address-input')
     const changeInput = requireDomElement('#change-input')
+    const changeAutoToggle = requireDomElement('#change-auto-toggle')
+    const conversation = requireDomElement('#conversation')
     const electrumInput = requireDomElement('#electrum-input')
     const feeRateInput = requireDomElement('#feerate-input')
     const networkRadios = requireDomElements('input[name="network"]')
     const psbtTextArea = requireDomElement('#psbt-textarea')
     const receiveInput = requireDomElement('#receive-input')
+    const txBody = requireDomElement('#transactions-body')
+    const txModal = requireDomElement('#transactions-modal')
     DOM = {
       addressInput,
       broadcastButton,
       changeInput,
+      changeAutoToggle,
+      conversation,
       electrumInput,
       feeRateInput,
-      tempMessage,
-      txBody,
-      txModal,
-      conversation,
       networkRadios,
       psbtTextArea,
       receiveInput,
+      tempMessage,
+      txBody,
+      txModal,
     }
+    addressInput.addEventListener('input', () => {
+      addressInput.classList.remove('input-error')
+    })
+    broadcastButton.addEventListener('click', (e) => {
+      e.preventDefault()
+      broadcast()
+    })
+    changeInput.addEventListener('input', onChangeDescriptorChange)
+    changeAutoToggle.addEventListener('click', onChangeDescriptorChange)
+    receiveInput.addEventListener('blur', validateDescriptor)
+    receiveInput.addEventListener('input', validateDescriptor)
+    networkRadios.forEach((radio) => {
+      radio.addEventListener('change', validateDescriptor)
+    })
+    psbtTextArea.addEventListener('input', () => {
+      broadcastButton.classList.remove('btn-disabled')
+    })
     requireDomElement('#estimate-button').addEventListener('click', (e) => {
       e.preventDefault()
       estimateFee()
@@ -834,21 +869,6 @@ window.addEventListener('DOMContentLoaded', () => {
     requireDomElement('#enumerate-button').addEventListener('click', (e) => {
       e.preventDefault()
       enumerate()
-    })
-    broadcastButton.addEventListener('click', (e) => {
-      e.preventDefault()
-      broadcast()
-    })
-    receiveInput.addEventListener('blur', validateDescriptor)
-    receiveInput.addEventListener('input', validateDescriptor)
-    networkRadios.forEach((radio) => {
-      radio.addEventListener('change', validateDescriptor)
-    })
-    addressInput.addEventListener('input', () => {
-      addressInput.classList.remove('input-error')
-    })
-    psbtTextArea.addEventListener('input', () => {
-      broadcastButton.classList.remove('btn-disabled')
     })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
