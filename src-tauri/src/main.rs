@@ -261,12 +261,12 @@ fn get_wallet(
   {
     receive = resolve!(
       receive_descriptor.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
     );
 
     change = Some(resolve!(
       change_descriptor.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
     ));
   } else {
     receive = resolve!(
