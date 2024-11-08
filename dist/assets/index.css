@@ -2704,9 +2704,6 @@ html {
 .left-full {
   left: 100%;
 }
-.top-10 {
-  top: 2.5rem;
-}
 .mb-3 {
   margin-bottom: 0.75rem;
 }
@@ -2730,9 +2727,6 @@ html {
 }
 .mt-2 {
   margin-top: 0.5rem;
-}
-.mt-5 {
-  margin-top: 1.25rem;
 }
 .block {
   display: block;
@@ -2933,6 +2927,11 @@ html {
 }
 .opacity-50 {
   opacity: 0.5;
+}
+.shadow-2xl {
+  --tw-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --tw-shadow-colored: 0 25px 50px -12px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
 }
 .shadow-xl {
   --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
