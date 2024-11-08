@@ -85,9 +85,12 @@ async function main() {
   log(`STATIC funded singlesig wallet mnemonic: '${DEFAULT_WALLET_MNEMONIC1}'`)
   log('STATIC funded singlesig wallet descriptor (public):', ssfPub)
   log('STATIC funded singlesig wallet descriptor (private):', ssfPrv)
-  const ssfAddress = await getAddress(ssfKey, '0/0')
-  log('STATIC funded singlesig wallet address', ssfAddress)
-  await client.sendToAddressAndConfirm(ssfAddress, 10)
+  const ssfReceiveAddress = await getAddress(ssfKey, '0/0')
+  const ssfChangeAddress = await getAddress(ssfKey, '1/0')
+  log('STATIC funded singlesig wallet receive address', ssfReceiveAddress)
+  log('STATIC funded singlesig wallet change address', ssfChangeAddress)
+  await client.sendToAddress(ssfReceiveAddress, 10)
+  await client.sendToAddressAndConfirm(ssfChangeAddress, 3)
   logSeparator()
 
   const msfMnemonics = [DEFAULT_WALLET_MNEMONIC1, DEFAULT_WALLET_MNEMONIC2, DEFAULT_WALLET_MNEMONIC3]

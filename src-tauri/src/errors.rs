@@ -5,6 +5,7 @@ use specta::Type;
 pub enum DescriptorType {
   Receive,
   Change,
+  Multipath,
 }
 
 impl std::fmt::Display for DescriptorType {
@@ -12,6 +13,7 @@ impl std::fmt::Display for DescriptorType {
     match self {
       DescriptorType::Receive => write!(f, "Receive"),
       DescriptorType::Change => write!(f, "Change"),
+      DescriptorType::Multipath => write!(f, "Multipath"),
     }
   }
 }
