@@ -1,7 +1,7 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, PsbtSigningStatus, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import { capitalize, createConversationBubble, isChangeDescriptor } from './helpers'
+import { capitalize, createConversationBubble, isChangeDescriptor, scrollToLastMessage } from './helpers'
 import { simpleCheckmark } from './icons'
 import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
 
@@ -594,6 +594,18 @@ window.addEventListener('DOMContentLoaded', () => {
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
     })
+
+    // Set up observer to scroll to the last chat message whenever a message is added
+    const config = { childList: true } // only observe the addition/removal of child nodes
+    const callback = (mutationList: MutationRecord[]) => {
+      for (const mutation of mutationList) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          scrollToLastMessage()
+        }
+      }
+    }
+    const observer = new MutationObserver(callback)
+    observer.observe(conversation, config)
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
     if (tempMessage) {

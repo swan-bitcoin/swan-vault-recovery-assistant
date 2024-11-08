@@ -260,6 +260,12 @@ const isChangeDescriptor = (descriptor) => {
   return changePattern.test(descriptor)
 }
 const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
+const scrollToLastMessage = () => {
+  const conversationContainer = document.getElementById('conversation')
+  if (conversationContainer && conversationContainer.lastElementChild) {
+    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -850,6 +856,16 @@ window.addEventListener('DOMContentLoaded', () => {
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
     })
+    const config = { childList: true }
+    const callback = (mutationList) => {
+      for (const mutation of mutationList) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          scrollToLastMessage()
+        }
+      }
+    }
+    const observer = new MutationObserver(callback)
+    observer.observe(conversation, config)
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
     if (tempMessage) {
@@ -862,9 +878,7 @@ const adjustMainContentHeight = () => {
   const footer = document.getElementById('footer')
   const mainContent = document.getElementById('main-content')
   const availableHeight = window.innerHeight - navbar.offsetHeight - footer.offsetHeight
-  console.log('height of navbar + footer: ', navbar.offsetHeight + footer.offsetHeight)
   mainContent.style.height = `${availableHeight}px`
-  console.log('height of main content: ', availableHeight)
 }
 window.addEventListener('load', adjustMainContentHeight)
 window.addEventListener('resize', adjustMainContentHeight)

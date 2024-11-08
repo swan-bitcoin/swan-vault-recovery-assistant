@@ -2987,21 +2987,28 @@ html {
   transform: scale(1.1); /* Enlarges, for example, icons when added */
 }
 
+/* Custom class to hide the scrollbar, this works on Mac and likely on Linux */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Not sure whether those are needed for Windows */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 .checked\:bg-blue-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity));
 }
-
 .checked\:bg-green-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(34 197 94 / var(--tw-bg-opacity));
 }
-
 .checked\:bg-orange-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(249 115 22 / var(--tw-bg-opacity));
 }
-
 .group:hover .group-hover\:block {
   display: block;
 }
