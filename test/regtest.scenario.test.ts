@@ -1,6 +1,6 @@
 import RegtestClient from './util/regtest.client'
 import { By, WebElement } from 'selenium-webdriver'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { assert, beforeAll, describe, expect, it } from 'vitest'
 import { driver } from './setup.scenario'
 import prand from 'pure-rand'
 import { ensureDockerStack } from './util/container'
@@ -11,10 +11,9 @@ const log = (message: string, ...args: any[]): void => {
   console.log('[TEST][REGTEST_SCENARIO]', message, ...args)
 }
 
-const UI_TIMEOUT_MS = 500
-const BITCOIN_NETWORK_TIMEOUT_MS = 3000
+const UI_TIMEOUT_MS = 30_000
+const BITCOIN_NETWORK_TIMEOUT_MS = 3_000
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
-const sleepForUI = () => sleep(UI_TIMEOUT_MS)
 const sleepForBitcoinNetwork = () => sleep(BITCOIN_NETWORK_TIMEOUT_MS)
 
 const REGEX_BALANCE_NONZERO = /(?!0\.00 000 000)(\d\.\d{2} \d{3} \d{3})$/
@@ -91,9 +90,26 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     log('destination address', destinationAddress)
   })
 
+  const waitForUI = async () => {
+    let start = Date.now()
+    let now
+    do {
+      await sleep(500)
+      const tempMessage = await outputs.temporaryMessage.getText()
+
+      if (!(/^Please wait/.test(tempMessage) || /^Fetching/.test(tempMessage))) {
+        return
+      }
+
+      now = Date.now()
+    } while (now - start < UI_TIMEOUT_MS)
+
+    assert(false)
+  }
+
   const expectAnAddress = async () => {
     await inputs.newAddress.click()
-    await sleepForUI()
+    await waitForUI()
     expect(await outputs.temporaryMessage.getText()).toMatch(/Address retrieved successfully!/)
     const elements = await outputs.conversation.findElements(By.className('break-all'))
     expect(elements.length).toBeGreaterThan(0)
@@ -104,7 +120,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   const expectLatestBalance = async (confirmed: RegExp, unconfirmed: RegExp): Promise<void> => {
     await inputs.fetchBalance.click()
-    await sleepForUI()
+    await waitForUI()
     expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
     const stats = await outputs.conversation.findElements(By.className('stat'))
     expect(stats.length).toBeGreaterThan(1)
@@ -115,7 +131,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   }
 
   const expectLatestMessageToMatch = async (regex: RegExp) => {
-    await sleepForUI()
+    await waitForUI()
     const elements = await outputs.conversation.findElements(By.className('chat-bubble'))
     expect(elements.length).toBeGreaterThan(0)
     const latestMessage = await elements[elements.length - 1].getText()
@@ -273,11 +289,14 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.address.sendKeys(destinationAddress)
 
     await inputs.sweep.click()
-    await sleepForUI()
+    await waitForUI()
     expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('none') // broadcast button should be disabled
     await inputs.copy.click()
+    await waitForUI()
     psbt = await clipboardy.read()
+    await waitForUI()
     expect(psbt).toMatch(/^cHNid/)
+    log('newly-created psbt', psbt)
   })
 
   it("can retrieve a status of 'unsigned' for a newly-created PSBT", async () => {
@@ -289,24 +308,26 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     psbt = signAllInputs(keys[0], psbt)
     log('once-signed psbt', psbt)
     await clipboardy.write(psbt)
+    await waitForUI()
     await inputs.paste.click()
-    await sleepForUI()
+    await waitForUI()
     expect(await outputs.temporaryMessage.getText()).toMatch(/^PSBT pasted/)
     expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('auto') // broadcast button should be re-enabled
-    await sleepForUI()
   })
 
   it("can retrieve a status of 'partially signed' for the once-signed PSBT", async () => {
     await inputs.psbtStatus.click()
+    await waitForUI()
     await expectLatestMessageToMatch(/The transaction is partially signed/)
   })
 
-  it('can paste in a PSBT which has been signed twice, but not finalized, and broadcast', async () => {
+  it('can paste in a PSBT which has been signed twice, but not finalized, and see the ready status', async () => {
     psbt = signAllInputs(keys[1], psbt)
     log('twice-signed psbt', psbt)
     await clipboardy.write(psbt)
+    await waitForUI()
     await inputs.paste.click()
-    await sleepForUI()
+    await waitForUI()
     await inputs.psbtStatus.click()
     await expectLatestMessageToMatch(/The transaction is fully signed/)
   })
@@ -314,7 +335,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   it('can broadcast the twice-signed psbt', async () => {
     expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('auto') // broadcast button should still be enabled
     await inputs.broadcast.click()
-    await sleepForUI()
+    await waitForUI()
     await expectLatestMessageToMatch(/Broadcast successful!/)
   })
 

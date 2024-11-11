@@ -323,7 +323,7 @@ async function getAddress() {
   const { recv, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.tempMessage.textContent = 'Getting the next unused address for you ...'
+  DOM.tempMessage.textContent = 'Fetching the next unused address for you ...'
   try {
     const userBubble = createConversationBubble('Give me an address!', true)
     DOM.conversation.appendChild(userBubble)
