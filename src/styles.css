@@ -13,3 +13,14 @@
 .copied {
   transform: scale(1.1); /* Enlarges, for example, icons when added */
 }
+
+/* Custom class to hide the scrollbar, this works on Mac and likely on Linux */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Not sure whether those are needed for Windows */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -10,7 +10,7 @@
 
   <body class="flex flex-col min-h-screen">
     <!-- Navbar -->
-    <nav class="navbar bg-base-200 justify-between">
+    <nav id="navbar" class="navbar bg-base-200 justify-between">
       <div class="ml-6">Tempura</div>
       <!-- Toggles -->
       <div class="flex gap-4">
@@ -55,26 +55,32 @@
     </nav>
 
     <!-- Main content section -->
-    <main class="flex flex-grow p-4">
+    <main id="main-content" class="flex flex-grow overflow-hidden p-4">
       <!-- Chat bubble on the left -->
-      <div class="flex-col w-2/5">
-        <div class="sticky mt-5 top-10">
-          <!-- Persistent conversation -->
-          <div id="conversation"></div>
-          <!-- Temporary feedback -->
-          <div class="chat chat-start">
-            <div class="chat-image avatar">
-              <span class="text-4xl">🍤</span>
+      <div class="flex-col w-2/5 overflow-y-auto no-scrollbar pr-4">
+        <div class="card card-normal bg-base-200 shadow-2xl">
+          <div class="card-body">
+            <h2 class="card-title">Chat</h2>
+            <!-- Persistent conversation -->
+            <div id="conversation"></div>
+            <!-- Temporary feedback -->
+            <div class="chat chat-start">
+              <div class="chat-image avatar">
+                <span class="text-4xl">🍤</span>
+              </div>
+              <div class="chat-bubble chat-bubble-primary" id="temporary-message">
+                Hi there! To start, enter your wallet configuration.
+              </div>
             </div>
-            <div class="chat-bubble chat-bubble-primary" id="temporary-message">
-              Hi there! To start, enter your wallet configuration.
+            <div class="card-actions justify-end">
+              <button id="clear-messages-btn" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">Clear Messages</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Cards section -->
-      <div class="flex flex-col w-2/5 gap-4">
+      <div class="flex flex-col w-2/5 overflow-y-auto gap-4 pr-4 ml-6">
         <!-- First Card: Wallet Set Up -->
         <div class="card bg-base-300 shadow-xl card-compact">
           <div class="card-body">
@@ -86,7 +92,7 @@
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
-                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
                   >
                     Enter a receive or combined descriptor. For Swan Vault recovery, use the "Wallet Configuration"
                     descriptor under "Advanced Wallet Information". Receive descriptors typically start with
@@ -110,7 +116,7 @@
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
-                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
                   >
                     You only need to enter a change descriptor if it does not end in <code>/1/*</code>. By default, Tempura
                     automatically derives the change descriptor from your receive descriptor if it ends with
@@ -128,7 +134,7 @@
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
-                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
                   >
                     Enter a custom Electrum server in the format <code>server:port</code>. This is optional, and if left
                     blank, the default server (Blockstream) will be used.
@@ -192,12 +198,12 @@
 
             <!-- Fee rate -->
             <div class="form-control mb-5">
-              <div class="label justify-normal gap-2">
+              <div class="label justify-normal gap-1">
                 <label class="label">Fee Rate (optional)</label>
                 <div class="group">
                   <span class="cursor-pointer">ℹ️</span>
                   <div
-                    class="tooltip tooltip-right absolute left-full ml-2 hidden group-hover:block bg-base-300 p-2 rounded min-w-[200px] max-w-[300px]"
+                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
                   >
                     A fee must be paid to miners to include your transaction in a block. The 'fee rate' is the rate at which
                     the fee increases relative to the transaction's complexity, and is the primary factor a miner uses to
@@ -249,9 +255,9 @@
     </main>
 
     <!-- Footer -->
-    <footer class="footer p-4 bg-base-200 text-base-content">
+    <footer id="footer" class="footer bg-base-200 text-base-content p-4">
       <div class="items-center grid-flow-col">
-        <p>&copy; 2024 Tempura. All rights reserved.</p>
+        <p>&copy; 2024 Tempura</p>
       </div>
     </footer>
 

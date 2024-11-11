@@ -241,6 +241,12 @@ const showConversation = () => {
     conversationContainer.classList.remove('hidden')
   }
 }
+const showClearMessagesButton = () => {
+  const clearMessagesButton = document.getElementById('clear-messages-btn')
+  if (clearMessagesButton) {
+    clearMessagesButton.classList.remove('hidden')
+  }
+}
 const createConversationBubble = (content, isUserSpeaking = false) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
@@ -253,6 +259,7 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
   showConversation()
+  showClearMessagesButton()
   return chatContainer
 }
 const isChangeDescriptor = (descriptor) => {
@@ -260,6 +267,12 @@ const isChangeDescriptor = (descriptor) => {
   return changePattern.test(descriptor)
 }
 const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
+const scrollToLastMessage = () => {
+  const conversationContainer = document.getElementById('conversation')
+  if (conversationContainer && conversationContainer.lastElementChild) {
+    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -850,6 +863,22 @@ window.addEventListener('DOMContentLoaded', () => {
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
     })
+    const config = { childList: true }
+    const callback = (mutationList) => {
+      for (const mutation of mutationList) {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          scrollToLastMessage()
+        }
+      }
+    }
+    const observer = new MutationObserver(callback)
+    observer.observe(conversation, config)
+    const clearMessagesBtn = document.getElementById('clear-messages-btn')
+    clearMessagesBtn.addEventListener('click', () => {
+      conversation.innerHTML = ''
+      tempMessage.textContent = 'All messages cleared 🫡'
+      clearMessagesBtn.classList.add('hidden')
+    })
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
     if (tempMessage) {
@@ -857,3 +886,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 })
+const adjustMainContentHeight = () => {
+  const navbar = document.getElementById('navbar')
+  const footer = document.getElementById('footer')
+  const mainContent = document.getElementById('main-content')
+  const availableHeight = window.innerHeight - navbar.offsetHeight - footer.offsetHeight
+  mainContent.style.height = `${availableHeight}px`
+}
+window.addEventListener('load', adjustMainContentHeight)
+window.addEventListener('resize', adjustMainContentHeight)
