@@ -759,6 +759,11 @@ html {
   justify-content: center;
 }
 @media (hover: hover) {
+  .checkbox-info:hover {
+    --tw-border-opacity: 1;
+    border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+  }
+
   .label a:hover {
     --tw-text-opacity: 1;
     color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
@@ -1863,6 +1868,24 @@ html {
     linear-gradient(-90deg, transparent 80%, var(--chkbg) 80%),
     linear-gradient(0deg, var(--chkbg) 43%, var(--chkfg) 43%, var(--chkfg) 57%, var(--chkbg) 57%);
 }
+.checkbox-info {
+  --chkbg: var(--fallback-in, oklch(var(--in) / 1));
+  --chkfg: var(--fallback-inc, oklch(var(--inc) / 1));
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+}
+.checkbox-info:focus-visible {
+  outline-color: var(--fallback-in, oklch(var(--in) / 1));
+}
+.checkbox-info:checked,
+.checkbox-info[aria-checked='true'] {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+  --tw-bg-opacity: 1;
+  background-color: var(--fallback-in, oklch(var(--in) / var(--tw-bg-opacity)));
+  --tw-text-opacity: 1;
+  color: var(--fallback-inc, oklch(var(--inc) / var(--tw-text-opacity)));
+}
 @keyframes checkmark {
   0% {
     background-position-y: 5px;
@@ -2355,6 +2378,10 @@ html {
   width: 2rem;
   border-radius: 9999px;
   padding: 0px;
+}
+[type='checkbox'].checkbox-sm {
+  height: 1.25rem;
+  width: 1.25rem;
 }
 .join.join-vertical {
   flex-direction: column;

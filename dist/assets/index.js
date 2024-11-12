@@ -503,7 +503,7 @@ const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
 function getInputs() {
   var _a, _b, _c
   const address = DOM.addressInput.value.trim()
-  const autoChange = DOM.changeAutoToggle.checked
+  const autoChange = DOM.changeAutoCheckbox.checked
   const receive = DOM.receiveInput.value.trim()
   const change = ((_a = DOM.changeInput) == null ? void 0 : _a.value.trim()) || null
   const electrum = ((_b = DOM.electrumInput) == null ? void 0 : _b.value.trim()) || null
@@ -679,12 +679,12 @@ async function estimateFee() {
     handleError(e)
   }
 }
-function onChangeDescriptorChange(e) {
-  if (e.target === DOM.changeInput) {
-    DOM.changeAutoToggle.checked = false
-  }
-  if (DOM.changeAutoToggle.checked) {
-    DOM.changeInput.value = ''
+const showChangeInput = () => {
+  const changeContainer = document.getElementById('change-input-container')
+  if (DOM.changeAutoCheckbox.checked) {
+    changeContainer.classList.add('hidden')
+  } else {
+    changeContainer.classList.remove('hidden')
   }
 }
 function pastePsbtFromClipboard() {
@@ -803,7 +803,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const broadcastButton = requireDomElement('#broadcast-button')
     const addressInput = requireDomElement('#address-input')
     const changeInput = requireDomElement('#change-input')
-    const changeAutoToggle = requireDomElement('#change-auto-toggle')
+    const changeAutoCheckbox = requireDomElement('#change-auto-checkbox')
     const conversation = requireDomElement('#conversation')
     const electrumInput = requireDomElement('#electrum-input')
     const feeRateInput = requireDomElement('#feerate-input')
@@ -816,7 +816,7 @@ window.addEventListener('DOMContentLoaded', () => {
       addressInput,
       broadcastButton,
       changeInput,
-      changeAutoToggle,
+      changeAutoCheckbox,
       conversation,
       electrumInput,
       feeRateInput,
@@ -874,8 +874,7 @@ window.addEventListener('DOMContentLoaded', () => {
       e.preventDefault()
       broadcast()
     })
-    changeInput.addEventListener('input', onChangeDescriptorChange)
-    changeAutoToggle.addEventListener('click', onChangeDescriptorChange)
+    changeAutoCheckbox.addEventListener('click', showChangeInput)
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
     })
