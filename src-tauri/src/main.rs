@@ -740,7 +740,7 @@ fn main() {
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
   let specta_builder = specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw);
 
-  #[cfg(debug_assertions)] // <- Only export on non-release builds
+  #[cfg(debug_assertions)]
   specta_builder
     .export(
       specta_typescript::Typescript::default(),

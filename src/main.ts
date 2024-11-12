@@ -3,7 +3,7 @@ import { commands, Descriptors, PsbtSigningStatus, type TempuraError } from './b
 import { Address, Balance, Success, Transactions } from './components'
 import { capitalize, createConversationBubble, isChangeDescriptor, scrollToLastMessage } from './helpers'
 import { simpleCheckmark } from './icons'
-import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignMessageAndPsbt } from './parsing'
+import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignResultAndPsbt } from './parsing'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
@@ -140,9 +140,10 @@ async function getFeeRate(): Promise<FeeRate> {
 type UpdatePsbtStatusProps = {
   psbtStatus: PsbtSigningStatus
   device: Device
+  signed: boolean
 }
 
-const updatePsbtStatus = ({ psbtStatus, device }: UpdatePsbtStatusProps) => {
+const updatePsbtStatus = ({ psbtStatus, device, signed }: UpdatePsbtStatusProps) => {
   const psbtStatusElement = document.getElementById('psbt-status')
 
   // Clear any existing status UI
@@ -157,10 +158,9 @@ const updatePsbtStatus = ({ psbtStatus, device }: UpdatePsbtStatusProps) => {
     `
     DOM.broadcastButton.classList.remove('btn-disabled')
   } else if (psbtStatus === 'PartiallySigned') {
-    const deviceTypeCapitalized = capitalize(device.type)
     psbtStatusElement.innerHTML = `
       <span class="text-warning">Partially Signed</span>
-      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+      ${signed ? `<br>Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>` : ''}
     `
   } else if (psbtStatus === 'Unsigned') {
     psbtStatusElement.innerHTML = ''
@@ -432,16 +432,15 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-    const tempuraBubble = createConversationBubble(Success('Signature added'))
+    const tempuraBubble = createConversationBubble(message)
     DOM.conversation.appendChild(tempuraBubble)
     // Check the psbt status and adapt UI
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
-    updatePsbtStatus({ psbtStatus, device })
+    updatePsbtStatus({ psbtStatus, device, signed })
     // Give feedback via shrimpy
-    const message = getPsbtStatusMessage(psbtStatus)
-    DOM.tempMessage.textContent = message
+    DOM.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
   } catch (e: unknown) {
     handleError(e)
   }
