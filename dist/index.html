@@ -118,10 +118,17 @@
                   <div
                     class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
                   >
-                    You only need to enter a change descriptor if it does not end in <code>/1/*</code>. By default, Tempura
-                    automatically derives the change descriptor from your receive descriptor if it ends with
-                    <code>/1/*</code>, which is the most common format.
+                    You only need to enter a change descriptor if it is non-standard. By default, Tempura automatically
+                    derives the change descriptor paths ending in '<code>/1/*</code>' from your receive descriptor if the
+                    receive descriptor paths end with '<code>/0/*</code>', which is the most common format. Multipath receive
+                    descriptors are also supported, which look like '<code>&lt;0;1&gt;</code>'
                   </div>
+                </div>
+                <div class="justify-end">
+                  <label class="flex cursor-pointer gap-1">
+                    <span>Automatic (recommended)</span>
+                    <input type="checkbox" id="change-auto-toggle" class="toggle checked:bg-green-500" checked />
+                  </label>
                 </div>
               </div>
               <input class="input w-full" id="change-input" type="text" />
