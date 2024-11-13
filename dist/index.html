@@ -87,26 +87,16 @@
             <h2 class="card-title">Wallet Set Up</h2>
             <!-- Receive descriptor -->
             <div class="form-control mb-3">
-              <div class="label justify-normal gap-2">
+              <div class="label">
                 <label class="label-text">Wallet Configuration (Descriptor)</label>
-                <div class="group">
-                  <span class="cursor-pointer">ℹ️</span>
-                  <div
-                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
-                  >
-                    Enter a receive or combined descriptor. For Swan Vault recovery, use the "Wallet Configuration"
-                    descriptor under "Advanced Wallet Information". Receive descriptors typically start with
-                    <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code>; combined descriptors end with
-                    <code>/&lt;0;1&gt;/*</code>.
-                  </div>
-                </div>
+                <button class="btn btn-link no-underline" onclick="wallet_config_modal.showModal()">
+                  Where can I find this?
+                </button>
               </div>
-              <label class="form-control">
-                <textarea
-                  id="receive-input"
-                  class="textarea textarea-bordered textarea-md h-36 break-all w-full leading-normal transition-border-color duration-500 ease-in-out"
-                ></textarea>
-              </label>
+              <textarea
+                id="receive-input"
+                class="textarea textarea-bordered textarea-md h-36 break-all w-full leading-normal transition-border-color duration-500 ease-in-out"
+              ></textarea>
             </div>
 
             <!-- Change descriptor -->
@@ -117,37 +107,36 @@
                 </div>
                 <input class="input w-full" id="change-input" type="text" />
               </div>
-              <label class="label cursor-pointer justify-normal gap-2">
-                <span class="label-text">Auto Calculate Change Descriptor</span>
-                <input
-                  type="checkbox"
-                  id="change-auto-checkbox"
-                  checked="checked"
-                  class="checkbox checkbox-info checkbox-sm"
-                />
-                <button class="btn btn-link" onclick="auto_change_modal.showModal()">What is auto-calculation?</button>
+              <label class="label cursor-pointer">
+                <div class="flex gap-2">
+                  <span class="label-text">Auto Calculate Change Descriptor</span>
+                  <input
+                    type="checkbox"
+                    id="change-auto-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline" onclick="auto_change_modal.showModal()">
+                  What is auto-calculation?
+                </button>
               </label>
             </div>
 
             <!-- Custom Electrum server -->
             <div class="form-control mb-3 dev-only">
-              <div class="label justify-normal gap-2">
-                <label class="label-text">Custom Electrum Server</label>
-                <div class="group">
-                  <span class="cursor-pointer">ℹ️</span>
-                  <div
-                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
-                  >
-                    Enter a custom Electrum server in the format <code>server:port</code>. This is optional, and if left
-                    blank, the default server (Blockstream) will be used.
-                  </div>
-                </div>
+              <div class="label">
+                <label class="label-text">Electrum Server</label>
+                <button class="btn btn-link no-underline" onclick="electrum_server_modal.showModal()">
+                  How to use a custom server?
+                </button>
               </div>
+              <!-- TODO: Adding a SSL checkbox here and then adjust the explainer box -->
               <input
                 class="input input-ghost input-bordered w-full max-w-xs"
                 id="electrum-input"
                 type="text"
-                placeholder="electrum.blockstream.info:60001"
+                placeholder="blockstream.info:110"
               />
             </div>
 
@@ -291,11 +280,60 @@
       </div>
     </dialog>
 
+    <!-- Wallet Configuration Modal -->
+    <dialog id="wallet_config_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">There are several ways to find your wallet configuration</h3>
+        <p class="py-4">For Swan Vault recovery, use the descriptor from your "Wallet Configuration":</p>
+        <div class="flex justify-center py-2">
+          <img
+            src="/assets/swan_vault_recovery_sheet.png"
+            alt="Swan Vault Recovery Sheet"
+            class="rounded-lg shadow-lg max-w-full"
+          />
+        </div>
+        <p class="py-4">For recovery from Specter, use the "Bitcoin Core Receive Descriptor":</p>
+        <div class="flex justify-center py-2">
+          <img
+            src="/assets/specter_recovery_sheet.png"
+            alt="Specter Recovery Sheet"
+            class="rounded-lg shadow-lg max-w-full"
+          />
+        </div>
+        <p class="text-sm text-gray-500 mt-2">
+          You can enter a receive or combined descriptor. Receive descriptors typically start with
+          <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code>; combined descriptors end with
+          <code>/&lt;0;1&gt;/*</code>.
+        </p>
+      </div>
+    </dialog>
+
+    <!-- Electrum Server Modal -->
+    <dialog id="electrum_server_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Using your own server is easy</h3>
+        <div class="py-4">
+          <p>
+            Just enter your custom Electrum server in the format <code>server:port</code>. If the server uses SSL, add before
+            this <code>ssl://</code>.
+          </p>
+          <p>For example: <code>ssl://electrum.shared.swanbitcoin.com:60002</code></p>
+        </div>
+        <p class="py-4">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
+      </div>
+    </dialog>
+
     <!-- Auto-change Modal -->
     <dialog id="auto_change_modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
         <h3 class="text-lg font-bold">Automatic Change Descriptor Calculation</h3>
         <p class="py-4">
