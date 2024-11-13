@@ -879,7 +879,10 @@ window.addEventListener('DOMContentLoaded', () => {
       broadcastButton.classList.remove('btn-disabled')
     })
     receiveInput.addEventListener('blur', validateDescriptor)
-    receiveInput.addEventListener('input', validateDescriptor)
+    receiveInput.addEventListener('input', () => {
+      receiveInput.value = receiveInput.value.replace(/\n/g, '').trim()
+      validateDescriptor()
+    })
     networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
     })

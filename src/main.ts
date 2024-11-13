@@ -616,7 +616,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Add event listeners for validation of descriptor
     receiveInput.addEventListener('blur', validateDescriptor)
-    receiveInput.addEventListener('input', validateDescriptor)
+    receiveInput.addEventListener('input', () => {
+      // Clean up the input
+      receiveInput.value = receiveInput.value.replace(/\n/g, '').trim()
+      validateDescriptor()
+    })
     networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
     })
