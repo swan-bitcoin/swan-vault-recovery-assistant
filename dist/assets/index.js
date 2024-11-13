@@ -340,10 +340,12 @@ function getPsbtStatusMessage(status) {
   }
   return message
 }
-function getSignMessageAndPsbt(val) {
+function getSignResultAndPsbt(val) {
   const signResponse = parseSignResponse(val)
-  const message = signResponse.signed ? 'PSBT signed successfully' : 'PSBT not signed'
-  return { message, psbt: signResponse.psbt }
+  const message = signResponse.signed
+    ? Success('Signature added')
+    : 'A signature was not added, have you already signed with this device?'
+  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
 const isDevice = (item) => {
   if (typeof item !== 'object' || item === null) return false
@@ -480,7 +482,7 @@ async function getFeeRate() {
   }
   return { value: feeRate }
 }
-const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
+const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device, signed }) => {
   const psbtStatusElement = document.getElementById('psbt-status')
   if (psbtStatusElement) {
     psbtStatusElement.innerHTML = ''
@@ -491,10 +493,9 @@ const updatePsbtStatus = ({ psbtStatus: psbtStatus2, device }) => {
     `
     DOM.broadcastButton.classList.remove('btn-disabled')
   } else if (psbtStatus2 === 'PartiallySigned') {
-    const deviceTypeCapitalized = capitalize(device.type)
     psbtStatusElement.innerHTML = `
       <span class="text-warning">Partially Signed</span>
-      <div>Signed by ${deviceTypeCapitalized} device with fingerprint: <span class="font-bold">${device.fingerprint}</span></div>
+      ${signed ? `<br>Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>` : ''}
     `
   } else if (psbtStatus2 === 'Unsigned') {
     psbtStatusElement.innerHTML = ''
@@ -730,14 +731,13 @@ async function sign() {
     const device = getDevice(enumeration)
     DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
-    const { psbt: responsePsbt } = getSignMessageAndPsbt(response)
+    const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
     DOM.psbtTextArea.value = responsePsbt
-    const tempuraBubble = createConversationBubble(Success('Signature added'))
+    const tempuraBubble = createConversationBubble(message)
     DOM.conversation.appendChild(tempuraBubble)
     const psbtStatus2 = await commands.psbtStatus(responsePsbt, network, descriptors)
-    updatePsbtStatus({ psbtStatus: psbtStatus2, device })
-    const message = getPsbtStatusMessage(psbtStatus2)
-    DOM.tempMessage.textContent = message
+    updatePsbtStatus({ psbtStatus: psbtStatus2, device, signed })
+    DOM.tempMessage.textContent = getPsbtStatusMessage(psbtStatus2)
   } catch (e) {
     handleError(e)
   }

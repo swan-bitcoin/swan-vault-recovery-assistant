@@ -101,6 +101,9 @@ macro_rules! resolve_io {
       }
       TempuraError::new(TempuraErrorType::CommandError, &e.to_string())
     })?;
-    resolve!(String::from_utf8(o.stdout), TempuraErrorType::ParseError)
+    let response = String::from_utf8(o.stdout);
+    #[cfg(debug_assertions)]
+    println!("{:?}", response);
+    resolve!(response, TempuraErrorType::ParseError)
   }};
 }

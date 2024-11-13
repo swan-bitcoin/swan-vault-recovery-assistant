@@ -1,4 +1,5 @@
 import { PsbtSigningStatus } from './bindings'
+import { Success } from './components'
 
 export type Device = {
   type: string
@@ -92,14 +93,17 @@ export function getPsbtStatusMessage(status: PsbtSigningStatus) {
   return message
 }
 
-export function getSignMessageAndPsbt(val: unknown): {
+export function getSignResultAndPsbt(val: unknown): {
   message: string
   psbt: string
+  signed: boolean
 } {
   const signResponse = parseSignResponse(val)
 
-  const message = signResponse.signed ? 'PSBT signed successfully' : 'PSBT not signed'
-  return { message, psbt: signResponse.psbt }
+  const message = signResponse.signed
+    ? Success('Signature added')
+    : 'A signature was not added, have you already signed with this device?'
+  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
 
 /**

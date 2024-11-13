@@ -101,16 +101,17 @@ describe('getDevicePrompt()', () => {
   })
 })
 
-describe('getSignMessageAndPsbt()', () => {
+describe('getSignResultAndPsbt()', () => {
   it('should return a message and psbt when a valid response is present', () => {
     const response = {
       psbt: 'a',
       signed: false,
     }
 
-    expect(parsing.getSignMessageAndPsbt(JSON.stringify(response))).toStrictEqual({
-      message: 'PSBT not signed',
+    expect(parsing.getSignResultAndPsbt(JSON.stringify(response))).toStrictEqual({
+      message: 'A signature was not added, have you already signed with this device?',
       psbt: 'a',
+      signed: false,
     })
   })
 
@@ -120,10 +121,14 @@ describe('getSignMessageAndPsbt()', () => {
       signed: true,
     }
 
-    expect(parsing.getSignMessageAndPsbt(JSON.stringify(response))).toStrictEqual({
-      message: 'PSBT signed successfully',
-      psbt: 'b',
-    })
+    const result = parsing.getSignResultAndPsbt(JSON.stringify(response))
+    expect(result).toEqual(
+      expect.objectContaining({
+        psbt: 'b',
+        signed: true,
+      })
+    )
+    expect(result.message).toContain('Signature added')
   })
 })
 
