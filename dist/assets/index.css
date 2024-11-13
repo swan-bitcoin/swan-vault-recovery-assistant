@@ -2993,6 +2993,10 @@ html {
   --tw-text-opacity: 1;
   color: var(--fallback-in, oklch(var(--in) / var(--tw-text-opacity)));
 }
+.text-neutral-500 {
+  --tw-text-opacity: 1;
+  color: rgb(115 115 115 / var(--tw-text-opacity));
+}
 .text-success {
   --tw-text-opacity: 1;
   color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));

@@ -16,6 +16,8 @@ let DOM: {
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
   networkRadios: NodeListOf<HTMLInputElement>
+  psbtSignHistory: HTMLDivElement
+  psbtStatusElement: HTMLDivElement
   psbtTextArea: HTMLTextAreaElement
   receiveInput: HTMLInputElement
   tempMessage: HTMLDivElement
@@ -137,34 +139,27 @@ async function getFeeRate(): Promise<FeeRate> {
   return { value: feeRate }
 }
 
-type UpdatePsbtStatusProps = {
-  psbtStatus: PsbtSigningStatus
-  device: Device
-  signed: boolean
-}
-
-const updatePsbtStatus = ({ psbtStatus, device, signed }: UpdatePsbtStatusProps) => {
-  const psbtStatusElement = document.getElementById('psbt-status')
-
-  // Clear any existing status UI
-  if (psbtStatusElement) {
-    psbtStatusElement.innerHTML = ''
-  }
-
-  // Update the UI based on the PSBT status
+const updatePsbtStatusField = (psbtStatus: PsbtSigningStatus) => {
   if (psbtStatus === 'FullySigned') {
-    psbtStatusElement.innerHTML = `
+    DOM.psbtStatusElement.innerHTML = `
       <span class="text-success">Fully Signed ${simpleCheckmark}</span>
     `
     DOM.broadcastButton.classList.remove('btn-disabled')
   } else if (psbtStatus === 'PartiallySigned') {
-    psbtStatusElement.innerHTML = `
+    DOM.psbtStatusElement.innerHTML = `
       <span class="text-warning">Partially Signed</span>
-      ${signed ? `<br>Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>` : ''}
     `
   } else if (psbtStatus === 'Unsigned') {
-    psbtStatusElement.innerHTML = ''
+    DOM.psbtStatusElement.innerHTML = `
+      <span class="text-neutral-500">Unsigned</span>
+    `
   }
+}
+
+const updateSignHistory = (device: Device) => {
+  const currentSign = document.createElement('div')
+  currentSign.innerHTML = `Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>`
+  DOM.psbtSignHistory.appendChild(currentSign)
 }
 
 type Inputs = {
@@ -387,9 +382,13 @@ const showChangeInput = () => {
 function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
-      DOM.broadcastButton.classList.remove('btn-disabled')
-
       const trimmed = psbt.trim()
+      if (trimmed !== DOM.psbtTextArea.value) {
+        DOM.broadcastButton.classList.remove('btn-disabled')
+        DOM.psbtStatusElement.innerHTML = ''
+        DOM.psbtSignHistory.innerHTML = ''
+      }
+
       DOM.psbtTextArea.value = trimmed
       if (!trimmed || !trimmed.startsWith('cHNid')) {
         DOM.tempMessage.textContent = 'Warning: Pasted data does not look like a PSBT'
@@ -411,7 +410,9 @@ async function psbtStatus() {
   try {
     const userBubble = createConversationBubble(`What is the status of this PSBT?`, true)
     DOM.conversation.appendChild(userBubble)
-    const message = getPsbtStatusMessage(await commands.psbtStatus(psbt, network, descriptors))
+    const psbtStatus = await commands.psbtStatus(psbt, network, descriptors)
+    updatePsbtStatusField(psbtStatus)
+    const message = getPsbtStatusMessage(psbtStatus)
     const tempuraBubble = createConversationBubble(Success(message))
     DOM.tempMessage.textContent = 'PSBT status retrieved successfully!'
     DOM.conversation.appendChild(tempuraBubble)
@@ -438,7 +439,10 @@ async function sign() {
     DOM.conversation.appendChild(tempuraBubble)
     // Check the psbt status and adapt UI
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
-    updatePsbtStatus({ psbtStatus, device, signed })
+    updatePsbtStatusField(psbtStatus)
+    if (signed) {
+      updateSignHistory(device)
+    }
     // Give feedback via shrimpy
     DOM.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
   } catch (e: unknown) {
@@ -473,6 +477,8 @@ async function sweep() {
     DOM.conversation.appendChild(userBubble)
     const { psbt } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
     DOM.psbtTextArea.value = psbt
+    updatePsbtStatusField('Unsigned')
+    DOM.psbtSignHistory.innerHTML = ''
 
     // Scroll to psbt area and highlight the psbt creation
     DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
@@ -523,6 +529,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const electrumInput = requireDomElement<HTMLInputElement>('#electrum-input')
     const feeRateInput = requireDomElement<HTMLInputElement>('#feerate-input')
     const networkRadios = requireDomElements<HTMLInputElement>('input[name="network"]')
+    const psbtSignHistory = requireDomElement<HTMLDivElement>('#psbt-sign-history')
+    const psbtStatusElement = requireDomElement<HTMLDivElement>('#psbt-status')
     const psbtTextArea = requireDomElement<HTMLTextAreaElement>('#psbt-textarea')
     const receiveInput = requireDomElement<HTMLInputElement>('#receive-input')
     const txBody = requireDomElement<HTMLTableSectionElement>('#transactions-body')
@@ -537,6 +545,8 @@ window.addEventListener('DOMContentLoaded', () => {
       electrumInput,
       feeRateInput,
       networkRadios,
+      psbtSignHistory,
+      psbtStatusElement,
       psbtTextArea,
       receiveInput,
       tempMessage,
@@ -611,6 +621,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
+      psbtStatusElement.innerHTML = ''
+      psbtSignHistory.innerHTML = ''
     })
 
     // Add event listeners for validation of descriptor
