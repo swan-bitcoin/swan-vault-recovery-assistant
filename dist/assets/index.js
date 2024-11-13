@@ -88,6 +88,15 @@ const commands = {
   async estimateFee(network, electrum, blocks) {
     return await invoke('estimate_fee', { network, electrum, blocks })
   },
+  async isAddress(address) {
+    return await invoke('is_address', { address })
+  },
+  async isAddressForNetwork(address, network) {
+    return await invoke('is_address_for_network', { address, network })
+  },
+  async isAddressMine(address, network, descriptors) {
+    return await invoke('is_address_mine', { address, network, descriptors })
+  },
   async isDescriptor(descriptor) {
     return await invoke('is_descriptor', { descriptor })
   },
@@ -682,14 +691,6 @@ async function estimateFee() {
     handleError(e)
   }
 }
-const showChangeInput = () => {
-  const changeContainer = document.getElementById('change-input-container')
-  if (DOM.changeAutoCheckbox.checked) {
-    changeContainer.classList.add('hidden')
-  } else {
-    changeContainer.classList.remove('hidden')
-  }
-}
 function pastePsbtFromClipboard() {
   readText()
     .then((psbt) => {
@@ -726,6 +727,20 @@ async function psbtStatus() {
     DOM.conversation.appendChild(tempuraBubble)
   } catch (e) {
     handleError(e)
+  }
+}
+function resetAddressField() {
+  DOM.addressInput.value = ''
+  DOM.addressInput.classList.remove('input-success')
+  DOM.addressInput.classList.remove('input-error')
+  DOM.addressInput.classList.remove('input-warning')
+}
+function showChangeInput() {
+  const changeContainer = document.getElementById('change-input-container')
+  if (DOM.changeAutoCheckbox.checked) {
+    changeContainer.classList.add('hidden')
+  } else {
+    changeContainer.classList.remove('hidden')
   }
 }
 async function sign() {
@@ -809,6 +824,44 @@ function requireDomElements(name) {
   }
   return elements
 }
+async function validateAddress() {
+  const { address, descriptors, network } = getInputs()
+  DOM.addressInput.classList.remove('input-success')
+  DOM.addressInput.classList.remove('input-error')
+  DOM.addressInput.classList.remove('input-warning')
+  if (!address) {
+    DOM.tempMessage.textContent = 'No address, no problem! You only need one for testing or performing a recovery.'
+    return false
+  }
+  try {
+    const isValid = await commands.isAddress(address)
+    if (!isValid) {
+      DOM.addressInput.classList.add('input-error')
+      DOM.tempMessage.textContent = 'This address is not valid.'
+      return false
+    }
+    const isForNetwork = await commands.isAddressForNetwork(address, network)
+    if (!isForNetwork) {
+      DOM.addressInput.classList.add('input-error')
+      DOM.tempMessage.textContent = 'This address is not for the selected network'
+      return false
+    }
+    const isMine = await commands.isAddressMine(address, network, descriptors)
+    if (isMine) {
+      DOM.tempMessage.textContent =
+        'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
+      DOM.addressInput.classList.add('input-warning')
+      return false
+    }
+    DOM.addressInput.classList.add('input-success')
+    DOM.tempMessage.textContent = 'This address looks good!'
+    return true
+  } catch (e) {
+    DOM.addressInput.classList.add('input-error')
+    handleError(e)
+  }
+  return false
+}
 window.addEventListener('DOMContentLoaded', () => {
   let tempMessage = void 0
   try {
@@ -884,9 +937,7 @@ window.addEventListener('DOMContentLoaded', () => {
       e.preventDefault()
       enumerate()
     })
-    addressInput.addEventListener('input', () => {
-      addressInput.classList.remove('input-error')
-    })
+    addressInput.addEventListener('input', validateAddress)
     broadcastButton.addEventListener('click', (e) => {
       e.preventDefault()
       broadcast()
@@ -903,7 +954,10 @@ window.addEventListener('DOMContentLoaded', () => {
       validateDescriptor()
     })
     networkRadios.forEach((radio) => {
-      radio.addEventListener('change', validateDescriptor)
+      radio.addEventListener('change', () => {
+        resetAddressField()
+        validateDescriptor()
+      })
     })
     const config = { childList: true }
     const callback = (mutationList) => {

@@ -1945,6 +1945,26 @@ html {
   color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
   box-shadow: none;
 }
+.input-success {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity)));
+}
+.input-success:focus,
+.input-success:focus-within {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity)));
+  outline-color: var(--fallback-su, oklch(var(--su) / 1));
+}
+.input-warning {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+}
+.input-warning:focus,
+.input-warning:focus-within {
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-border-opacity)));
+  outline-color: var(--fallback-wa, oklch(var(--wa) / 1));
+}
 .input-error {
   --tw-border-opacity: 1;
   border-color: var(--fallback-er, oklch(var(--er) / var(--tw-border-opacity)));

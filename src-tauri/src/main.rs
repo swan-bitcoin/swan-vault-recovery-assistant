@@ -539,6 +539,61 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 
 #[tauri::command]
 #[specta::specta]
+async fn is_address(address: String) -> bool {
+  bdk::bitcoin::Address::from_str(&address).is_ok()
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn is_address_for_network(address: String, network: String) -> Result<bool, TempuraError> {
+  let network: bdk::bitcoin::Network = Network::from_str(&network)?.into();
+
+  let addr = resolve!(
+    bdk::bitcoin::Address::from_str(&address),
+    TempuraErrorType::AddressError
+  );
+  Ok(addr.network == network)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn is_address_mine(
+  address: String,
+  network: String,
+  descriptors: Descriptors,
+) -> Result<bool, TempuraError> {
+  let network = Network::from_str(&network)?;
+  let wallet = get_wallet(network, descriptors)?;
+  let network: bdk::bitcoin::Network = network.into();
+
+  let addr = resolve!(
+    bdk::bitcoin::Address::from_str(&address),
+    TempuraErrorType::AddressError
+  );
+
+  if addr.network != wallet.network() {
+    return Err(TempuraError::new(
+      TempuraErrorType::AddressError,
+      &format!(
+        "Mismatched address and network. address: {}, network: {}",
+        address, network
+      ),
+    ));
+  }
+
+  resolve!(
+    wallet.ensure_addresses_cached(100),
+    TempuraErrorType::WalletError
+  );
+
+  Ok(resolve!(
+    wallet.is_mine(&addr.payload.script_pubkey()),
+    TempuraErrorType::WalletError
+  ))
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn is_descriptor(descriptor: String) -> bool {
   bdk::descriptor::ExtendedDescriptor::from_str(&descriptor).is_ok()
 }
@@ -729,6 +784,9 @@ fn main() {
       broadcast,
       enumerate,
       estimate_fee,
+      is_address,
+      is_address_for_network,
+      is_address_mine,
       is_descriptor,
       is_descriptor_for_network,
       psbt_status,
