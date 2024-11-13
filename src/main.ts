@@ -11,7 +11,7 @@ let DOM: {
   addressInput: HTMLInputElement
   broadcastButton: HTMLButtonElement
   changeInput: HTMLInputElement
-  changeAutoToggle: HTMLInputElement
+  changeAutoCheckbox: HTMLInputElement
   conversation: HTMLDivElement
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
@@ -178,7 +178,7 @@ type Inputs = {
 
 function getInputs(): Inputs {
   const address = DOM.addressInput.value.trim()
-  const autoChange = DOM.changeAutoToggle.checked
+  const autoChange = DOM.changeAutoCheckbox.checked
   const receive = DOM.receiveInput.value.trim()
   const change = DOM.changeInput?.value.trim() || null
   const electrum = DOM.electrumInput?.value.trim() || null
@@ -375,12 +375,12 @@ async function estimateFee() {
   }
 }
 
-function onChangeDescriptorChange(e: Event) {
-  if (e.target === DOM.changeInput) {
-    DOM.changeAutoToggle.checked = false
-  }
-  if (DOM.changeAutoToggle.checked) {
-    DOM.changeInput.value = ''
+const showChangeInput = () => {
+  const changeContainer = document.getElementById('change-input-container')
+  if (DOM.changeAutoCheckbox.checked) {
+    changeContainer.classList.add('hidden')
+  } else {
+    changeContainer.classList.remove('hidden')
   }
 }
 
@@ -519,7 +519,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const broadcastButton = requireDomElement<HTMLButtonElement>('#broadcast-button')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
-    const changeAutoToggle = requireDomElement<HTMLInputElement>('#change-auto-toggle')
+    const changeAutoCheckbox = requireDomElement<HTMLInputElement>('#change-auto-checkbox')
     const conversation = requireDomElement<HTMLDivElement>('#conversation')
     const electrumInput = requireDomElement<HTMLInputElement>('#electrum-input')
     const feeRateInput = requireDomElement<HTMLInputElement>('#feerate-input')
@@ -533,7 +533,7 @@ window.addEventListener('DOMContentLoaded', () => {
       addressInput,
       broadcastButton,
       changeInput,
-      changeAutoToggle,
+      changeAutoCheckbox,
       conversation,
       electrumInput,
       feeRateInput,
@@ -608,8 +608,7 @@ window.addEventListener('DOMContentLoaded', () => {
       broadcast()
     })
 
-    changeInput.addEventListener('input', onChangeDescriptorChange)
-    changeAutoToggle.addEventListener('click', onChangeDescriptorChange)
+    changeAutoCheckbox.addEventListener('click', showChangeInput)
 
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')

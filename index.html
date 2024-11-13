@@ -112,27 +112,22 @@
 
             <!-- Change descriptor -->
             <div class="form-control mb-3 dev-only">
-              <div class="label justify-normal gap-2">
-                <label class="label-text">Change Descriptor</label>
-                <div class="group">
-                  <span class="cursor-pointer">ℹ️</span>
-                  <div
-                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
-                  >
-                    You only need to enter a change descriptor if it is non-standard. By default, Tempura automatically
-                    derives the change descriptor paths ending in '<code>/1/*</code>' from your receive descriptor if the
-                    receive descriptor paths end with '<code>/0/*</code>', which is the most common format. Multipath receive
-                    descriptors are also supported, which look like '<code>&lt;0;1&gt;</code>'
-                  </div>
+              <div id="change-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Change Descriptor</label>
                 </div>
-                <div class="justify-end">
-                  <label class="flex cursor-pointer gap-1">
-                    <span>Automatic (recommended)</span>
-                    <input type="checkbox" id="change-auto-toggle" class="toggle checked:bg-green-500" checked />
-                  </label>
-                </div>
+                <input class="input w-full" id="change-input" type="text" />
               </div>
-              <input class="input w-full" id="change-input" type="text" />
+              <label class="label cursor-pointer justify-normal gap-2">
+                <span class="label-text">Auto Calculate Change Descriptor</span>
+                <input
+                  type="checkbox"
+                  id="change-auto-checkbox"
+                  checked="checked"
+                  class="checkbox checkbox-info checkbox-sm"
+                />
+                <button class="btn btn-link" onclick="auto_change_modal.showModal()">What is auto-calculation?</button>
+              </label>
             </div>
 
             <!-- Custom Electrum server -->
@@ -294,6 +289,22 @@
             <button class="btn btn-sm">Close</button>
           </form>
         </div>
+      </div>
+    </dialog>
+
+    <!-- Auto-change Modal -->
+    <dialog id="auto_change_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Automatic Change Descriptor Calculation</h3>
+        <p class="py-4">
+          By default, Tempura automatically calculates the change descriptor paths ending in <code>/1/*</code> from your
+          receive descriptor if the receive descriptor paths end with <code>/0/*</code>, which is the most common format. The
+          same goes for multipath descriptors of type <code>&lt;0;1&gt;</code>.
+        </p>
+        <p>Hence, you only need to enter a change descriptor if it is non-standard.</p>
       </div>
     </dialog>
   </body>
