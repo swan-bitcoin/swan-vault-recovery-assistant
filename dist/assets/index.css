@@ -2863,9 +2863,6 @@ html {
 .w-full {
   width: 100%;
 }
-.min-w-\[200px\] {
-  min-width: 200px;
-}
 .max-w-5xl {
   max-width: 64rem;
 }
@@ -2899,9 +2896,6 @@ html {
 }
 .items-center {
   align-items: center;
-}
-.justify-normal {
-  justify-content: normal;
 }
 .justify-end {
   justify-content: flex-end;
@@ -2938,9 +2932,6 @@ html {
 .break-all {
   word-break: break-all;
 }
-.rounded {
-  border-radius: 0.25rem;
-}
 .rounded-lg {
   border-radius: 0.5rem;
 }
@@ -2960,9 +2951,6 @@ html {
 }
 .stroke-current {
   stroke: currentColor;
-}
-.p-2 {
-  padding: 0.5rem;
 }
 .p-4 {
   padding: 1rem;
@@ -3120,7 +3108,4 @@ html {
 .checked\:bg-orange-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(249 115 22 / var(--tw-bg-opacity));
-}
-.group:hover .group-hover\:block {
-  display: block;
 }

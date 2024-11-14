@@ -132,7 +132,6 @@
                   How to use a custom server?
                 </button>
               </div>
-              <!-- TODO: Adding a SSL checkbox here and then adjust the explainer box -->
               <input
                 class="input input-ghost input-bordered w-full max-w-xs"
                 id="electrum-input"
@@ -190,19 +189,9 @@
 
             <!-- Fee rate -->
             <div class="form-control mb-5">
-              <div class="label justify-normal gap-1">
-                <label class="label">Fee Rate (optional)</label>
-                <div class="group">
-                  <span class="cursor-pointer">ℹ️</span>
-                  <div
-                    class="tooltip tooltip-down mt-2 absolute hidden group-hover:block bg-base-200 p-2 rounded min-w-[200px]"
-                  >
-                    A fee must be paid to miners to include your transaction in a block. The 'fee rate' is the rate at which
-                    the fee increases relative to the transaction's complexity, and is the primary factor a miner uses to
-                    determine the transaction's priority. If you leave this blank, Tempura will attempt to suggest a fee rate
-                    for you.
-                  </div>
-                </div>
+              <div class="label">
+                <label class="label">Fee Rate</label>
+                <button class="btn btn-link no-underline" onclick="fee_rate_modal.showModal()">What is this for?</button>
               </div>
               <div class="flex items-center gap-2">
                 <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
@@ -313,6 +302,22 @@
       </div>
     </dialog>
 
+    <!-- Auto-change Modal -->
+    <dialog id="auto_change_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Automatic Change Descriptor Calculation</h3>
+        <p class="py-4">
+          By default, Tempura automatically calculates the change descriptor paths ending in <code>/1/*</code> from your
+          receive descriptor if the receive descriptor paths end with <code>/0/*</code>, which is the most common format. The
+          same goes for multipath descriptors of type <code>&lt;0;1&gt;</code>.
+        </p>
+        <p>Hence, you only need to enter a change descriptor if it is non-standard.</p>
+      </div>
+    </dialog>
+
     <!-- Electrum Server Modal -->
     <dialog id="electrum_server_modal" class="modal">
       <div class="modal-box">
@@ -331,19 +336,24 @@
       </div>
     </dialog>
 
-    <!-- Auto-change Modal -->
-    <dialog id="auto_change_modal" class="modal">
+    <!-- Fee Rate Modal -->
+    <dialog id="fee_rate_modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Automatic Change Descriptor Calculation</h3>
-        <p class="py-4">
-          By default, Tempura automatically calculates the change descriptor paths ending in <code>/1/*</code> from your
-          receive descriptor if the receive descriptor paths end with <code>/0/*</code>, which is the most common format. The
-          same goes for multipath descriptors of type <code>&lt;0;1&gt;</code>.
+        <h3 class="text-lg font-bold">Understanding the Fee Rate</h3>
+        <div class="py-4">
+          <p>
+            Miners prioritize transactions based on this rate, which reflects how much is paid per "virtual byte" (a measure
+            of transaction complexity). A higher fee rate increases the chances of a quicker confirmation, especially in
+            periods of high network activity.
+          </p>
+        </div>
+        <p class="py-2">
+          Setting a fee manually is optional. If left blank, Tempura will automatically estimate the fee rate needed to
+          prioritize your transaction for the next block.
         </p>
-        <p>Hence, you only need to enter a change descriptor if it is non-standard.</p>
       </div>
     </dialog>
   </body>
