@@ -108,7 +108,7 @@
                 <input class="input w-full" id="change-input" type="text" />
               </div>
               <label class="label cursor-pointer">
-                <div class="flex gap-2">
+                <div class="flex items-center gap-2">
                   <span class="label-text">Auto Calculate Change Descriptor</span>
                   <input
                     type="checkbox"
@@ -320,12 +320,12 @@
         <h3 class="text-lg font-bold">Using your own server is easy</h3>
         <div class="py-4">
           <p>
-            Just enter your custom Electrum server in the format <code>server:port</code>. If the server uses SSL, add before
-            this <code>ssl://</code>.
+            Enter your custom Electrum server in the format <code>server:port</code>. If the server uses SSL, you must
+            specify it at the beginning.
           </p>
-          <p>For example: <code>ssl://electrum.shared.swanbitcoin.com:60002</code></p>
+          <p>For example: <code>ssl://electrum.satoshi.com:50001</code></p>
         </div>
-        <p class="py-4">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
+        <p class="py-2">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
       </div>
     </dialog>
 
