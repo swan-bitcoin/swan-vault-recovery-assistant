@@ -898,7 +898,10 @@ window.addEventListener('DOMContentLoaded', () => {
       psbtSignHistory.innerHTML = ''
     })
     receiveInput.addEventListener('blur', validateDescriptor)
-    receiveInput.addEventListener('input', validateDescriptor)
+    receiveInput.addEventListener('input', () => {
+      receiveInput.value = receiveInput.value.replace(/\r?\n|\r/g, '').trim()
+      validateDescriptor()
+    })
     networkRadios.forEach((radio) => {
       radio.addEventListener('change', validateDescriptor)
     })
