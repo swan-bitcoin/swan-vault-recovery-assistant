@@ -830,7 +830,7 @@ async function validateAddress() {
   DOM.addressInput.classList.remove('input-error')
   DOM.addressInput.classList.remove('input-warning')
   if (!address) {
-    DOM.tempMessage.textContent = 'No address, no problem! You only need one for testing or performing a recovery.'
+    DOM.tempMessage.textContent = 'No address provided'
     return false
   }
   try {

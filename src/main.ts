@@ -46,7 +46,7 @@ function handleError(e: unknown) {
   DOM.tempMessage.textContent = 'An unknown error occurred'
 }
 
-const validateDescriptor = async (): Promise<boolean> => {
+const validateDescriptor = async () => {
   const descriptor = DOM.receiveInput.value
   const network = Array.from(DOM.networkRadios).find((radio) => radio.checked).value
   const standardWalletActions = document.getElementById('standard-wallet-actions')
@@ -522,14 +522,15 @@ function requireDomElements<T extends HTMLElement>(name: string): NodeListOf<T> 
   return elements
 }
 
-async function validateAddress(): Promise<boolean> {
+async function validateAddress() {
   const { address, descriptors, network } = getInputs()
   DOM.addressInput.classList.remove('input-success')
   DOM.addressInput.classList.remove('input-error')
   DOM.addressInput.classList.remove('input-warning')
 
   if (!address) {
-    DOM.tempMessage.textContent = 'No address, no problem! You only need one for testing or performing a recovery.'
+    // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
+    DOM.tempMessage.textContent = 'No address provided'
     return false
   }
 
@@ -658,7 +659,6 @@ window.addEventListener('DOMContentLoaded', () => {
       enumerate()
     })
 
-    // Remove the red border from the address field due to no address entered when the user enters an address
     addressInput.addEventListener('input', validateAddress)
 
     broadcastButton.addEventListener('click', (e) => {
