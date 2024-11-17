@@ -370,15 +370,6 @@ async function estimateFee() {
   }
 }
 
-const showChangeInput = () => {
-  const changeContainer = document.getElementById('change-input-container')
-  if (DOM.changeAutoCheckbox.checked) {
-    changeContainer.classList.add('hidden')
-  } else {
-    changeContainer.classList.remove('hidden')
-  }
-}
-
 function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
@@ -421,6 +412,22 @@ async function psbtStatus() {
   }
 }
 
+function resetAddressField() {
+  DOM.addressInput.value = ''
+  DOM.addressInput.classList.remove('input-success')
+  DOM.addressInput.classList.remove('input-error')
+  DOM.addressInput.classList.remove('input-warning')
+}
+
+function showChangeInput() {
+  const changeContainer = document.getElementById('change-input-container')
+  if (DOM.changeAutoCheckbox.checked) {
+    changeContainer.classList.add('hidden')
+  } else {
+    changeContainer.classList.remove('hidden')
+  }
+}
+
 async function sign() {
   const { psbt, descriptors, network } = getInputs()
   require(psbt, 'PSBT')
@@ -455,7 +462,6 @@ async function sweep() {
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
-  // TODO: Add validateAddress to also provide positive feedback on the address similar to validateDescriptor?
   if (!address) {
     DOM.addressInput.classList.add('input-error')
   }
@@ -514,6 +520,52 @@ function requireDomElements<T extends HTMLElement>(name: string): NodeListOf<T> 
     throw new Error(`Failed to initialize: missing required DOM element ${name}`)
   }
   return elements
+}
+
+async function validateAddress() {
+  const { address, descriptors, network } = getInputs()
+  DOM.addressInput.classList.remove('input-success')
+  DOM.addressInput.classList.remove('input-error')
+  DOM.addressInput.classList.remove('input-warning')
+
+  if (!address) {
+    // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
+    DOM.tempMessage.textContent = 'No address provided'
+    return false
+  }
+
+  try {
+    const isValid = await commands.isAddress(address)
+    if (!isValid) {
+      DOM.addressInput.classList.add('input-error')
+      DOM.tempMessage.textContent = 'This address is not valid.'
+      return false
+    }
+
+    const isForNetwork = await commands.isAddressForNetwork(address, network)
+    if (!isForNetwork) {
+      DOM.addressInput.classList.add('input-error')
+      DOM.tempMessage.textContent = 'This address is not for the selected network'
+      return false
+    }
+
+    const isMine = await commands.isAddressMine(address, network, descriptors)
+    if (isMine) {
+      DOM.tempMessage.textContent =
+        'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
+      DOM.addressInput.classList.add('input-warning')
+      return false
+    }
+
+    DOM.addressInput.classList.add('input-success')
+    DOM.tempMessage.textContent = 'This address looks good!'
+    return true
+  } catch (e: unknown) {
+    DOM.addressInput.classList.add('input-error')
+    handleError(e)
+  }
+
+  return false
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -607,10 +659,7 @@ window.addEventListener('DOMContentLoaded', () => {
       enumerate()
     })
 
-    // Remove the red border from the address field due to no address entered when the user enters an address
-    addressInput.addEventListener('input', () => {
-      addressInput.classList.remove('input-error')
-    })
+    addressInput.addEventListener('input', validateAddress)
 
     broadcastButton.addEventListener('click', (e) => {
       e.preventDefault()
@@ -633,7 +682,10 @@ window.addEventListener('DOMContentLoaded', () => {
       validateDescriptor()
     })
     networkRadios.forEach((radio) => {
-      radio.addEventListener('change', validateDescriptor)
+      radio.addEventListener('change', () => {
+        resetAddressField()
+        validateDescriptor()
+      })
     })
 
     // Set up observer to scroll to the last chat message whenever a message is added

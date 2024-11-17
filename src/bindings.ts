@@ -25,6 +25,15 @@ async enumerate(network: string) : Promise<string> {
 async estimateFee(network: string, electrum: string | null, blocks: number | null) : Promise<number> {
     return await TAURI_INVOKE("estimate_fee", { network, electrum, blocks });
 },
+async isAddress(address: string) : Promise<boolean> {
+    return await TAURI_INVOKE("is_address", { address });
+},
+async isAddressForNetwork(address: string, network: string) : Promise<boolean> {
+    return await TAURI_INVOKE("is_address_for_network", { address, network });
+},
+async isAddressMine(address: string, network: string, descriptors: Descriptors) : Promise<boolean> {
+    return await TAURI_INVOKE("is_address_mine", { address, network, descriptors });
+},
 async isDescriptor(descriptor: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_descriptor", { descriptor });
 },
