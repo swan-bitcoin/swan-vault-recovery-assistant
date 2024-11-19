@@ -10,20 +10,6 @@
   </head>
 
   <body class="flex flex-col min-h-screen">
-    <!-- Navbar -->
-    <nav id="navbar" class="navbar bg-base-200 justify-between">
-      <div class="ml-6">Tempura</div>
-      <!-- Toggles -->
-      <div class="flex gap-4">
-        <!-- Dev mode -->
-        <label class="flex cursor-pointer gap-1">
-          <span>Standard 🙂</span>
-          <input type="checkbox" id="dev-mode-toggle" class="toggle dev-mode-toggle" />
-          <span>🤯 Advanced</span>
-        </label>
-      </div>
-    </nav>
-
     <!-- Main content section -->
     <main id="main-content" class="flex flex-grow overflow-hidden p-4">
       <!-- Chat bubble on the left -->
@@ -70,7 +56,7 @@
             </div>
 
             <!-- Change descriptor -->
-            <div class="form-control mb-3 dev-only">
+            <div class="form-control mb-3">
               <div id="change-input-container" class="hidden">
                 <div class="label">
                   <label class="label-text">Change Descriptor</label>
@@ -94,7 +80,7 @@
             </div>
 
             <!-- Custom Electrum server -->
-            <div class="form-control mb-3 dev-only">
+            <div class="form-control mb-3">
               <div class="label">
                 <label class="label-text">Electrum Server</label>
                 <button class="btn btn-link no-underline" onclick="electrum_server_modal.showModal()">
@@ -110,7 +96,7 @@
             </div>
 
             <!-- Network selection -->
-            <div class="form-control mb-5 dev-only">
+            <div class="form-control mb-5">
               <div class="label">
                 <label class="label-text">Network</label>
               </div>
@@ -190,9 +176,9 @@
             <!-- PSBT controls -->
             <div class="card-actions justify-end mb-6">
               <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
-              <button class="btn btn-outline btn-sm dev-only" type="button" id="psbt-status-button">PSBT Status</button>
-              <button class="btn btn-outline btn-sm dev-only" type="button" id="copy-psbt-button">Copy PSBT</button>
-              <button class="btn btn-outline btn-sm dev-only" type="button" id="paste-psbt-button">Paste PSBT</button>
+              <button class="btn btn-outline btn-sm" type="button" id="psbt-status-button">PSBT Status</button>
+              <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+              <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
             </div>
 
             <!-- Device & Broadcast controls -->

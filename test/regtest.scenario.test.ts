@@ -139,10 +139,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   }
 
   it('can locate all the expected elements', async () => {
-    // toggles at the top
-    inputs.devToggle = await driver.findElement(By.id('dev-mode-toggle'))
-    expect(inputs.devToggle).toBeTruthy()
-
     // descriptor fields
     inputs.receive = await driver.findElement(By.id('receive-input'))
     expect(inputs.receive).toBeTruthy()
