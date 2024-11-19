@@ -56,43 +56,60 @@
             </div>
 
             <!-- Change descriptor -->
-            <div class="form-control mb-3">
-              <div id="change-input-container" class="hidden">
-                <div class="label">
-                  <label class="label-text">Change Descriptor</label>
-                </div>
-                <input class="input w-full" id="change-input" type="text" />
-              </div>
+            <div class="form-control mb-1">
               <label class="label cursor-pointer">
                 <div class="flex items-center gap-2">
-                  <span class="label-text">Auto Calculate Change Descriptor</span>
+                  <span class="label-text">Auto Calculate Change Configuration</span>
                   <input
                     type="checkbox"
-                    id="change-auto-checkbox"
+                    id="auto-change-checkbox"
                     checked="checked"
                     class="checkbox checkbox-info checkbox-sm"
                   />
                 </div>
                 <button class="btn btn-link no-underline" onclick="auto_change_modal.showModal()">
-                  What is auto-calculation?
+                  What is auto calculation?
                 </button>
               </label>
+              <div id="change-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Change Descriptor (optional)</label>
+                </div>
+                <input class="input w-full" id="change-input" type="text" />
+              </div>
             </div>
 
             <!-- Custom Electrum server -->
             <div class="form-control mb-3">
-              <div class="label">
-                <label class="label-text">Electrum Server</label>
-                <button class="btn btn-link no-underline" onclick="electrum_server_modal.showModal()">
-                  How to use a custom server?
+              <label class="label cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Use Default Electrum Server</span>
+                  <input
+                    type="checkbox"
+                    id="auto-electrum-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline" onclick="auto_electrum_modal.showModal()">
+                  What is an Electrum Server?
                 </button>
+              </label>
+
+              <div id="electrum-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Electrum Server (optional)</label>
+                  <button class="btn btn-link no-underline" onclick="electrum_server_modal.showModal()">
+                    How to use a custom server?
+                  </button>
+                </div>
+                <input
+                  class="input input-ghost input-bordered w-full max-w-xs"
+                  id="electrum-input"
+                  type="text"
+                  placeholder="blockstream.info:110"
+                />
               </div>
-              <input
-                class="input input-ghost input-bordered w-full max-w-xs"
-                id="electrum-input"
-                type="text"
-                placeholder="blockstream.info:110"
-              />
             </div>
 
             <!-- Network selection -->
@@ -335,6 +352,26 @@
           same goes for multipath descriptors of type <code>&lt;0;1&gt;</code>.
         </p>
         <p>Hence, you only need to enter a change descriptor if it is non-standard.</p>
+      </div>
+    </dialog>
+
+    <!-- Auto-electrum Modal -->
+    <dialog id="auto_electrum_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">What is an Electrum Server?</h3>
+        <p class="py-4">
+          An Electrum server is a special type of computer that helps you connect to the Bitcoin Network. It allows your
+          wallet to quickly check existing balances & transactions and even broadcast new ones. Think of it as a helpful
+          assistant that can interact with the network without requiring your computer to download the entire Bitcoin
+          blockchain.
+        </p>
+        <p>
+          An internet connection is required to check your balance, existing transactions, or to broadcast a new transaction.
+          An internet connection is not involved in the signing process.
+        </p>
       </div>
     </dialog>
 

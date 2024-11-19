@@ -515,7 +515,7 @@ const updateSignHistory = (device) => {
 function getInputs() {
   var _a, _b, _c
   const address = DOM.addressInput.value.trim()
-  const autoChange = DOM.changeAutoCheckbox.checked
+  const autoChange = DOM.autoChangeCheckbox.checked
   const receive = DOM.receiveInput.value.trim()
   const change = ((_a = DOM.changeInput) == null ? void 0 : _a.value.trim()) || null
   const electrum = ((_b = DOM.electrumInput) == null ? void 0 : _b.value.trim()) || null
@@ -736,11 +736,17 @@ function resetAddressField() {
   DOM.addressInput.classList.remove('input-warning')
 }
 function showChangeInput() {
-  const changeContainer = document.getElementById('change-input-container')
-  if (DOM.changeAutoCheckbox.checked) {
-    changeContainer.classList.add('hidden')
+  if (DOM.autoChangeCheckbox.checked) {
+    DOM.changeContainer.classList.add('hidden')
   } else {
-    changeContainer.classList.remove('hidden')
+    DOM.changeContainer.classList.remove('hidden')
+  }
+}
+function showElectrumInput() {
+  if (DOM.autoElectrumCheckbox.checked) {
+    DOM.electrumContainer.classList.add('hidden')
+  } else {
+    DOM.electrumContainer.classList.remove('hidden')
   }
 }
 async function sign() {
@@ -866,11 +872,14 @@ window.addEventListener('DOMContentLoaded', () => {
   let tempMessage = void 0
   try {
     tempMessage = requireDomElement('#temporary-message')
+    const autoChangeCheckbox = requireDomElement('#auto-change-checkbox')
+    const autoElectrumCheckbox = requireDomElement('#auto-electrum-checkbox')
     const broadcastButton = requireDomElement('#broadcast-button')
     const addressInput = requireDomElement('#address-input')
+    const changeContainer = requireDomElement('#change-input-container')
     const changeInput = requireDomElement('#change-input')
-    const changeAutoCheckbox = requireDomElement('#change-auto-checkbox')
     const conversation = requireDomElement('#conversation')
+    const electrumContainer = requireDomElement('#electrum-input-container')
     const electrumInput = requireDomElement('#electrum-input')
     const feeRateInput = requireDomElement('#feerate-input')
     const networkRadios = requireDomElements('input[name="network"]')
@@ -882,10 +891,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const txModal = requireDomElement('#transactions-modal')
     DOM = {
       addressInput,
+      autoChangeCheckbox,
+      autoElectrumCheckbox,
       broadcastButton,
+      changeContainer,
       changeInput,
-      changeAutoCheckbox,
       conversation,
+      electrumContainer,
       electrumInput,
       feeRateInput,
       networkRadios,
@@ -938,11 +950,12 @@ window.addEventListener('DOMContentLoaded', () => {
       enumerate()
     })
     addressInput.addEventListener('input', validateAddress)
+    autoChangeCheckbox.addEventListener('click', showChangeInput)
+    autoElectrumCheckbox.addEventListener('click', showElectrumInput)
     broadcastButton.addEventListener('click', (e) => {
       e.preventDefault()
       broadcast()
     })
-    changeAutoCheckbox.addEventListener('click', showChangeInput)
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
       psbtStatusElement.innerHTML = ''
