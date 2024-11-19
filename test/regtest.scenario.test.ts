@@ -139,10 +139,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   }
 
   it('can locate all the expected elements', async () => {
-    // toggles at the top
-    inputs.devToggle = await driver.findElement(By.id('dev-mode-toggle'))
-    expect(inputs.devToggle).toBeTruthy()
-
     // descriptor fields
     inputs.receive = await driver.findElement(By.id('receive-input'))
     expect(inputs.receive).toBeTruthy()
@@ -190,32 +186,9 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(outputs.temporaryMessage).toBeTruthy()
   })
 
-  it('can see the receive descriptor box in simple mode', async () => {
+  it('can see the receive descriptor box', async () => {
     expect(await inputs.receive.isDisplayed()).toBe(true)
     expect(await inputs.change.isDisplayed()).toBe(false)
-  })
-
-  it('cannot see the advanced options in simple mode', async () => {
-    expect(await inputs.devToggle.isSelected()).toBe(false)
-    expect(await inputs.electrum.isDisplayed()).toBe(false)
-    expect(await inputs.networkBitcoin.isDisplayed()).toBe(false)
-    expect(await inputs.networkTestnet.isDisplayed()).toBe(false)
-    expect(await inputs.networkRegtest.isDisplayed()).toBe(false)
-  })
-
-  it('can switch to advanced mode', async () => {
-    expect(await inputs.devToggle.isDisplayed()).toBe(true)
-    expect(await inputs.devToggle.isEnabled()).toBe(true)
-    await inputs.devToggle.click()
-    expect(await inputs.devToggle.isSelected()).toBe(true)
-  })
-
-  it('can see the advanced options in advanced mode', async () => {
-    expect(await inputs.devToggle.isSelected()).toBe(true)
-    expect(await inputs.electrum.isDisplayed()).toBe(true)
-    expect(await inputs.networkBitcoin.isDisplayed()).toBe(true)
-    expect(await inputs.networkTestnet.isDisplayed()).toBe(true)
-    expect(await inputs.networkRegtest.isDisplayed()).toBe(true)
   })
 
   it('can switch from bitcoin to regtest network', async () => {

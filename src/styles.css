@@ -2,14 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root:has(input.dev-mode-toggle:checked) .dev-only {
-  @apply block;
-}
-
-.dev-only {
-  @apply hidden;
-}
-
 .copied {
   transform: scale(1.1); /* Enlarges, for example, icons when added */
 }

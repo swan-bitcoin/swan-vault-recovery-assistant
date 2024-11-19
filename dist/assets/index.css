@@ -2978,9 +2978,6 @@ html {
 .justify-center {
   justify-content: center;
 }
-.justify-between {
-  justify-content: space-between;
-}
 .gap-1 {
   gap: 0.25rem;
 }
@@ -3148,14 +3145,6 @@ html {
 }
 .ease-in-out {
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-:root:has(input.dev-mode-toggle:checked) .dev-only {
-  display: block;
-}
-
-.dev-only {
-  display: none;
 }
 
 .copied {
