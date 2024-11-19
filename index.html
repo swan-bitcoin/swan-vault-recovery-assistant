@@ -197,7 +197,7 @@
         <!-- About -->
         <div class="flex gap-1">
           🍤
-          <a class="link link-hover" href="#">About</a>
+          <a class="link link-hover" href="#" onclick="about_tempura_modal.showModal()">About</a>
         </div>
         <div class="divider divider-horizontal"></div>
         <!-- GitHub -->
@@ -270,6 +270,53 @@
         </label>
       </div>
     </footer>
+
+    <!-- About Modal -->
+    <dialog id="about_tempura_modal" class="modal">
+      <div class="modal-box max-w-full w-4/5">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Hey there! I'm tempura. 🍤</h3>
+        <div class="py-2 font-medium">
+          <p>I'm here to make bitcoin simple.</p>
+        </div>
+        <p class="text-sm font-light">
+          Bitcoin can have a steep learning curve, and software typically doesn't help with this! Tempura aims to reduce that
+          complexity as much as possible, with plenty of help along the way.
+        </p>
+        <p class="text-sm mt-1 font-light">
+          Tempura has a terrible memory. That is, none! You don't have to worry about leaving any breadcrumbs behind.
+        </p>
+        <p class="py-2 font-medium">What can I do with this tool?</p>
+        <p class="text-sm font-light">
+          Tempura hopes to give you peace of mind, especially when you may have had a wallet configured for you, such as a
+          Swan Vault.
+        </p>
+        <p class="text-sm mt-1 font-light">
+          You can use Tempura to independently verify your bitcoin balance and transactions on the bitcoin network, fetch a
+          deposit address, and (should you require it), recover your funds to another address!
+        </p>
+        <p class="py-2 font-medium">What are the risks of using this tool?</p>
+        <p class="text-sm font-light">
+          The use of this tool is generally safe, but there are two important things to keep in mind:
+        </p>
+        <p class="text-sm mt-1 font-normal">1. Do not use this tool if you were given a link from an untrusted source.</p>
+        <p class="text-sm font-light">
+          You should only use this tool if you aquired it from the official github releases. If you are unsure, you should
+          not use this tool.
+        </p>
+        <p class="text-sm mt-1 font-normal">
+          2. Tempura communicates with an "Electrum server" to fetch your wallet information.
+        </p>
+        <p class="text-sm font-light">
+          This server gains some information about which addresses belong to your wallet. This is a privacy concern only, it
+          does not weaken the security of your bitcoin! The authors of this tool have chosen a default server (owned by
+          <a href="https://blockstream.com/about/" target="_blank" style="text-decoration: underline">Blockstream</a>) that
+          we feel can be trusted, but you can change this if you wish.
+        </p>
+      </div>
+    </dialog>
 
     <!-- Transactions Modal -->
     <dialog id="transactions-modal" class="modal">
