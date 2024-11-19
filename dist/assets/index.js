@@ -115,6 +115,9 @@ const commands = {
   async transactions(network, descriptors, electrum) {
     return await invoke('transactions', { network, descriptors, electrum })
   },
+  async createWindow(label, html, title) {
+    await invoke('create_window', { label, html, title })
+  },
 }
 const innerPaths = `
 <!-- Clipboard Icon Path -->

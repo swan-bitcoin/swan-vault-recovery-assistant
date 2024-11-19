@@ -51,6 +51,9 @@ async sweep(address: string, feeRate: number, network: string, descriptors: Desc
 },
 async transactions(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Transaction[]> {
     return await TAURI_INVOKE("transactions", { network, descriptors, electrum });
+},
+async createWindow(label: string, html: string, title: string) : Promise<void> {
+    await TAURI_INVOKE("create_window", { label, html, title });
 }
 }
 
