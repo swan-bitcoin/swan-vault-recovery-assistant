@@ -282,6 +282,14 @@ const scrollToLastMessage = () => {
     conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
   }
 }
+const setThemeBasedOnSystemPreference = () => {
+  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+  if (prefersDarkScheme) {
+    document.documentElement.setAttribute('data-theme', 'halloween')
+  } else {
+    document.documentElement.setAttribute('data-theme', 'cupcake')
+  }
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -983,11 +991,20 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 })
 const adjustMainContentHeight = () => {
-  const navbar = document.getElementById('navbar')
   const footer = document.getElementById('footer')
   const mainContent = document.getElementById('main-content')
-  const availableHeight = window.innerHeight - navbar.offsetHeight - footer.offsetHeight
+  const availableHeight = window.innerHeight - footer.offsetHeight
   mainContent.style.height = `${availableHeight}px`
 }
 window.addEventListener('load', adjustMainContentHeight)
 window.addEventListener('resize', adjustMainContentHeight)
+document.addEventListener('DOMContentLoaded', () => {
+  setThemeBasedOnSystemPreference()
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+    if (e.matches) {
+      document.documentElement.setAttribute('data-theme', 'halloween')
+    } else {
+      document.documentElement.setAttribute('data-theme', 'cupcake')
+    }
+  })
+})

@@ -1411,17 +1411,6 @@ html {
   overflow: hidden;
   scrollbar-gutter: stable;
 }
-.navbar {
-  display: flex;
-  align-items: center;
-  padding: var(--navbar-padding, 0.5rem);
-  min-height: 4rem;
-  width: 100%;
-}
-:where(.navbar > *:not(script, style)) {
-  display: inline-flex;
-  align-items: center;
-}
 .radio {
   flex-shrink: 0;
   --chkbg: var(--bc);
