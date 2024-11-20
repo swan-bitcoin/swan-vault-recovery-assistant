@@ -775,7 +775,14 @@ async fn transactions(
 
 #[tauri::command]
 #[specta::specta]
-async fn create_window(app: tauri::AppHandle, label: String, html: String, title: String) {
+async fn create_window(
+  app: tauri::AppHandle,
+  label: String,
+  html: String,
+  title: String,
+  width: f64,
+  height: f64,
+) {
   // First check if a window with the label already exists and if so, show it
   if let Some(window) = app.get_webview_window(&label) {
     window.show().unwrap();
@@ -784,6 +791,7 @@ async fn create_window(app: tauri::AppHandle, label: String, html: String, title
     let _webview_window =
       tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::App(html.into()))
         .title(title)
+        .inner_size(width, height)
         .build()
         .unwrap();
   }

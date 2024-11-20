@@ -115,8 +115,8 @@ const commands = {
   async transactions(network, descriptors, electrum) {
     return await invoke('transactions', { network, descriptors, electrum })
   },
-  async createWindow(label, html, title) {
-    await invoke('create_window', { label, html, title })
+  async createWindow(label, html, title, width, height) {
+    await invoke('create_window', { label, html, title, width, height })
   },
 }
 const innerPaths = `
@@ -1028,6 +1028,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const aboutLink = document.getElementById('about-link')
   aboutLink.addEventListener('click', async (event) => {
     event.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura')
+    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
 })
