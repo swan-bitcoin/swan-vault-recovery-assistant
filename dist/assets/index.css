@@ -640,73 +640,7 @@ html {
   --er: 65.72% 0.199 27.33;
 }
 
-:root:has(input.theme-controller[value='halloween']:checked) {
-  color-scheme: dark;
-  --b2: 23.0416% 0 0;
-  --b3: 21.3072% 0 0;
-  --bc: 84.9552% 0 0;
-  --sc: 89.196% 0.0496 305.03;
-  --nc: 84.8742% 0.009322 65.681484;
-  --inc: 90.923% 0.043042 262.880917;
-  --suc: 12.541% 0.033982 149.213788;
-  --wac: 13.3168% 0.031484 58.31834;
-  --erc: 13.144% 0.0398 27.33;
-  --rounded-box: 1rem;
-  --rounded-btn: 0.5rem;
-  --rounded-badge: 1.9rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --tab-border: 1px;
-  --tab-radius: 0.5rem;
-  --p: 77.48% 0.204 60.62;
-  --pc: 19.6935% 0.004671 196.779412;
-  --s: 45.98% 0.248 305.03;
-  --a: 64.8% 0.223 136.073479;
-  --ac: 0% 0 0;
-  --n: 24.371% 0.046608 65.681484;
-  --b1: 24.7759% 0 0;
-  --in: 54.615% 0.215208 262.880917;
-  --su: 62.7052% 0.169912 149.213788;
-  --wa: 66.584% 0.157422 58.31834;
-  --er: 65.72% 0.199 27.33;
-}
-
 [data-theme='cupcake'] {
-  color-scheme: light;
-  --in: 72.06% 0.191 231.6;
-  --su: 64.8% 0.15 160;
-  --wa: 84.71% 0.199 83.87;
-  --er: 71.76% 0.221 22.18;
-  --pc: 15.2344% 0.017892 200.026556;
-  --sc: 15.787% 0.020249 356.29965;
-  --ac: 15.8762% 0.029206 78.618794;
-  --nc: 84.7148% 0.013247 313.189598;
-  --inc: 0% 0 0;
-  --suc: 0% 0 0;
-  --wac: 0% 0 0;
-  --erc: 0% 0 0;
-  --rounded-box: 1rem;
-  --rounded-badge: 1.9rem;
-  --animation-btn: 0.25s;
-  --animation-input: 0.2s;
-  --btn-focus-scale: 0.95;
-  --border-btn: 1px;
-  --p: 76.172% 0.089459 200.026556;
-  --s: 78.9351% 0.101246 356.29965;
-  --a: 79.3811% 0.146032 78.618794;
-  --n: 23.5742% 0.066235 313.189598;
-  --b1: 97.7882% 0.00418 56.375637;
-  --b2: 93.9822% 0.007638 61.449292;
-  --b3: 91.5861% 0.006811 53.440502;
-  --bc: 23.5742% 0.066235 313.189598;
-  --rounded-btn: 1.9rem;
-  --tab-border: 2px;
-  --tab-radius: 0.7rem;
-}
-
-:root:has(input.theme-controller[value='cupcake']:checked) {
   color-scheme: light;
   --in: 72.06% 0.191 231.6;
   --su: 64.8% 0.15 160;
@@ -1506,31 +1440,6 @@ html {
   border-color: transparent;
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity)));
-}
-.toggle {
-  flex-shrink: 0;
-  --tglbg: var(--fallback-b1, oklch(var(--b1) / 1));
-  --handleoffset: 1.5rem;
-  --handleoffsetcalculator: calc(var(--handleoffset) * -1);
-  --togglehandleborder: 0 0;
-  height: 1.5rem;
-  width: 3rem;
-  cursor: pointer;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  border-radius: var(--rounded-badge, 1.9rem);
-  border-width: 1px;
-  border-color: currentColor;
-  background-color: currentColor;
-  color: var(--fallback-bc, oklch(var(--bc) / 0.5));
-  transition:
-    background,
-    box-shadow var(--animation-input, 0.2s) ease-out;
-  box-shadow:
-    var(--handleoffsetcalculator) 0 0 2px var(--tglbg) inset,
-    0 0 0 2px var(--tglbg) inset,
-    var(--togglehandleborder);
 }
 .avatar-group :where(.avatar) {
   overflow: hidden;
@@ -2338,52 +2247,6 @@ html {
     opacity: 1;
   }
 }
-[dir='rtl'] .toggle {
-  --handleoffsetcalculator: calc(var(--handleoffset) * 1);
-}
-.toggle:focus-visible {
-  outline-style: solid;
-  outline-width: 2px;
-  outline-offset: 2px;
-  outline-color: var(--fallback-bc, oklch(var(--bc) / 0.2));
-}
-.toggle:hover {
-  background-color: currentColor;
-}
-.toggle:checked,
-.toggle[aria-checked='true'] {
-  background-image: none;
-  --handleoffsetcalculator: var(--handleoffset);
-  --tw-text-opacity: 1;
-  color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
-}
-[dir='rtl'] .toggle:checked,
-[dir='rtl'] .toggle[aria-checked='true'] {
-  --handleoffsetcalculator: calc(var(--handleoffset) * -1);
-}
-.toggle:indeterminate {
-  --tw-text-opacity: 1;
-  color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
-  box-shadow:
-    calc(var(--handleoffset) / 2) 0 0 2px var(--tglbg) inset,
-    calc(var(--handleoffset) / -2) 0 0 2px var(--tglbg) inset,
-    0 0 0 2px var(--tglbg) inset;
-}
-[dir='rtl'] .toggle:indeterminate {
-  box-shadow:
-    calc(var(--handleoffset) / 2) 0 0 2px var(--tglbg) inset,
-    calc(var(--handleoffset) / -2) 0 0 2px var(--tglbg) inset,
-    0 0 0 2px var(--tglbg) inset;
-}
-.toggle:disabled {
-  cursor: not-allowed;
-  --tw-border-opacity: 1;
-  border-color: var(--fallback-bc, oklch(var(--bc) / var(--tw-border-opacity)));
-  background-color: transparent;
-  opacity: 0.3;
-  --togglehandleborder: 0 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset,
-    var(--handleoffsetcalculator) 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset;
-}
 .btn-xs {
   height: 1.5rem;
   min-height: 1.5rem;
@@ -2857,9 +2720,6 @@ html {
 }
 .ml-6 {
   margin-left: 1.5rem;
-}
-.mr-2 {
-  margin-right: 0.5rem;
 }
 .mt-12 {
   margin-top: 3rem;

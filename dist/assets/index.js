@@ -284,13 +284,10 @@ const scrollToLastMessage = () => {
 }
 const setThemeBasedOnSystemPreference = () => {
   const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-  const themeInput = document.querySelector('.theme-controller')
   if (prefersDarkScheme) {
     document.documentElement.setAttribute('data-theme', 'halloween')
-    themeInput.checked = false
   } else {
     document.documentElement.setAttribute('data-theme', 'cupcake')
-    themeInput.checked = true
   }
 }
 function getDevice(val) {
@@ -996,20 +993,19 @@ window.addEventListener('DOMContentLoaded', () => {
 const adjustMainContentHeight = () => {
   const footer = document.getElementById('footer')
   const mainContent = document.getElementById('main-content')
-  const availableHeight = window.innerHeight - footer.offsetHeight
-  mainContent.style.height = `${availableHeight}px`
+  if (footer && mainContent) {
+    const availableHeight = window.innerHeight - footer.offsetHeight
+    mainContent.style.height = `${availableHeight}px`
+  }
 }
 window.addEventListener('load', adjustMainContentHeight)
 window.addEventListener('resize', adjustMainContentHeight)
 document.addEventListener('DOMContentLoaded', () => {
   setThemeBasedOnSystemPreference()
-  const themeInput = document.querySelector('.theme-controller')
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
     if (e.matches) {
-      themeInput.checked = false
       document.documentElement.setAttribute('data-theme', 'halloween')
     } else {
-      themeInput.checked = true
       document.documentElement.setAttribute('data-theme', 'cupcake')
     }
   })
