@@ -146,6 +146,10 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.change).toBeTruthy()
 
     // basic descriptor actions
+    inputs.changeCheckbox = await driver.findElement(By.id('auto-change-checkbox'))
+    expect(inputs.changeCheckbox).toBeTruthy()
+    inputs.electrumCheckbox = await driver.findElement(By.id('auto-electrum-checkbox'))
+    expect(inputs.electrumCheckbox).toBeTruthy()
     inputs.electrum = await driver.findElement(By.id('electrum-input'))
     expect(inputs.electrum).toBeTruthy()
     inputs.feeRate = await driver.findElement(By.id('feerate-input'))
@@ -188,7 +192,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see the receive descriptor box', async () => {
     expect(await inputs.receive.isDisplayed()).toBe(true)
-    expect(await inputs.change.isDisplayed()).toBe(false)
   })
 
   it('can switch from bitcoin to regtest network', async () => {
@@ -250,6 +253,31 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     fullWalletBalance = receiveAmount + changeAmount
     fullWalletBalanceFixed = fullWalletBalance.toFixed(2)
     await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
+  })
+
+  it('can toggle the visibility of the change descriptor field', async () => {
+    expect(await inputs.change.isDisplayed()).toBe(false)
+    await inputs.changeCheckbox.click()
+    await waitForUI()
+    expect(await inputs.change.isDisplayed()).toBe(true)
+  })
+
+  it('can see the receive balance only when auto-change is disabled', async () => {
+    await expectLatestBalance(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
+  })
+
+  it('can restore auto-change to see the full balance', async () => {
+    await inputs.changeCheckbox.click()
+    await waitForUI()
+    expect(await inputs.change.isDisplayed()).toBe(false)
+    await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
+  })
+
+  it('can toggle the visibility of the electrum server field', async () => {
+    expect(await inputs.electrum.isDisplayed()).toBe(false)
+    await inputs.electrumCheckbox.click()
+    await waitForUI()
+    expect(await inputs.electrum.isDisplayed()).toBe(true)
   })
 
   let psbt: string

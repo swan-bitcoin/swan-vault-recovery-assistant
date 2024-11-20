@@ -9,10 +9,13 @@ const FEE_RATE_WARNING_RATIO = 0.9
 
 let DOM: {
   addressInput: HTMLInputElement
+  autoChangeCheckbox: HTMLInputElement
+  autoElectrumCheckbox: HTMLInputElement
   broadcastButton: HTMLButtonElement
+  changeContainer: HTMLDivElement
   changeInput: HTMLInputElement
-  changeAutoCheckbox: HTMLInputElement
   conversation: HTMLDivElement
+  electrumContainer: HTMLDivElement
   electrumInput: HTMLInputElement
   feeRateInput: HTMLInputElement
   networkRadios: NodeListOf<HTMLInputElement>
@@ -173,7 +176,7 @@ type Inputs = {
 
 function getInputs(): Inputs {
   const address = DOM.addressInput.value.trim()
-  const autoChange = DOM.changeAutoCheckbox.checked
+  const autoChange = DOM.autoChangeCheckbox.checked
   const receive = DOM.receiveInput.value.trim()
   const change = DOM.changeInput?.value.trim() || null
   const electrum = DOM.electrumInput?.value.trim() || null
@@ -420,11 +423,18 @@ function resetAddressField() {
 }
 
 function showChangeInput() {
-  const changeContainer = document.getElementById('change-input-container')
-  if (DOM.changeAutoCheckbox.checked) {
-    changeContainer.classList.add('hidden')
+  if (DOM.autoChangeCheckbox.checked) {
+    DOM.changeContainer.classList.add('hidden')
   } else {
-    changeContainer.classList.remove('hidden')
+    DOM.changeContainer.classList.remove('hidden')
+  }
+}
+
+function showElectrumInput() {
+  if (DOM.autoElectrumCheckbox.checked) {
+    DOM.electrumContainer.classList.add('hidden')
+  } else {
+    DOM.electrumContainer.classList.remove('hidden')
   }
 }
 
@@ -573,11 +583,14 @@ window.addEventListener('DOMContentLoaded', () => {
   try {
     // initialization of DOM elements used elsewhere in the code
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
+    const autoChangeCheckbox = requireDomElement<HTMLInputElement>('#auto-change-checkbox')
+    const autoElectrumCheckbox = requireDomElement<HTMLInputElement>('#auto-electrum-checkbox')
     const broadcastButton = requireDomElement<HTMLButtonElement>('#broadcast-button')
     const addressInput = requireDomElement<HTMLInputElement>('#address-input')
+    const changeContainer = requireDomElement<HTMLDivElement>('#change-input-container')
     const changeInput = requireDomElement<HTMLInputElement>('#change-input')
-    const changeAutoCheckbox = requireDomElement<HTMLInputElement>('#change-auto-checkbox')
     const conversation = requireDomElement<HTMLDivElement>('#conversation')
+    const electrumContainer = requireDomElement<HTMLDivElement>('#electrum-input-container')
     const electrumInput = requireDomElement<HTMLInputElement>('#electrum-input')
     const feeRateInput = requireDomElement<HTMLInputElement>('#feerate-input')
     const networkRadios = requireDomElements<HTMLInputElement>('input[name="network"]')
@@ -590,10 +603,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     DOM = {
       addressInput,
+      autoChangeCheckbox,
+      autoElectrumCheckbox,
       broadcastButton,
+      changeContainer,
       changeInput,
-      changeAutoCheckbox,
       conversation,
+      electrumContainer,
       electrumInput,
       feeRateInput,
       networkRadios,
@@ -661,12 +677,13 @@ window.addEventListener('DOMContentLoaded', () => {
 
     addressInput.addEventListener('input', validateAddress)
 
+    autoChangeCheckbox.addEventListener('click', showChangeInput)
+    autoElectrumCheckbox.addEventListener('click', showElectrumInput)
+
     broadcastButton.addEventListener('click', (e) => {
       e.preventDefault()
       broadcast()
     })
-
-    changeAutoCheckbox.addEventListener('click', showChangeInput)
 
     psbtTextArea.addEventListener('input', () => {
       broadcastButton.classList.remove('btn-disabled')
