@@ -57,7 +57,7 @@
 
             <!-- Change descriptor -->
             <div class="form-control mb-1">
-              <label class="label cursor-pointer">
+              <div class="label">
                 <div class="flex items-center gap-2">
                   <span class="label-text">Auto Calculate Change Configuration</span>
                   <input
@@ -70,10 +70,10 @@
                 <button class="btn btn-link no-underline" onclick="auto_change_modal.showModal()">
                   What is auto calculation?
                 </button>
-              </label>
+              </div>
               <div id="change-input-container" class="hidden">
                 <div class="label">
-                  <label class="label-text">Change Descriptor (optional)</label>
+                  <label class="label-text">Change Descriptor</label>
                 </div>
                 <input class="input w-full" id="change-input" type="text" />
               </div>
@@ -81,7 +81,7 @@
 
             <!-- Custom Electrum server -->
             <div class="form-control mb-3">
-              <label class="label cursor-pointer">
+              <div class="label">
                 <div class="flex items-center gap-2">
                   <span class="label-text">Use Default Electrum Server</span>
                   <input
@@ -94,21 +94,26 @@
                 <button class="btn btn-link no-underline" onclick="auto_electrum_modal.showModal()">
                   What is an Electrum Server?
                 </button>
-              </label>
+              </div>
 
               <div id="electrum-input-container" class="hidden">
-                <div class="label">
-                  <label class="label-text">Electrum Server (optional)</label>
-                  <button class="btn btn-link no-underline" onclick="electrum_server_modal.showModal()">
+                <div class="label justify-normal items-center gap-2">
+                  <label class="label-text">Electrum Server</label>
+                </div>
+                <div class="flex flex-col items-start">
+                  <input
+                    class="input input-ghost input-bordered w-full max-w-xs"
+                    id="electrum-input"
+                    type="text"
+                    placeholder="blockstream.info:110"
+                  />
+                  <button
+                    class="btn btn-link no-underline btn-xs px-1 py-0 font-normal"
+                    onclick="electrum_server_modal.showModal()"
+                  >
                     How to use a custom server?
                   </button>
                 </div>
-                <input
-                  class="input input-ghost input-bordered w-full max-w-xs"
-                  id="electrum-input"
-                  type="text"
-                  placeholder="blockstream.info:110"
-                />
               </div>
             </div>
 

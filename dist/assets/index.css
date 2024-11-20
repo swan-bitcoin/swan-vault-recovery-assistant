@@ -2972,8 +2972,14 @@ html {
 .flex-col {
   flex-direction: column;
 }
+.items-start {
+  align-items: flex-start;
+}
 .items-center {
   align-items: center;
+}
+.justify-normal {
+  justify-content: normal;
 }
 .justify-end {
   justify-content: flex-end;
@@ -3030,6 +3036,14 @@ html {
 .p-5 {
   padding: 1.25rem;
 }
+.px-1 {
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+}
+.py-0 {
+  padding-top: 0px;
+  padding-bottom: 0px;
+}
 .py-2 {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
@@ -3055,6 +3069,9 @@ html {
 }
 .font-bold {
   font-weight: 700;
+}
+.font-normal {
+  font-weight: 400;
 }
 .capitalize {
   text-transform: capitalize;
