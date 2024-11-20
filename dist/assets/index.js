@@ -272,7 +272,7 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   return chatContainer
 }
 const isChangeDescriptor = (descriptor) => {
-  const changePattern = /\/1\/\*\)\)#\w+$/
+  const changePattern = /\/1\/\*\)+(?:#\w+)?$/
   return changePattern.test(descriptor)
 }
 const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
