@@ -1,3 +1,4 @@
+import { DOM, initializeDOM } from './dom'
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, Descriptors, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
@@ -7,29 +8,6 @@ import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMess
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
-let DOM: {
-  addressInput: HTMLInputElement
-  autoChangeCheckbox: HTMLInputElement
-  autoElectrumCheckbox: HTMLInputElement
-  broadcastButton: HTMLButtonElement
-  changeContainer: HTMLDivElement
-  changeInput: HTMLInputElement
-  conversation: HTMLDivElement
-  electrumContainer: HTMLDivElement
-  electrumInput: HTMLInputElement
-  feeRateInput: HTMLInputElement
-  networkCheckbox: HTMLInputElement
-  networkContainer: HTMLDivElement
-  networkRadios: NodeListOf<HTMLInputElement>
-  psbtSignHistory: HTMLDivElement
-  psbtStatusElement: HTMLDivElement
-  psbtTextArea: HTMLTextAreaElement
-  receiveInput: HTMLInputElement
-  tempMessage: HTMLDivElement
-  txBody: HTMLTableSectionElement
-  txModal: HTMLDialogElement
-}
-
 function isTempuraError(e: unknown): e is TempuraError {
   const tempuraError = e as TempuraError
   return !!(tempuraError.error_type && tempuraError.message)
@@ -38,71 +16,71 @@ function isTempuraError(e: unknown): e is TempuraError {
 function handleError(e: unknown) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
     return
   }
 
   if (e instanceof Error) {
     console.error(e)
-    DOM.tempMessage.textContent = e.message
+    DOM.outputs.tempMessage.textContent = e.message
     return
   }
 
-  DOM.tempMessage.textContent = 'An unknown error occurred'
+  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
 }
 
 const validateDescriptor = async () => {
-  const descriptor = DOM.receiveInput.value
-  const network = Array.from(DOM.networkRadios).find((radio) => radio.checked).value
+  const descriptor = DOM.inputs.receive.value
+  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
   const standardWalletActions = document.getElementById('standard-wallet-actions')
   const recoveryOptionsCard = document.getElementById('recovery-options-card')
 
   if (!descriptor) {
-    DOM.tempMessage.textContent = 'Wallet configuration is missing!'
-    DOM.receiveInput.classList.add('textarea-error')
-    DOM.receiveInput.classList.remove('textarea-success')
-    DOM.receiveInput.classList.remove('textarea-warning')
+    DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
+    DOM.inputs.receive.classList.add('textarea-error')
+    DOM.inputs.receive.classList.remove('textarea-success')
+    DOM.inputs.receive.classList.remove('textarea-warning')
     return false
   }
 
   try {
     const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
     if (!isValidDescriptor) {
-      DOM.tempMessage.textContent =
+      DOM.outputs.tempMessage.textContent =
         'Descriptor is fine but it is for the wrong network. Open the network settings to the right to change the network!'
-      DOM.receiveInput.classList.add('textarea-error')
-      DOM.receiveInput.classList.remove('textarea-success')
-      DOM.receiveInput.classList.remove('textarea-warning')
+      DOM.inputs.receive.classList.add('textarea-error')
+      DOM.inputs.receive.classList.remove('textarea-success')
+      DOM.inputs.receive.classList.remove('textarea-warning')
       return false
     }
 
     // Warning for change descriptor
     if (isChangeDescriptor(descriptor)) {
-      DOM.tempMessage.textContent =
+      DOM.outputs.tempMessage.textContent =
         'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
-      DOM.receiveInput.classList.add('textarea-warning')
-      DOM.receiveInput.classList.remove('textarea-success')
-      DOM.receiveInput.classList.remove('textarea-error')
+      DOM.inputs.receive.classList.add('textarea-warning')
+      DOM.inputs.receive.classList.remove('textarea-success')
+      DOM.inputs.receive.classList.remove('textarea-error')
       recoveryOptionsCard.classList.remove('hidden')
       standardWalletActions.classList.remove('hidden')
       return true
     }
 
     // Descriptor is valid, show now wallet actions and recovery options card (one way switch)
-    DOM.receiveInput.classList.add('textarea-success')
-    DOM.receiveInput.classList.remove('textarea-error')
-    DOM.receiveInput.classList.remove('textarea-warning')
-    DOM.tempMessage.textContent =
+    DOM.inputs.receive.classList.add('textarea-success')
+    DOM.inputs.receive.classList.remove('textarea-error')
+    DOM.inputs.receive.classList.remove('textarea-warning')
+    DOM.outputs.tempMessage.textContent =
       'Your wallet configuration is valid. You can now fetch your balance and perform other actions.'
     recoveryOptionsCard.classList.remove('hidden')
     standardWalletActions.classList.remove('hidden')
     return true
   } catch (e: unknown) {
     console.error(e)
-    DOM.tempMessage.textContent = 'Invalid wallet configuration!'
-    DOM.receiveInput.classList.add('textarea-error')
-    DOM.receiveInput.classList.remove('textarea-success')
-    DOM.receiveInput.classList.remove('textarea-warning')
+    DOM.outputs.tempMessage.textContent = 'Invalid wallet configuration!'
+    DOM.inputs.receive.classList.add('textarea-error')
+    DOM.inputs.receive.classList.remove('textarea-success')
+    DOM.inputs.receive.classList.remove('textarea-warning')
     return false
   }
 }
@@ -147,7 +125,7 @@ async function getFeeRate(): Promise<FeeRate> {
 const updateSignHistory = (device: Device) => {
   const currentSign = document.createElement('div')
   currentSign.innerHTML = `Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>`
-  DOM.psbtSignHistory.appendChild(currentSign)
+  DOM.outputs.psbtSignHistory.appendChild(currentSign)
 }
 
 type Inputs = {
@@ -160,14 +138,14 @@ type Inputs = {
 }
 
 function getInputs(): Inputs {
-  const address = DOM.addressInput.value.trim()
-  const autoChange = DOM.autoChangeCheckbox.checked
-  const receive = DOM.receiveInput.value.trim()
-  const change = DOM.changeInput?.value.trim() || null
-  const electrum = DOM.electrumInput?.value.trim() || null
-  const feeRate = Number(DOM.feeRateInput?.value.trim()) || null
-  const network = Array.from(DOM.networkRadios).find((radio) => radio.checked).value
-  const psbt = DOM.psbtTextArea.value.trim()
+  const address = DOM.inputs.address.value.trim()
+  const autoChange = DOM.checkboxes.change.checked
+  const receive = DOM.inputs.receive.value.trim()
+  const change = DOM.inputs.change?.value.trim() || null
+  const electrum = DOM.inputs.electrum?.value.trim() || null
+  const feeRate = Number(DOM.inputs.feeRate?.value.trim()) || null
+  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
+  const psbt = DOM.outputs.psbtTextArea.value.trim()
 
   return {
     address,
@@ -186,7 +164,7 @@ function getInputs(): Inputs {
 function require(value: unknown, itemName: string) {
   if (!value) {
     const message = itemName.concat(' is required')
-    DOM.tempMessage.textContent = message
+    DOM.outputs.tempMessage.textContent = message
     throw new Error(message)
   }
 }
@@ -197,14 +175,14 @@ async function broadcast() {
   if (!isValid) return
   require(psbt, 'PSBT')
 
-  DOM.tempMessage.textContent = 'Please wait...'
+  DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble('Broadcast the transaction from this PSBT', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     await commands.broadcast(psbt, network, descriptors, electrum)
     const tempuraBubble = createConversationBubble('Broadcast successful!')
-    DOM.conversation.appendChild(tempuraBubble)
-    DOM.tempMessage.textContent = 'Anything else?'
+    DOM.outputs.conversation.appendChild(tempuraBubble)
+    DOM.outputs.tempMessage.textContent = 'Anything else?'
   } catch (e: unknown) {
     handleError(e)
   }
@@ -213,14 +191,14 @@ async function broadcast() {
 async function enumerate() {
   const { network } = getInputs()
 
-  DOM.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
+  DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
     const userBubble = createConversationBubble('Find my device', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const response = await commands.enumerate(network)
     const tempuraBubble = createConversationBubble(getDeviceMessage(response))
-    DOM.conversation.appendChild(tempuraBubble)
-    DOM.tempMessage.textContent = getDevicePrompt(response)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
+    DOM.outputs.tempMessage.textContent = getDevicePrompt(response)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -230,20 +208,20 @@ async function getBalance() {
   const { descriptors, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.tempMessage.textContent = 'Fetching balance ...'
+  DOM.outputs.tempMessage.textContent = 'Fetching balance ...'
 
   try {
     const userBubble = createConversationBubble('What is my balance?', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const balance = await commands.balance(network, descriptors, electrum)
-    DOM.tempMessage.textContent = 'Balance fetched successfully!'
+    DOM.outputs.tempMessage.textContent = 'Balance fetched successfully!'
     const tempuraBubble = createConversationBubble(
       Balance({
         confirmed: balance.confirmed,
         unconfirmed: balance.untrusted_pending,
       })
     )
-    DOM.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -272,7 +250,7 @@ function instrumentCopyButtons(parent: HTMLElement) {
           }, 2000)
         })
         .catch(() => {
-          DOM.tempMessage.textContent = `Failed to copy ${copyButton.getAttribute('value')} to clipboard`
+          DOM.outputs.tempMessage.textContent = `Failed to copy ${copyButton.getAttribute('value')} to clipboard`
         })
     })
   })
@@ -282,26 +260,26 @@ async function getTransactions() {
   const { descriptors, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.tempMessage.textContent = 'Fetching transactions ...'
+  DOM.outputs.tempMessage.textContent = 'Fetching transactions ...'
 
   try {
     const userBubble = createConversationBubble('Show me my transactions', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const transactions = await commands.transactions(network, descriptors, electrum)
-    DOM.txModal.showModal()
-    DOM.txBody.innerHTML = Transactions(transactions)
-    DOM.tempMessage.textContent = 'Transactions fetched successfully!'
+    DOM.outputs.txModal.showModal()
+    DOM.outputs.txBody.innerHTML = Transactions(transactions)
+    DOM.outputs.tempMessage.textContent = 'Transactions fetched successfully!'
     const tempuraBubble = createConversationBubble(
       `${transactions.length} transactions fetched <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>`
     )
-    DOM.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
     // Add event listener for the "Show List" button
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton?.addEventListener('click', () => {
-      DOM.txModal.showModal()
+      DOM.outputs.txModal.showModal()
     })
 
-    instrumentCopyButtons(DOM.txBody)
+    instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -315,14 +293,14 @@ async function getAddress() {
   } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.tempMessage.textContent = 'Fetching the next unused address for you ...'
+  DOM.outputs.tempMessage.textContent = 'Fetching the next unused address for you ...'
   try {
     const userBubble = createConversationBubble('Give me an address!', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const { address } = await commands.address(network, receive, electrum)
-    DOM.tempMessage.textContent = 'Address retrieved successfully!'
+    DOM.outputs.tempMessage.textContent = 'Address retrieved successfully!'
     const tempuraBubble = createConversationBubble(Address({ address }))
-    DOM.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
     instrumentCopyButtons(tempuraBubble)
   } catch (e: unknown) {
     handleError(e)
@@ -330,29 +308,29 @@ async function getAddress() {
 }
 
 function copyPsbtToClipboard() {
-  const psbt = DOM.psbtTextArea.value.trim()
+  const psbt = DOM.outputs.psbtTextArea.value.trim()
   if (!psbt) {
-    DOM.tempMessage.textContent = 'No PSBT to copy'
+    DOM.outputs.tempMessage.textContent = 'No PSBT to copy'
     return
   }
 
   toClipboard(psbt)
     .then(() => {
-      DOM.tempMessage.textContent = 'PSBT copied to clipboard'
+      DOM.outputs.tempMessage.textContent = 'PSBT copied to clipboard'
     })
     .catch((e) => {
       console.log('Failed to copy PSBT to clipboard', e)
-      DOM.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
+      DOM.outputs.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
 
 async function estimateFee() {
-  DOM.tempMessage.textContent = 'Please wait...'
+  DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const { electrum, network } = getInputs()
     const feeRate = await commands.estimateFee(network, electrum, 1)
-    DOM.feeRateInput.value = feeRate.toString()
-    DOM.tempMessage.innerHTML = Success('Fee retrieved')
+    DOM.inputs.feeRate.value = feeRate.toString()
+    DOM.outputs.tempMessage.innerHTML = Success('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -362,19 +340,19 @@ function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
       const trimmed = psbt.trim()
-      if (trimmed !== DOM.psbtTextArea.value) {
-        DOM.broadcastButton.classList.remove('btn-disabled')
-        DOM.psbtStatusElement.innerHTML = ''
-        DOM.psbtSignHistory.innerHTML = ''
+      if (trimmed !== DOM.outputs.psbtTextArea.value) {
+        DOM.buttons.broadcast.classList.remove('btn-disabled')
+        DOM.outputs.psbtStatus.innerHTML = ''
+        DOM.outputs.psbtSignHistory.innerHTML = ''
       }
 
-      DOM.tempMessage.textContent = 'PSBT pasted from your clipboard'
-      DOM.psbtTextArea.value = trimmed
+      DOM.outputs.tempMessage.textContent = 'PSBT pasted from your clipboard'
+      DOM.outputs.psbtTextArea.value = trimmed
       validatePsbt()
     })
     .catch((e) => {
       console.log('Failed to paste PSBT from clipboard', e)
-      DOM.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
+      DOM.outputs.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
 
@@ -389,13 +367,13 @@ function clearStatusIndicators(element: HTMLElement) {
 
 async function validatePsbt() {
   const { psbt, network, descriptors } = getInputs()
-  clearStatusIndicators(DOM.psbtTextArea)
+  clearStatusIndicators(DOM.outputs.psbtTextArea)
 
   try {
     const isValid = await commands.isPsbt(psbt)
     if (!isValid) {
-      DOM.psbtTextArea.classList.add('textarea-error')
-      DOM.psbtStatusElement.innerHTML = `
+      DOM.outputs.psbtTextArea.classList.add('textarea-error')
+      DOM.outputs.psbtStatus.innerHTML = `
       <span class="text-error">Invalid PSBT</span>
     `
       return
@@ -403,17 +381,17 @@ async function validatePsbt() {
 
     const psbtStatus = await commands.psbtStatus(psbt, network, descriptors)
     if (psbtStatus === 'FullySigned') {
-      DOM.psbtTextArea.classList.add('textarea-success')
-      DOM.psbtStatusElement.innerHTML = `
+      DOM.outputs.psbtTextArea.classList.add('textarea-success')
+      DOM.outputs.psbtStatus.innerHTML = `
         <span class="text-success">Fully Signed ${simpleCheckmark}</span>
       `
-      DOM.broadcastButton.classList.remove('btn-disabled')
+      DOM.buttons.broadcast.classList.remove('btn-disabled')
     } else if (psbtStatus === 'PartiallySigned') {
-      DOM.psbtStatusElement.innerHTML = `
+      DOM.outputs.psbtStatus.innerHTML = `
         <span class="text-warning">Partially Signed</span>
       `
     } else if (psbtStatus === 'Unsigned') {
-      DOM.psbtStatusElement.innerHTML = `
+      DOM.outputs.psbtStatus.innerHTML = `
         <span class="text-neutral-500">Unsigned</span>
       `
     }
@@ -423,26 +401,26 @@ async function validatePsbt() {
 }
 
 function showChangeInput() {
-  if (DOM.autoChangeCheckbox.checked) {
-    DOM.changeContainer.classList.add('hidden')
+  if (DOM.checkboxes.change.checked) {
+    DOM.containers.change.classList.add('hidden')
   } else {
-    DOM.changeContainer.classList.remove('hidden')
+    DOM.containers.change.classList.remove('hidden')
   }
 }
 
 function showElectrumInput() {
-  if (DOM.autoElectrumCheckbox.checked) {
-    DOM.electrumContainer.classList.add('hidden')
+  if (DOM.checkboxes.electrum.checked) {
+    DOM.containers.electrum.classList.add('hidden')
   } else {
-    DOM.electrumContainer.classList.remove('hidden')
+    DOM.containers.electrum.classList.remove('hidden')
   }
 }
 
 function showNetworkInput() {
-  if (DOM.networkCheckbox.checked) {
-    DOM.networkContainer.classList.add('hidden')
+  if (DOM.checkboxes.network.checked) {
+    DOM.containers.network.classList.add('hidden')
   } else {
-    DOM.networkContainer.classList.remove('hidden')
+    DOM.containers.network.classList.remove('hidden')
   }
 }
 
@@ -450,25 +428,26 @@ async function sign() {
   const { psbt, descriptors, network } = getInputs()
   require(psbt, 'PSBT')
 
-  DOM.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
+  DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
     const userBubble = createConversationBubble('Sign this transaction (PSBT)', true)
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
-    DOM.tempMessage.textContent = 'Follow the instructions on your device (might take a few seconds for them to appear).'
+    DOM.outputs.tempMessage.textContent =
+      'Follow the instructions on your device (might take a few seconds for them to appear).'
     const response = await commands.sign(psbt, network, device.type)
     const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
-    DOM.psbtTextArea.value = responsePsbt
+    DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble(message)
-    DOM.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
     validatePsbt()
     if (signed) {
       updateSignHistory(device)
     }
     // Give feedback via shrimpy
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
-    DOM.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
+    DOM.outputs.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
   } catch (e: unknown) {
     handleError(e)
   }
@@ -480,106 +459,90 @@ async function sweep() {
   const isValid = await validateDescriptor()
   if (!isValid) return
   if (!address) {
-    DOM.addressInput.classList.add('input-error')
+    DOM.inputs.address.classList.add('input-error')
   }
   require(address, 'Address')
 
   const feeRate = await getFeeRate()
   if (feeRate.failed) {
-    DOM.tempMessage.textContent =
+    DOM.outputs.tempMessage.textContent =
       'Unable to automatically estimate a fee for this network. Please enter a fee rate manually.'
     return
   }
 
-  DOM.tempMessage.textContent = 'Please wait...'
+  DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
       `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
-    DOM.conversation.appendChild(userBubble)
+    DOM.outputs.conversation.appendChild(userBubble)
     const { psbt } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
-    clearStatusIndicators(DOM.psbtTextArea)
-    DOM.psbtTextArea.value = psbt
+    clearStatusIndicators(DOM.outputs.psbtTextArea)
+    DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
-    DOM.psbtSignHistory.innerHTML = ''
+    DOM.outputs.psbtSignHistory.innerHTML = ''
 
     // Scroll to psbt area and highlight the psbt creation
-    DOM.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
-    DOM.psbtTextArea.classList.add('textarea-primary')
+    DOM.outputs.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
+    DOM.outputs.psbtTextArea.classList.add('textarea-primary')
     setTimeout(() => {
-      DOM.psbtTextArea.classList.remove('textarea-primary')
+      DOM.outputs.psbtTextArea.classList.remove('textarea-primary')
     }, 1500)
 
-    DOM.tempMessage.textContent = 'Sign next?'
+    DOM.outputs.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
-    DOM.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
 
     if (feeRate.warning) {
       const warningBubble = createConversationBubble(feeRate.warning)
-      DOM.conversation.appendChild(warningBubble)
+      DOM.outputs.conversation.appendChild(warningBubble)
     }
   } catch (e: unknown) {
     handleError(e)
   }
 }
 
-function requireDomElement<T extends HTMLElement>(name: string): T {
-  const element = document.querySelector<T>(name)
-  if (!element) {
-    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
-  }
-  return element
-}
-
-function requireDomElements<T extends HTMLElement>(name: string): NodeListOf<T> {
-  const elements = document.querySelectorAll<T>(name)
-  if (elements.length === 0) {
-    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
-  }
-  return elements
-}
-
 async function validateAddress() {
   const { address, descriptors, network } = getInputs()
-  DOM.addressInput.classList.remove('input-success')
-  DOM.addressInput.classList.remove('input-error')
-  DOM.addressInput.classList.remove('input-warning')
+  DOM.inputs.address.classList.remove('input-success')
+  DOM.inputs.address.classList.remove('input-error')
+  DOM.inputs.address.classList.remove('input-warning')
 
   if (!address) {
     // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
-    DOM.tempMessage.textContent = 'No address provided'
+    DOM.outputs.tempMessage.textContent = 'No address provided'
     return false
   }
 
   try {
     const isValid = await commands.isAddress(address)
     if (!isValid) {
-      DOM.addressInput.classList.add('input-error')
-      DOM.tempMessage.textContent = 'This address is not valid.'
+      DOM.inputs.address.classList.add('input-error')
+      DOM.outputs.tempMessage.textContent = 'This address is not valid.'
       return false
     }
 
     const isForNetwork = await commands.isAddressForNetwork(address, network)
     if (!isForNetwork) {
-      DOM.addressInput.classList.add('input-error')
-      DOM.tempMessage.textContent = 'This address is not for the selected network'
+      DOM.inputs.address.classList.add('input-error')
+      DOM.outputs.tempMessage.textContent = 'This address is not for the selected network'
       return false
     }
 
     const isMine = await commands.isAddressMine(address, network, descriptors)
     if (isMine) {
-      DOM.tempMessage.textContent =
+      DOM.outputs.tempMessage.textContent =
         'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
-      DOM.addressInput.classList.add('input-warning')
+      DOM.inputs.address.classList.add('input-warning')
       return false
     }
 
-    DOM.addressInput.classList.add('input-success')
-    DOM.tempMessage.textContent = 'This address looks good!'
+    DOM.inputs.address.classList.add('input-success')
+    DOM.outputs.tempMessage.textContent = 'This address looks good!'
     return true
   } catch (e: unknown) {
-    DOM.addressInput.classList.add('input-error')
+    DOM.inputs.address.classList.add('input-error')
     handleError(e)
   }
 
@@ -587,156 +550,102 @@ async function validateAddress() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  let tempMessage: HTMLDivElement | undefined = undefined
-  try {
-    // initialization of DOM elements used elsewhere in the code
-    tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
-    const autoChangeCheckbox = requireDomElement<HTMLInputElement>('#auto-change-checkbox')
-    const autoElectrumCheckbox = requireDomElement<HTMLInputElement>('#auto-electrum-checkbox')
-    const broadcastButton = requireDomElement<HTMLButtonElement>('#broadcast-button')
-    const addressInput = requireDomElement<HTMLInputElement>('#address-input')
-    const changeContainer = requireDomElement<HTMLDivElement>('#change-input-container')
-    const changeInput = requireDomElement<HTMLInputElement>('#change-input')
-    const conversation = requireDomElement<HTMLDivElement>('#conversation')
-    const electrumContainer = requireDomElement<HTMLDivElement>('#electrum-input-container')
-    const electrumInput = requireDomElement<HTMLInputElement>('#electrum-input')
-    const feeRateInput = requireDomElement<HTMLInputElement>('#feerate-input')
-    const networkCheckbox = requireDomElement<HTMLInputElement>('#network-checkbox')
-    const networkContainer = requireDomElement<HTMLInputElement>('#network-input-container')
-    const networkRadios = requireDomElements<HTMLInputElement>('input[name="network"]')
-    const psbtSignHistory = requireDomElement<HTMLDivElement>('#psbt-sign-history')
-    const psbtStatusElement = requireDomElement<HTMLDivElement>('#psbt-status')
-    const psbtTextArea = requireDomElement<HTMLTextAreaElement>('#psbt-textarea')
-    const receiveInput = requireDomElement<HTMLInputElement>('#receive-input')
-    const txBody = requireDomElement<HTMLTableSectionElement>('#transactions-body')
-    const txModal = requireDomElement<HTMLDialogElement>('#transactions-modal')
+  initializeDOM()
 
-    DOM = {
-      addressInput,
-      autoChangeCheckbox,
-      autoElectrumCheckbox,
-      broadcastButton,
-      changeContainer,
-      changeInput,
-      conversation,
-      electrumContainer,
-      electrumInput,
-      feeRateInput,
-      networkCheckbox,
-      networkContainer,
-      networkRadios,
-      psbtSignHistory,
-      psbtStatusElement,
-      psbtTextArea,
-      receiveInput,
-      tempMessage,
-      txBody,
-      txModal,
-    }
+  DOM.buttons.estimate.addEventListener('click', (e) => {
+    e.preventDefault()
+    estimateFee()
+  })
 
-    // events & callbacks
-    // elements that do not need to be referenced later are not stored
+  DOM.buttons.balance.addEventListener('click', (e) => {
+    e.preventDefault()
+    getBalance()
+  })
 
-    requireDomElement<HTMLInputElement>('#estimate-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      estimateFee()
-    })
+  DOM.buttons.transactions.addEventListener('click', (e) => {
+    e.preventDefault()
+    getTransactions()
+  })
 
-    requireDomElement<HTMLButtonElement>('#fetch-balance-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      getBalance()
-    })
+  DOM.buttons.address.addEventListener('click', (e) => {
+    e.preventDefault()
+    getAddress()
+  })
 
-    requireDomElement<HTMLButtonElement>('#fetch-transactions-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      getTransactions()
-    })
+  DOM.buttons.sweep.addEventListener('click', (e) => {
+    e.preventDefault()
+    sweep()
+  })
 
-    requireDomElement<HTMLButtonElement>('#new-address-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      getAddress()
-    })
+  DOM.buttons.copyPsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    copyPsbtToClipboard()
+  })
 
-    requireDomElement<HTMLButtonElement>('#sweep-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      sweep()
-    })
+  DOM.buttons.pastePsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    pastePsbtFromClipboard()
+  })
 
-    requireDomElement<HTMLButtonElement>('#copy-psbt-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      copyPsbtToClipboard()
-    })
+  DOM.buttons.sign.addEventListener('click', (e) => {
+    e.preventDefault()
+    sign()
+  })
 
-    requireDomElement<HTMLButtonElement>('#paste-psbt-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      pastePsbtFromClipboard()
-    })
+  DOM.buttons.enumerate.addEventListener('click', (e) => {
+    e.preventDefault()
+    enumerate()
+  })
 
-    requireDomElement<HTMLButtonElement>('#sign-message-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      sign()
-    })
+  DOM.inputs.address.addEventListener('input', validateAddress)
 
-    requireDomElement<HTMLButtonElement>('#enumerate-button').addEventListener('click', (e) => {
-      e.preventDefault()
-      enumerate()
-    })
+  DOM.checkboxes.change.addEventListener('click', showChangeInput)
+  DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
+  DOM.checkboxes.network.addEventListener('click', showNetworkInput)
 
-    addressInput.addEventListener('input', validateAddress)
+  DOM.buttons.broadcast.addEventListener('click', (e) => {
+    e.preventDefault()
+    broadcast()
+  })
 
-    autoChangeCheckbox.addEventListener('click', showChangeInput)
-    autoElectrumCheckbox.addEventListener('click', showElectrumInput)
-    networkCheckbox.addEventListener('click', showNetworkInput)
+  DOM.outputs.psbtTextArea.addEventListener('input', () => {
+    DOM.buttons.broadcast.classList.remove('btn-disabled')
+    DOM.outputs.psbtSignHistory.innerHTML = ''
+    validatePsbt()
+  })
 
-    broadcastButton.addEventListener('click', (e) => {
-      e.preventDefault()
-      broadcast()
-    })
-
-    psbtTextArea.addEventListener('input', () => {
-      broadcastButton.classList.remove('btn-disabled')
-      DOM.psbtSignHistory.innerHTML = ''
-      validatePsbt()
-    })
-
-    // Add event listeners for validation of descriptor
-    receiveInput.addEventListener('blur', validateDescriptor)
-    receiveInput.addEventListener('input', () => {
-      // Clean up the input
-      receiveInput.value = receiveInput.value.replace(/\r?\n|\r/g, '').trim()
+  // Add event listeners for validation of descriptor
+  DOM.inputs.receive.addEventListener('blur', validateDescriptor)
+  DOM.inputs.receive.addEventListener('input', () => {
+    // Clean up the input
+    DOM.inputs.receive.value = DOM.inputs.receive.value.replace(/\r?\n|\r/g, '').trim()
+    validateDescriptor()
+  })
+  DOM.inputs.networkRadios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      DOM.inputs.address.value = ''
+      clearStatusIndicators(DOM.inputs.address)
       validateDescriptor()
     })
-    networkRadios.forEach((radio) => {
-      radio.addEventListener('change', () => {
-        DOM.addressInput.value = ''
-        clearStatusIndicators(DOM.addressInput)
-        validateDescriptor()
-      })
-    })
+  })
 
-    // Set up observer to scroll to the last chat message whenever a message is added
-    const config = { childList: true } // only observe the addition/removal of child nodes
-    const callback = (mutationList: MutationRecord[]) => {
-      for (const mutation of mutationList) {
-        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          scrollToLastMessage()
-        }
+  // Set up observer to scroll to the last chat message whenever a message is added
+  const config = { childList: true } // only observe the addition/removal of child nodes
+  const callback = (mutationList: MutationRecord[]) => {
+    for (const mutation of mutationList) {
+      if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+        scrollToLastMessage()
       }
     }
-    const observer = new MutationObserver(callback)
-    observer.observe(conversation, config)
-
-    // Clear messages via button click
-    const clearMessagesBtn = document.getElementById('clear-messages-btn')
-    clearMessagesBtn.addEventListener('click', () => {
-      conversation.innerHTML = ''
-      tempMessage.textContent = 'All messages cleared 🫡'
-      clearMessagesBtn.classList.add('hidden')
-    })
-  } catch (e: unknown) {
-    const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
-    if (tempMessage) {
-      tempMessage.textContent = error.message
-    }
   }
+  const observer = new MutationObserver(callback)
+  observer.observe(DOM.outputs.conversation, config)
+
+  // Clear messages via button click
+  const clearMessagesBtn = document.getElementById('clear-messages-btn')
+  clearMessagesBtn.addEventListener('click', () => {
+    DOM.outputs.conversation.innerHTML = ''
+    DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
+    clearMessagesBtn.classList.add('hidden')
+  })
 })
