@@ -174,8 +174,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.address).toBeTruthy()
     inputs.psbt = await driver.findElement(By.id('psbt-textarea'))
     expect(inputs.psbt).toBeTruthy()
-    inputs.psbtStatus = await driver.findElement(By.id('psbt-status-button'))
-    expect(inputs.psbtStatus).toBeTruthy()
     inputs.sweep = await driver.findElement(By.id('sweep-button'))
     expect(inputs.sweep).toBeTruthy()
     inputs.copy = await driver.findElement(By.id('copy-psbt-button'))
@@ -190,6 +188,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(outputs.conversation).toBeTruthy()
     outputs.temporaryMessage = await driver.findElement(By.id('temporary-message'))
     expect(outputs.temporaryMessage).toBeTruthy()
+    outputs.psbtStatus = await driver.findElement(By.id('psbt-status'))
+    expect(outputs.psbtStatus).toBeTruthy()
   })
 
   it('can see the receive descriptor box and toggle checkboxes', async () => {
@@ -326,9 +326,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     log('newly-created psbt', psbt)
   })
 
-  it("can retrieve a status of 'unsigned' for a newly-created PSBT", async () => {
-    await inputs.psbtStatus.click()
-    await expectLatestMessageToMatch(/The PSBT is unsigned/)
+  it("can see a status of 'unsigned' for a newly-created PSBT", async () => {
+    expect(await outputs.psbtStatus.getText()).toMatch(/Unsigned/)
   })
 
   it('can paste in a PSBT with a single signature, but cannot broadcast it', async () => {
@@ -342,10 +341,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('auto') // broadcast button should be re-enabled
   })
 
-  it("can retrieve a status of 'partially signed' for the once-signed PSBT", async () => {
-    await inputs.psbtStatus.click()
-    await waitForUI()
-    await expectLatestMessageToMatch(/The transaction is partially signed/)
+  it("can see a status of 'partially signed' for the once-signed PSBT", async () => {
+    expect(await outputs.psbtStatus.getText()).toMatch(/Partially Signed/)
   })
 
   it('can paste in a PSBT which has been signed twice, but not finalized, and see the ready status', async () => {
@@ -355,8 +352,10 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await waitForUI()
     await inputs.paste.click()
     await waitForUI()
-    await inputs.psbtStatus.click()
-    await expectLatestMessageToMatch(/The transaction is fully signed/)
+  })
+
+  it("can see a status of 'fully signed' for the once-signed PSBT", async () => {
+    expect(await outputs.psbtStatus.getText()).toMatch(/Fully Signed/)
   })
 
   it('can broadcast the twice-signed psbt', async () => {

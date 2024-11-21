@@ -40,6 +40,9 @@ async isDescriptor(descriptor: string) : Promise<boolean> {
 async isDescriptorForNetwork(descriptor: string, network: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_descriptor_for_network", { descriptor, network });
 },
+async isPsbt(psbt: string) : Promise<boolean> {
+    return await TAURI_INVOKE("is_psbt", { psbt });
+},
 async psbtStatus(psbt: string, network: string, descriptors: Descriptors) : Promise<PsbtSigningStatus> {
     return await TAURI_INVOKE("psbt_status", { psbt, network, descriptors });
 },
