@@ -180,7 +180,9 @@
             <div class="form-control mb-5">
               <div class="label">
                 <label class="label">Fee Rate</label>
-                <button class="btn btn-link no-underline" onclick="fee_rate_modal.showModal()">What is this for?</button>
+                <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
+                  What is this for?
+                </button>
               </div>
               <div class="flex items-center gap-2">
                 <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
@@ -190,27 +192,59 @@
             </div>
 
             <!-- Sweep button -->
-            <div class="card-actions justify-end mb-6">
+            <div class="card-actions justify-end mb-2">
               <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
             </div>
 
-            <!-- PSBT textarea -->
+            <!-- Transaction -->
             <div class="form-control mb-3">
-              <label class="label">Transaction (PSBT)</label>
-              <textarea
-                class="textarea textarea-bordered h-40 leading-normal transition-border-color duration-500 ease-in-out"
-                id="psbt-textarea"
-                placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
-              ></textarea>
-              <!-- PSBT Status -->
-              <div class="mt-2 ml-1" id="psbt-status"></div>
-              <div class="ml-1" id="psbt-sign-history"></div>
-            </div>
-
-            <!-- PSBT controls -->
-            <div class="card-actions justify-end mb-6">
-              <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
-              <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+              <!--  Overview -->
+              <div id="transaction-container">
+                <label class="label">Transaction</label>
+                <div class="overflow-x-auto">
+                  <table class="table table-fixed mb-2">
+                    <thead>
+                      <tr>
+                        <th class="truncate">Destination</th>
+                        <th class="truncate">Amount</th>
+                        <th class="truncate">Fee</th>
+                        <th class="truncate">Status</th>
+                        <th class="truncate">Signatures</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <td class="w-12">1234</td>
+                      <td class="w-24">0.0004 BTC</td>
+                      <td class="w-24">5000 sats</td>
+                      <td class="w-32">
+                        <div id="psbt-status" class="truncate">Unsigned Unsigned Unsigned Unsigned Unsigned</div>
+                      </td>
+                      <td class="w-32">
+                        <div id="psbt-sign-history" class="truncate">None</div>
+                      </td>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <!-- PSBT details -->
+              <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
+                <span class="label-text text-xs">Show PSBT Details</span>
+                <input id="psbt-details-toggle" type="checkbox" class="toggle" />
+              </label>
+              <!-- Toggle content-->
+              <div class="psbt-details-toggle-content">
+                <!-- PSBT textarea -->
+                <textarea
+                  class="textarea textarea-bordered h-40 w-full leading-normal transition-border-color duration-500 ease-in-out"
+                  id="psbt-textarea"
+                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                ></textarea>
+                <!-- PSBT controls -->
+                <div class="card-actions justify-end mt-2 mb-6">
+                  <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+                  <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+                </div>
+              </div>
             </div>
 
             <!-- Device & Broadcast controls -->

@@ -1441,6 +1441,31 @@ html {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity)));
 }
+.toggle {
+  flex-shrink: 0;
+  --tglbg: var(--fallback-b1, oklch(var(--b1) / 1));
+  --handleoffset: 1.5rem;
+  --handleoffsetcalculator: calc(var(--handleoffset) * -1);
+  --togglehandleborder: 0 0;
+  height: 1.5rem;
+  width: 3rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: var(--rounded-badge, 1.9rem);
+  border-width: 1px;
+  border-color: currentColor;
+  background-color: currentColor;
+  color: var(--fallback-bc, oklch(var(--bc) / 0.5));
+  transition:
+    background,
+    box-shadow var(--animation-input, 0.2s) ease-out;
+  box-shadow:
+    var(--handleoffsetcalculator) 0 0 2px var(--tglbg) inset,
+    0 0 0 2px var(--tglbg) inset,
+    var(--togglehandleborder);
+}
 .avatar-group :where(.avatar) {
   overflow: hidden;
   border-radius: 9999px;
@@ -2247,6 +2272,52 @@ html {
     opacity: 1;
   }
 }
+[dir='rtl'] .toggle {
+  --handleoffsetcalculator: calc(var(--handleoffset) * 1);
+}
+.toggle:focus-visible {
+  outline-style: solid;
+  outline-width: 2px;
+  outline-offset: 2px;
+  outline-color: var(--fallback-bc, oklch(var(--bc) / 0.2));
+}
+.toggle:hover {
+  background-color: currentColor;
+}
+.toggle:checked,
+.toggle[aria-checked='true'] {
+  background-image: none;
+  --handleoffsetcalculator: var(--handleoffset);
+  --tw-text-opacity: 1;
+  color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
+}
+[dir='rtl'] .toggle:checked,
+[dir='rtl'] .toggle[aria-checked='true'] {
+  --handleoffsetcalculator: calc(var(--handleoffset) * -1);
+}
+.toggle:indeterminate {
+  --tw-text-opacity: 1;
+  color: var(--fallback-bc, oklch(var(--bc) / var(--tw-text-opacity)));
+  box-shadow:
+    calc(var(--handleoffset) / 2) 0 0 2px var(--tglbg) inset,
+    calc(var(--handleoffset) / -2) 0 0 2px var(--tglbg) inset,
+    0 0 0 2px var(--tglbg) inset;
+}
+[dir='rtl'] .toggle:indeterminate {
+  box-shadow:
+    calc(var(--handleoffset) / 2) 0 0 2px var(--tglbg) inset,
+    calc(var(--handleoffset) / -2) 0 0 2px var(--tglbg) inset,
+    0 0 0 2px var(--tglbg) inset;
+}
+.toggle:disabled {
+  cursor: not-allowed;
+  --tw-border-opacity: 1;
+  border-color: var(--fallback-bc, oklch(var(--bc) / var(--tw-border-opacity)));
+  background-color: transparent;
+  opacity: 0.3;
+  --togglehandleborder: 0 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset,
+    var(--handleoffsetcalculator) 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset;
+}
 .btn-xs {
   height: 1.5rem;
   min-height: 1.5rem;
@@ -2703,6 +2774,9 @@ html {
 .top-3 {
   top: 0.75rem;
 }
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
 .mb-3 {
   margin-bottom: 0.75rem;
 }
@@ -2711,9 +2785,6 @@ html {
 }
 .mb-6 {
   margin-bottom: 1.5rem;
-}
-.ml-1 {
-  margin-left: 0.25rem;
 }
 .ml-2 {
   margin-left: 0.5rem;
@@ -2769,8 +2840,14 @@ html {
 .w-11\/12 {
   width: 91.666667%;
 }
+.w-12 {
+  width: 3rem;
+}
 .w-2\/5 {
   width: 40%;
+}
+.w-24 {
+  width: 6rem;
 }
 .w-3 {
   width: 0.75rem;
@@ -2780,6 +2857,9 @@ html {
 }
 .w-3\/5 {
   width: 60%;
+}
+.w-32 {
+  width: 8rem;
 }
 .w-4 {
   width: 1rem;
@@ -2804,6 +2884,9 @@ html {
 }
 .flex-grow {
   flex-grow: 1;
+}
+.table-fixed {
+  table-layout: fixed;
 }
 .transform {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x))
@@ -2855,6 +2938,11 @@ html {
 }
 .overflow-y-auto {
   overflow-y: auto;
+}
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .break-all {
   word-break: break-all;
@@ -2912,6 +3000,10 @@ html {
 .text-sm {
   font-size: 0.875rem;
   line-height: 1.25rem;
+}
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 .font-bold {
   font-weight: 700;
@@ -3031,14 +3123,25 @@ html {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.psbt-details-toggle-content {
+  display: none;
+}
+
+:root:has(input#psbt-details-toggle:checked) .psbt-details-toggle-content {
+  display: block;
+}
+
 .checked\:bg-blue-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(59 130 246 / var(--tw-bg-opacity));
 }
+
 .checked\:bg-green-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(34 197 94 / var(--tw-bg-opacity));
 }
+
 .checked\:bg-orange-500:checked {
   --tw-bg-opacity: 1;
   background-color: rgb(249 115 22 / var(--tw-bg-opacity));
