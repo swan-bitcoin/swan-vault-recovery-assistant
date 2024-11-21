@@ -624,6 +624,12 @@ async fn is_descriptor_for_network(
 
 #[tauri::command]
 #[specta::specta]
+async fn is_psbt(psbt: String) -> bool {
+  return bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt).is_ok();
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn psbt_status(
   psbt: String,
   network: String,
@@ -657,6 +663,7 @@ async fn psbt_status(
 
   Ok(PsbtSigningStatus::Unsigned)
 }
+
 #[tauri::command]
 #[specta::specta]
 async fn sign(psbt: String, network: String, device_type: String) -> Result<String, TempuraError> {
@@ -814,6 +821,7 @@ fn main() {
       is_address_mine,
       is_descriptor,
       is_descriptor_for_network,
+      is_psbt,
       psbt_status,
       sign,
       sweep,
