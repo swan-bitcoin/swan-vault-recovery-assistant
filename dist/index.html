@@ -209,7 +209,6 @@
 
             <!-- PSBT controls -->
             <div class="card-actions justify-end mb-6">
-              <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
               <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
               <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
             </div>
@@ -268,6 +267,29 @@
             rel="noopener noreferrer"
             >GitHub
           </a>
+        </div>
+        <div class="divider divider-horizontal"></div>
+        <div class="flex gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            x-bind:width="size"
+            x-bind:height="size"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            x-bind:stroke-width="stroke"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="24"
+            height="24"
+            stroke-width="2"
+          >
+            <path d="M2 6m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z"></path>
+            <path d="M6 12h4m-2 -2v4"></path>
+            <path d="M15 11l0 .01"></path>
+            <path d="M18 13l0 .01"></path>
+          </svg>
+          <button class="link link-hover" id="enumerate-button">Check Device</button>
         </div>
       </div>
     </footer>
