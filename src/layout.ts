@@ -1,4 +1,5 @@
 import { setThemeBasedOnSystemPreference } from './helpers'
+import { commands } from './bindings'
 
 const adjustMainContentHeight = () => {
   const footer = document.getElementById('footer')
@@ -27,5 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.documentElement.setAttribute('data-theme', 'cupcake')
     }
+  })
+
+  const aboutLink = document.getElementById('about-link')
+  aboutLink.addEventListener('click', async (event) => {
+    event.preventDefault()
+    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
 })

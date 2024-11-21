@@ -16,6 +16,7 @@ use network::{HwiNetwork, Network};
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use tauri::Manager;
 
 // bdk and bitcoin imports
 use bdk;
@@ -772,6 +773,30 @@ async fn transactions(
   })
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn create_window(
+  app: tauri::AppHandle,
+  label: String,
+  html: String,
+  title: String,
+  width: f64,
+  height: f64,
+) {
+  // First check if a window with the label already exists and if so, show it
+  if let Some(window) = app.get_webview_window(&label) {
+    window.show().unwrap();
+  } else {
+    // Otherwise, create a new window
+    let _webview_window =
+      tauri::WebviewWindowBuilder::new(&app, label, tauri::WebviewUrl::App(html.into()))
+        .title(title)
+        .inner_size(width, height)
+        .build()
+        .unwrap();
+  }
+}
+
 /**
  * entrypoint
  */
@@ -793,6 +818,7 @@ fn main() {
       sign,
       sweep,
       transactions,
+      create_window
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
