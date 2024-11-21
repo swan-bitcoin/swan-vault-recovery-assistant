@@ -120,28 +120,41 @@
             <!-- Network selection -->
             <div class="form-control mb-5">
               <div class="label">
-                <label class="label-text">Network</label>
-              </div>
-              <div class="flex gap-4">
-                <label class="label cursor-pointer">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">I don't need to change my network</span>
                   <input
-                    id="bitcoin"
-                    value="bitcoin"
-                    type="radio"
-                    name="network"
-                    class="radio checked:bg-orange-500"
-                    checked
+                    type="checkbox"
+                    id="network-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
                   />
-                  <span class="label-text ml-2">Bitcoin</span>
-                </label>
-                <label class="label cursor-pointer">
-                  <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
-                  <span class="label-text ml-2">Testnet</span>
-                </label>
-                <label class="label cursor-pointer">
-                  <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
-                  <span class="label-text ml-2">Regtest</span>
-                </label>
+                </div>
+                <button class="btn btn-link no-underline btn-sm" onclick="network_modal.showModal()">
+                  Why would I want to change this?
+                </button>
+              </div>
+              <div id="network-input-container" class="hidden">
+                <div class="flex gap-4">
+                  <label class="label cursor-pointer">
+                    <input
+                      id="bitcoin"
+                      value="bitcoin"
+                      type="radio"
+                      name="network"
+                      class="radio checked:bg-orange-500"
+                      checked
+                    />
+                    <span class="label-text ml-2">Bitcoin</span>
+                  </label>
+                  <label class="label cursor-pointer">
+                    <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
+                    <span class="label-text ml-2">Testnet</span>
+                  </label>
+                  <label class="label cursor-pointer">
+                    <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
+                    <span class="label-text ml-2">Regtest</span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -363,6 +376,24 @@
           <p>For example: <code>ssl://electrum.satoshi.com:50001</code></p>
         </div>
         <p class="py-2">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
+      </div>
+    </dialog>
+
+    <!-- Network Modal -->
+    <dialog id="network_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Why would I want to change my network?</h3>
+        <p class="py-4">
+          Bitcoin is a network of computers. It can be scary to use, because real money is involved. For this reason, the
+          'Testnet' network exists. It's like a sandbox where you can play around with Bitcoin without using real money. It's
+          also possible to create a small local network called 'Regtest' which you can control!
+        </p>
+        <p>
+          Developers love these features because they need to test things before releasing them, and Bitcoin is no exception.
+        </p>
       </div>
     </dialog>
 

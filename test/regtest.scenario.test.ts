@@ -160,6 +160,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.newAddress).toBeTruthy()
 
     // network selection buttons
+    inputs.networkCheckbox = await driver.findElement(By.id('network-checkbox'))
+    expect(inputs.networkCheckbox).toBeTruthy()
     inputs.networkBitcoin = await driver.findElement(By.id('bitcoin'))
     expect(inputs.networkBitcoin).toBeTruthy()
     inputs.networkTestnet = await driver.findElement(By.id('testnet'))
@@ -190,8 +192,39 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(outputs.temporaryMessage).toBeTruthy()
   })
 
-  it('can see the receive descriptor box', async () => {
+  it('can see the receive descriptor box and toggle checkboxes', async () => {
     expect(await inputs.receive.isDisplayed()).toBe(true)
+    expect(await inputs.changeCheckbox.isDisplayed()).toBe(true)
+    expect(await inputs.changeCheckbox.isSelected()).toBe(true)
+    expect(await inputs.electrumCheckbox.isDisplayed()).toBe(true)
+    expect(await inputs.electrumCheckbox.isSelected()).toBe(true)
+    expect(await inputs.networkCheckbox.isDisplayed()).toBe(true)
+    expect(await inputs.networkCheckbox.isSelected()).toBe(true)
+  })
+
+  it('can reveal the custom electrum server input', async () => {
+    expect(await inputs.electrum.isDisplayed()).toBe(false)
+
+    await inputs.electrumCheckbox.click()
+    await waitForUI()
+
+    expect(await inputs.electrumCheckbox.isSelected()).toBe(false)
+    expect(await inputs.electrum.isDisplayed()).toBe(true)
+    await inputs.electrumCheckbox.click()
+  })
+
+  it('can reveal the network radio buttons', async () => {
+    expect(await inputs.networkBitcoin.isDisplayed()).toBe(false)
+    expect(await inputs.networkTestnet.isDisplayed()).toBe(false)
+    expect(await inputs.networkRegtest.isDisplayed()).toBe(false)
+
+    await inputs.networkCheckbox.click()
+    await waitForUI()
+
+    expect(await inputs.networkCheckbox.isSelected()).toBe(false)
+    expect(await inputs.networkBitcoin.isDisplayed()).toBe(true)
+    expect(await inputs.networkTestnet.isDisplayed()).toBe(true)
+    expect(await inputs.networkRegtest.isDisplayed()).toBe(true)
   })
 
   it('can switch from bitcoin to regtest network', async () => {
@@ -271,13 +304,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await waitForUI()
     expect(await inputs.change.isDisplayed()).toBe(false)
     await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
-  })
-
-  it('can toggle the visibility of the electrum server field', async () => {
-    expect(await inputs.electrum.isDisplayed()).toBe(false)
-    await inputs.electrumCheckbox.click()
-    await waitForUI()
-    expect(await inputs.electrum.isDisplayed()).toBe(true)
   })
 
   let psbt: string

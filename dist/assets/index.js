@@ -445,7 +445,7 @@ const validateDescriptor = async () => {
     const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
     if (!isValidDescriptor) {
       DOM.tempMessage.textContent =
-        'Descriptor is fine but it is for the wrong network. Switch to Advanced Mode to change the network!'
+        'Descriptor is fine but it is for the wrong network. Open the network settings to the right to change the network!'
       DOM.receiveInput.classList.add('textarea-error')
       DOM.receiveInput.classList.remove('textarea-success')
       DOM.receiveInput.classList.remove('textarea-warning')
@@ -760,6 +760,13 @@ function showElectrumInput() {
     DOM.electrumContainer.classList.remove('hidden')
   }
 }
+function showNetworkInput() {
+  if (DOM.networkCheckbox.checked) {
+    DOM.networkContainer.classList.add('hidden')
+  } else {
+    DOM.networkContainer.classList.remove('hidden')
+  }
+}
 async function sign() {
   const { psbt, descriptors, network } = getInputs()
   require2(psbt, 'PSBT')
@@ -893,6 +900,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const electrumContainer = requireDomElement('#electrum-input-container')
     const electrumInput = requireDomElement('#electrum-input')
     const feeRateInput = requireDomElement('#feerate-input')
+    const networkCheckbox = requireDomElement('#network-checkbox')
+    const networkContainer = requireDomElement('#network-input-container')
     const networkRadios = requireDomElements('input[name="network"]')
     const psbtSignHistory = requireDomElement('#psbt-sign-history')
     const psbtStatusElement = requireDomElement('#psbt-status')
@@ -911,6 +920,8 @@ window.addEventListener('DOMContentLoaded', () => {
       electrumContainer,
       electrumInput,
       feeRateInput,
+      networkCheckbox,
+      networkContainer,
       networkRadios,
       psbtSignHistory,
       psbtStatusElement,
@@ -963,6 +974,7 @@ window.addEventListener('DOMContentLoaded', () => {
     addressInput.addEventListener('input', validateAddress)
     autoChangeCheckbox.addEventListener('click', showChangeInput)
     autoElectrumCheckbox.addEventListener('click', showElectrumInput)
+    networkCheckbox.addEventListener('click', showNetworkInput)
     broadcastButton.addEventListener('click', (e) => {
       e.preventDefault()
       broadcast()
