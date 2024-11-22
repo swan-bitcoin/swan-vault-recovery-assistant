@@ -1,4 +1,4 @@
-import { setThemeBasedOnSystemPreference } from './helpers'
+import { setThemeBasedOnSystemPreference } from './utilities'
 import { commands } from './bindings'
 
 const adjustMainContentHeight = () => {
