@@ -176,6 +176,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.psbt).toBeTruthy()
     inputs.sweep = await driver.findElement(By.id('sweep-button'))
     expect(inputs.sweep).toBeTruthy()
+    inputs.psbtToggle = await driver.findElement(By.id('psbt-details-toggle'))
+    expect(inputs.psbtToggle).toBeTruthy()
     inputs.copy = await driver.findElement(By.id('copy-psbt-button'))
     expect(inputs.copy).toBeTruthy()
     inputs.paste = await driver.findElement(By.id('paste-psbt-button'))
@@ -318,8 +320,25 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.sweep.click()
     await waitForUI()
     expect(await inputs.broadcast.getCssValue('pointer-events')).toBe('none') // broadcast button should be disabled
-    await inputs.copy.click()
+    expectLatestMessageToMatch(/Transaction \(PSBT\) created/)
+  })
+
+  it('can reveal the PSBT field with the toggle', async () => {
+    expect(await inputs.psbtToggle.isSelected()).toBe(false)
+    expect(await inputs.psbt.isDisplayed()).toBe(false)
+    expect(await inputs.copy.isDisplayed()).toBe(false)
+    expect(await inputs.paste.isDisplayed()).toBe(false)
+
+    await inputs.psbtToggle.click()
     await waitForUI()
+    expect(await inputs.psbtToggle.isSelected()).toBe(true)
+    expect(await inputs.psbt.isDisplayed()).toBe(true)
+    expect(await inputs.copy.isDisplayed()).toBe(true)
+    expect(await inputs.paste.isDisplayed()).toBe(true)
+  })
+
+  it('can copy the PSBT using the copy button', async () => {
+    await inputs.copy.click()
     psbt = await clipboardy.read()
     await waitForUI()
     expect(psbt).toMatch(/^cHNid/)
