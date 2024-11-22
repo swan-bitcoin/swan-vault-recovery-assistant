@@ -16,3 +16,11 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+.psbt-details-toggle-content {
+  display: none;
+}
+
+:root:has(input#psbt-details-toggle:checked) .psbt-details-toggle-content {
+  display: block;
+}

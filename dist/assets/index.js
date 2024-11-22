@@ -73,6 +73,7 @@ function initializeDOM() {
       psbtStatus: requireDomElement('#psbt-status'),
       psbtTextArea: requireDomElement('#psbt-textarea'),
       tempMessage,
+      transactionOverview: requireDomElement('#transaction-overview-container'),
       txBody: requireDomElement('#transactions-body'),
       txModal: requireDomElement('#transactions-modal'),
     }
@@ -368,6 +369,12 @@ const setThemeBasedOnSystemPreference = () => {
     document.documentElement.setAttribute('data-theme', 'cupcake')
   }
 }
+const populateTransactionOverview = ({ address, outbound, fee }) => {
+  const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
+  transactionRowTds[0].textContent = address
+  transactionRowTds[1].innerHTML = Sats(outbound)
+  transactionRowTds[2].innerHTML = Sats(fee)
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -577,9 +584,11 @@ async function getFeeRate() {
   return { value: feeRate }
 }
 const updateSignHistory = (device) => {
-  const currentSign = document.createElement('div')
-  currentSign.innerHTML = `Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>`
-  DOM.outputs.psbtSignHistory.appendChild(currentSign)
+  const newStep = document.createElement('li')
+  newStep.classList.add('step', 'step-info')
+  newStep.innerHTML = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  const stepsList = DOM.outputs.psbtSignHistory
+  stepsList.appendChild(newStep)
 }
 function getInputs() {
   var _a, _b, _c
@@ -887,16 +896,13 @@ async function sweep() {
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)
-    const { psbt } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+    const { psbt, outbound, fee } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
     clearStatusIndicators(DOM.outputs.psbtTextArea)
+    DOM.outputs.transactionOverview.classList.remove('hidden')
+    populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
-    DOM.outputs.psbtSignHistory.innerHTML = ''
-    DOM.outputs.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
-    DOM.outputs.psbtTextArea.classList.add('textarea-primary')
-    setTimeout(() => {
-      DOM.outputs.psbtTextArea.classList.remove('textarea-primary')
-    }, 1500)
+    DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
     DOM.outputs.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
     DOM.outputs.conversation.appendChild(tempuraBubble)

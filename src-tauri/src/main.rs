@@ -96,10 +96,14 @@ pub struct PsbtDetails {
   pub received: String,
   pub sent: String,
   pub fee: Option<String>,
+  pub outbound: String,
 }
 
 impl PsbtDetails {
   pub fn new(psbt: String, details: bdk::TransactionDetails) -> Self {
+    let fee = details.fee.unwrap_or(0);
+    let outbound = details.sent - details.received - fee;
+
     PsbtDetails {
       psbt: psbt,
       txid: details.txid.to_string(),
@@ -109,6 +113,7 @@ impl PsbtDetails {
         None => None,
         Some(fee) => Some(fee.to_string()),
       },
+      outbound: outbound.to_string(),
     }
   }
 }

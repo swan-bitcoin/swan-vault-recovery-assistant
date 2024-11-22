@@ -180,7 +180,9 @@
             <div class="form-control mb-5">
               <div class="label">
                 <label class="label">Fee Rate</label>
-                <button class="btn btn-link no-underline" onclick="fee_rate_modal.showModal()">What is this for?</button>
+                <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
+                  What is this for?
+                </button>
               </div>
               <div class="flex items-center gap-2">
                 <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
@@ -190,28 +192,58 @@
             </div>
 
             <!-- Sweep button -->
-            <div class="card-actions justify-end mb-6">
+            <div class="card-actions justify-end mb-2">
               <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
             </div>
 
-            <!-- PSBT textarea -->
-            <div class="form-control mb-3">
-              <label class="label">Transaction (PSBT)</label>
-              <textarea
-                class="textarea textarea-bordered h-40 leading-normal transition-border-color duration-500 ease-in-out"
-                id="psbt-textarea"
-                placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
-              ></textarea>
-              <!-- PSBT Status -->
-              <div class="mt-2 ml-1" id="psbt-status"></div>
-              <div class="ml-1" id="psbt-sign-history"></div>
-            </div>
-
-            <!-- PSBT controls -->
-            <div class="card-actions justify-end mb-6">
-              <button class="btn btn-outline btn-sm" type="button" id="enumerate-button">Check Devices</button>
-              <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
-              <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+            <!-- Transaction -->
+            <div class="form-control mb-3 hidden" id="transaction-overview-container">
+              <!-- Transaction overview -->
+              <label class="label">Transaction</label>
+              <div class="overflow-x-auto">
+                <table class="table table-fixed table-md mb-2">
+                  <thead>
+                    <tr>
+                      <th>To</th>
+                      <th>Amount</th>
+                      <th>Fee</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transaction-overview-body">
+                    <tr>
+                      <td class="truncate"></td>
+                      <td></td>
+                      <td></td>
+                      <td>
+                        <div id="psbt-status" class="truncate"></div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-center">
+                <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
+              </div>
+              <!-- PSBT details -->
+              <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
+                <span class="label-text text-xs">Show PSBT Details</span>
+                <input id="psbt-details-toggle" type="checkbox" class="toggle" />
+              </label>
+              <!-- Toggle content-->
+              <div class="psbt-details-toggle-content">
+                <!-- PSBT textarea -->
+                <textarea
+                  class="textarea textarea-bordered h-40 w-full leading-normal"
+                  id="psbt-textarea"
+                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                ></textarea>
+                <!-- PSBT controls -->
+                <div class="card-actions justify-end mt-2 mb-6">
+                  <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+                  <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+                </div>
+              </div>
             </div>
 
             <!-- Device & Broadcast controls -->
@@ -268,6 +300,29 @@
             rel="noopener noreferrer"
             >GitHub
           </a>
+        </div>
+        <div class="divider divider-horizontal"></div>
+        <div class="flex gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            x-bind:width="size"
+            x-bind:height="size"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            x-bind:stroke-width="stroke"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="24"
+            height="24"
+            stroke-width="2"
+          >
+            <path d="M2 6m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z"></path>
+            <path d="M6 12h4m-2 -2v4"></path>
+            <path d="M15 11l0 .01"></path>
+            <path d="M18 13l0 .01"></path>
+          </svg>
+          <button class="link link-hover" id="enumerate-button">Check Device</button>
         </div>
       </div>
     </footer>

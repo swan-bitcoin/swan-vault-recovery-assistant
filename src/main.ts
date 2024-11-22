@@ -2,7 +2,13 @@ import { DOM, initializeDOM } from './dom'
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands, Descriptors, type TempuraError } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import { capitalize, createConversationBubble, isChangeDescriptor, scrollToLastMessage } from './helpers'
+import {
+  capitalize,
+  createConversationBubble,
+  isChangeDescriptor,
+  populateTransactionOverview,
+  scrollToLastMessage,
+} from './helpers'
 import { simpleCheckmark } from './icons'
 import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignResultAndPsbt } from './parsing'
 
@@ -123,9 +129,11 @@ async function getFeeRate(): Promise<FeeRate> {
 }
 
 const updateSignHistory = (device: Device) => {
-  const currentSign = document.createElement('div')
-  currentSign.innerHTML = `Signed by ${capitalize(device.type)} device with fingerprint: <span class="font-bold">${device.fingerprint}</span>`
-  DOM.outputs.psbtSignHistory.appendChild(currentSign)
+  const newStep = document.createElement('li')
+  newStep.classList.add('step', 'step-info')
+  newStep.innerHTML = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  const stepsList = DOM.outputs.psbtSignHistory
+  stepsList.appendChild(newStep)
 }
 
 type Inputs = {
@@ -477,18 +485,17 @@ async function sweep() {
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)
-    const { psbt } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+    const { psbt, outbound, fee } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
     clearStatusIndicators(DOM.outputs.psbtTextArea)
+    // Show transaction overview and populate transaction overview table
+    DOM.outputs.transactionOverview.classList.remove('hidden')
+    populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
+    // Populate PSBT textarea even though it is not shown
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
-    DOM.outputs.psbtSignHistory.innerHTML = ''
 
-    // Scroll to psbt area and highlight the psbt creation
-    DOM.outputs.psbtTextArea.scrollIntoView({ behavior: 'smooth' })
-    DOM.outputs.psbtTextArea.classList.add('textarea-primary')
-    setTimeout(() => {
-      DOM.outputs.psbtTextArea.classList.remove('textarea-primary')
-    }, 1500)
+    // Show and scroll to transaction area
+    DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
 
     DOM.outputs.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
