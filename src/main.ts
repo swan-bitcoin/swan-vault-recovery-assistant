@@ -8,7 +8,7 @@ import {
   isChangeDescriptor,
   populateTransactionOverview,
   scrollToLastMessage,
-} from './helpers'
+} from './utilities'
 import { simpleCheckmark } from './icons'
 import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignResultAndPsbt } from './parsing'
 
