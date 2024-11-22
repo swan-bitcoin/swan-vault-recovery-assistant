@@ -39,15 +39,14 @@ function initializeDOM() {
     tempMessage = requireDomElement('#temporary-message')
     const buttons = {
       address: requireDomElement('#new-address-button'),
-      balance: requireDomElement('#fetch-balance-button'),
       broadcast: requireDomElement('#broadcast-button'),
       copyPsbt: requireDomElement('#copy-psbt-button'),
       enumerate: requireDomElement('#enumerate-button'),
       estimate: requireDomElement('#estimate-button'),
+      load: requireDomElement('#fetch-wallet-button'),
       pastePsbt: requireDomElement('#paste-psbt-button'),
       sign: requireDomElement('#sign-button'),
       sweep: requireDomElement('#sweep-button'),
-      transactions: requireDomElement('#fetch-transactions-button'),
     }
     const checkboxes = {
       change: requireDomElement('#auto-change-checkbox'),
@@ -149,9 +148,6 @@ const commands = {
   async address(network, descriptor, electrum) {
     return await invoke('address', { network, descriptor, electrum })
   },
-  async balance(network, descriptors, electrum) {
-    return await invoke('balance', { network, descriptors, electrum })
-  },
   async broadcast(psbt, network, descriptors, electrum) {
     return await invoke('broadcast', { psbt, network, descriptors, electrum })
   },
@@ -188,8 +184,8 @@ const commands = {
   async sweep(address, feeRate, network, descriptors, electrum) {
     return await invoke('sweep', { address, feeRate, network, descriptors, electrum })
   },
-  async transactions(network, descriptors, electrum) {
-    return await invoke('transactions', { network, descriptors, electrum })
+  async wallet(network, descriptors, electrum) {
+    return await invoke('wallet', { network, descriptors, electrum })
   },
   async createWindow(label, html, title, width, height) {
     await invoke('create_window', { label, html, title, width, height })
@@ -514,7 +510,6 @@ const validateDescriptor = async () => {
   const descriptor = DOM.inputs.receive.value
   const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
   const standardWalletActions = document.getElementById('standard-wallet-actions')
-  const recoveryOptionsCard = document.getElementById('recovery-options-card')
   if (!descriptor) {
     DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.inputs.receive.classList.add('textarea-error')
@@ -538,7 +533,6 @@ const validateDescriptor = async () => {
       DOM.inputs.receive.classList.add('textarea-warning')
       DOM.inputs.receive.classList.remove('textarea-success')
       DOM.inputs.receive.classList.remove('textarea-error')
-      recoveryOptionsCard.classList.remove('hidden')
       standardWalletActions.classList.remove('hidden')
       return true
     }
@@ -546,8 +540,7 @@ const validateDescriptor = async () => {
     DOM.inputs.receive.classList.remove('textarea-error')
     DOM.inputs.receive.classList.remove('textarea-warning')
     DOM.outputs.tempMessage.textContent =
-      'Your wallet configuration is valid. You can now fetch your balance and perform other actions.'
-    recoveryOptionsCard.classList.remove('hidden')
+      'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
     standardWalletActions.classList.remove('hidden')
     return true
   } catch (e) {
@@ -651,23 +644,45 @@ async function enumerate() {
     handleError(e)
   }
 }
-async function getBalance() {
+async function loadWallet() {
   const { descriptors, electrum, network } = getInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching balance ...'
+  DOM.outputs.tempMessage.textContent = 'Fetching wallet ...'
   try {
-    const userBubble = createConversationBubble('What is my balance?', true)
+    const userBubble = createConversationBubble('Fetch my wallet.', true)
     DOM.outputs.conversation.appendChild(userBubble)
-    const balance = await commands.balance(network, descriptors, electrum)
-    DOM.outputs.tempMessage.textContent = 'Balance fetched successfully!'
+    const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
+    DOM.outputs.txBody.innerHTML = Transactions(transactions)
+    DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
-      Balance({
+      `
+      ${Balance({
         confirmed: balance.confirmed,
         unconfirmed: balance.untrusted_pending,
-      })
+      })}
+      After ${transactions.length} transactions <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>
+      <br/>
+      <button class="btn btn-primary btn-sm float-right" id="begin-recovery-btn">Begin Recovery</button>
+      `
     )
+    tempuraBubble.classList.add('wallet-info')
     DOM.outputs.conversation.appendChild(tempuraBubble)
+    const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
+    showListButton == null
+      ? void 0
+      : showListButton.addEventListener('click', () => {
+          DOM.outputs.txModal.showModal()
+        })
+    const beginRecoveryButton = tempuraBubble.querySelector('#begin-recovery-btn')
+    beginRecoveryButton == null
+      ? void 0
+      : beginRecoveryButton.addEventListener('click', () => {
+          const recoveryOptionsCard = document.getElementById('recovery-options-card')
+          recoveryOptionsCard.classList.remove('hidden')
+          recoveryOptionsCard.scrollIntoView({ behavior: 'smooth' })
+        })
+    instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e) {
     handleError(e)
   }
@@ -694,33 +709,6 @@ function instrumentCopyButtons(parent) {
         })
     })
   })
-}
-async function getTransactions() {
-  const { descriptors, electrum, network } = getInputs()
-  const isValid = await validateDescriptor()
-  if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching transactions ...'
-  try {
-    const userBubble = createConversationBubble('Show me my transactions', true)
-    DOM.outputs.conversation.appendChild(userBubble)
-    const transactions = await commands.transactions(network, descriptors, electrum)
-    DOM.outputs.txModal.showModal()
-    DOM.outputs.txBody.innerHTML = Transactions(transactions)
-    DOM.outputs.tempMessage.textContent = 'Transactions fetched successfully!'
-    const tempuraBubble = createConversationBubble(
-      `${transactions.length} transactions fetched <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>`
-    )
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
-    showListButton == null
-      ? void 0
-      : showListButton.addEventListener('click', () => {
-          DOM.outputs.txModal.showModal()
-        })
-    instrumentCopyButtons(DOM.outputs.txBody)
-  } catch (e) {
-    handleError(e)
-  }
 }
 async function getAddress() {
   const {
@@ -958,13 +946,9 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     estimateFee()
   })
-  DOM.buttons.balance.addEventListener('click', (e) => {
+  DOM.buttons.load.addEventListener('click', (e) => {
     e.preventDefault()
-    getBalance()
-  })
-  DOM.buttons.transactions.addEventListener('click', (e) => {
-    e.preventDefault()
-    getTransactions()
+    loadWallet()
   })
   DOM.buttons.address.addEventListener('click', (e) => {
     e.preventDefault()
@@ -1003,10 +987,18 @@ window.addEventListener('DOMContentLoaded', () => {
     DOM.outputs.psbtSignHistory.innerHTML = ''
     validatePsbt()
   })
-  DOM.inputs.receive.addEventListener('blur', validateDescriptor)
+  DOM.inputs.receive.addEventListener('blur', () => {
+    validateDescriptor()
+    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
+      e.innerHTML = 'Outdated'
+    })
+  })
   DOM.inputs.receive.addEventListener('input', () => {
     DOM.inputs.receive.value = DOM.inputs.receive.value.replace(/\r?\n|\r/g, '').trim()
     validateDescriptor()
+    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
+      e.innerHTML = 'Outdated'
+    })
   })
   DOM.inputs.networkRadios.forEach((radio) => {
     radio.addEventListener('change', () => {

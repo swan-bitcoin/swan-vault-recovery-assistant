@@ -13,9 +13,6 @@ export const commands = {
 async address(network: string, descriptor: string, electrum: string | null) : Promise<AddressInfo> {
     return await TAURI_INVOKE("address", { network, descriptor, electrum });
 },
-async balance(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Balance> {
-    return await TAURI_INVOKE("balance", { network, descriptors, electrum });
-},
 async broadcast(psbt: string, network: string, descriptors: Descriptors, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, descriptors, electrum });
 },
@@ -52,8 +49,8 @@ async sign(psbt: string, network: string, deviceType: string) : Promise<string> 
 async sweep(address: string, feeRate: number, network: string, descriptors: Descriptors, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, descriptors, electrum });
 },
-async transactions(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Transaction[]> {
-    return await TAURI_INVOKE("transactions", { network, descriptors, electrum });
+async wallet(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Wallet> {
+    return await TAURI_INVOKE("wallet", { network, descriptors, electrum });
 },
 async createWindow(label: string, html: string, title: string, width: number, height: number) : Promise<void> {
     await TAURI_INVOKE("create_window", { label, html, title, width, height });
@@ -100,6 +97,7 @@ export type TempuraError = { error_type: string; message: string }
 export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }
 export type TxIn = { txid: string; vout: number }
 export type TxOut = { address: string | null; script: string; amount: string }
+export type Wallet = { balance: Balance; transactions: Transaction[] }
 
 /** tauri-specta globals **/
 

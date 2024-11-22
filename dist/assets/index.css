@@ -2855,6 +2855,9 @@ html {
 .top-3 {
   top: 0.75rem;
 }
+.float-right {
+  float: right;
+}
 .mb-2 {
   margin-bottom: 0.5rem;
 }
