@@ -34,10 +34,11 @@ type Inputs = {
 
 type Outputs = {
   conversation: HTMLDivElement
-  psbtSignHistory: HTMLDivElement
+  psbtSignHistory: HTMLUListElement
   psbtStatus: HTMLDivElement
   psbtTextArea: HTMLTextAreaElement
   tempMessage: HTMLDivElement
+  transactionOverview: HTMLDivElement
   txBody: HTMLTableSectionElement
   txModal: HTMLDialogElement
 }
@@ -92,10 +93,11 @@ export function initializeDOM() {
 
     const outputs = {
       conversation: requireDomElement<HTMLDivElement>('#conversation'),
-      psbtSignHistory: requireDomElement<HTMLDivElement>('#psbt-sign-history'),
+      psbtSignHistory: requireDomElement<HTMLUListElement>('#psbt-sign-history'),
       psbtStatus: requireDomElement<HTMLDivElement>('#psbt-status'),
       psbtTextArea: requireDomElement<HTMLTextAreaElement>('#psbt-textarea'),
       tempMessage,
+      transactionOverview: requireDomElement<HTMLDivElement>('#transaction-overview-container'),
       txBody: requireDomElement<HTMLTableSectionElement>('#transactions-body'),
       txModal: requireDomElement<HTMLDialogElement>('#transactions-modal'),
     }

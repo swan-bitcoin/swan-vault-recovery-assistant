@@ -198,34 +198,33 @@
             </div>
 
             <!-- Transaction -->
-            <div class="form-control mb-3">
-              <!--  Overview -->
-              <div id="transaction-container">
-                <label class="label">Transaction</label>
-                <div class="overflow-x-auto">
-                  <table class="table table-fixed mb-2">
-                    <thead>
-                      <tr>
-                        <th class="truncate">Destination</th>
-                        <th class="truncate">Amount</th>
-                        <th class="truncate">Fee</th>
-                        <th class="truncate">Status</th>
-                        <th class="truncate">Signatures</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <td class="w-12">1234</td>
-                      <td class="w-24">0.0004 BTC</td>
-                      <td class="w-24">5000 sats</td>
-                      <td class="w-32">
-                        <div id="psbt-status" class="truncate">Unsigned Unsigned Unsigned Unsigned Unsigned</div>
+            <div class="form-control mb-3 hidden" id="transaction-overview-container">
+              <!-- Transaction overview -->
+              <label class="label">Transaction</label>
+              <div class="overflow-x-auto">
+                <table class="table table-fixed table-md mb-2">
+                  <thead>
+                    <tr>
+                      <th>To</th>
+                      <th>Amount</th>
+                      <th>Fee</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transaction-overview-body">
+                    <tr>
+                      <td class="truncate"></td>
+                      <td></td>
+                      <td></td>
+                      <td>
+                        <div id="psbt-status" class="truncate"></div>
                       </td>
-                      <td class="w-32">
-                        <div id="psbt-sign-history" class="truncate">None</div>
-                      </td>
-                    </tbody>
-                  </table>
-                </div>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-center">
+                <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
               </div>
               <!-- PSBT details -->
               <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
@@ -236,7 +235,7 @@
               <div class="psbt-details-toggle-content">
                 <!-- PSBT textarea -->
                 <textarea
-                  class="textarea textarea-bordered h-40 w-full leading-normal transition-border-color duration-500 ease-in-out"
+                  class="textarea textarea-bordered h-40 w-full leading-normal"
                   id="psbt-textarea"
                   placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
                 ></textarea>
