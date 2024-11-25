@@ -119,9 +119,9 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   }
 
   const expectLatestBalance = async (confirmed: RegExp, unconfirmed: RegExp): Promise<void> => {
-    await inputs.fetchBalance.click()
+    await inputs.fetchWallet.click()
     await waitForUI()
-    expect(await outputs.temporaryMessage.getText()).toMatch(/Balance fetched successfully!/)
+    expect(await outputs.temporaryMessage.getText()).toMatch(/Wallet fetched successfully!/)
     const stats = await outputs.conversation.findElements(By.className('stat'))
     expect(stats.length).toBeGreaterThan(1)
     const confirmedValue = await stats[stats.length - 2].findElement(By.className('stat-value')).getText()
@@ -154,8 +154,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.electrum).toBeTruthy()
     inputs.feeRate = await driver.findElement(By.id('feerate-input'))
     expect(inputs.feeRate).toBeTruthy()
-    inputs.fetchBalance = await driver.findElement(By.id('fetch-balance-button'))
-    expect(inputs.fetchBalance).toBeTruthy()
+    inputs.fetchWallet = await driver.findElement(By.id('fetch-wallet-button'))
+    expect(inputs.fetchWallet).toBeTruthy()
     inputs.newAddress = await driver.findElement(By.id('new-address-button'))
     expect(inputs.newAddress).toBeTruthy()
 
@@ -306,6 +306,12 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await waitForUI()
     expect(await inputs.change.isDisplayed()).toBe(false)
     await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
+  })
+
+  it('begins recovery', async () => {
+    const beginRecoveryButton = await driver.findElement(By.id('begin-recovery-btn'))
+    await beginRecoveryButton.click()
+    await waitForUI()
   })
 
   let psbt: string

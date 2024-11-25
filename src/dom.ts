@@ -1,14 +1,13 @@
 type Buttons = {
   address: HTMLButtonElement
-  balance: HTMLButtonElement
   broadcast: HTMLButtonElement
   copyPsbt: HTMLButtonElement
   enumerate: HTMLButtonElement
   estimate: HTMLButtonElement
+  load: HTMLButtonElement
   pastePsbt: HTMLButtonElement
   sign: HTMLButtonElement
   sweep: HTMLButtonElement
-  transactions: HTMLButtonElement
 }
 
 type Checkboxes = {
@@ -59,15 +58,14 @@ export function initializeDOM() {
 
     const buttons = {
       address: requireDomElement<HTMLButtonElement>('#new-address-button'),
-      balance: requireDomElement<HTMLButtonElement>('#fetch-balance-button'),
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),
       enumerate: requireDomElement<HTMLButtonElement>('#enumerate-button'),
       estimate: requireDomElement<HTMLButtonElement>('#estimate-button'),
+      load: requireDomElement<HTMLButtonElement>('#fetch-wallet-button'),
       pastePsbt: requireDomElement<HTMLButtonElement>('#paste-psbt-button'),
       sign: requireDomElement<HTMLButtonElement>('#sign-button'),
       sweep: requireDomElement<HTMLButtonElement>('#sweep-button'),
-      transactions: requireDomElement<HTMLButtonElement>('#fetch-transactions-button'),
     }
 
     const checkboxes = {
