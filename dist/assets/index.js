@@ -511,7 +511,7 @@ const validateDescriptor = async () => {
   const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
   const standardWalletActions = document.getElementById('standard-wallet-actions')
   if (!descriptor) {
-    DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
+    DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!!'
     DOM.inputs.receive.classList.add('textarea-error')
     DOM.inputs.receive.classList.remove('textarea-success')
     DOM.inputs.receive.classList.remove('textarea-warning')
