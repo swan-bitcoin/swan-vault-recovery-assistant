@@ -1,3 +1,5 @@
+import { Descriptors, TempuraError } from './bindings'
+
 type Buttons = {
   address: HTMLButtonElement
   broadcast: HTMLButtonElement
@@ -50,6 +52,64 @@ type DOM = {
   outputs: Outputs
 }
 export let DOM: DOM
+
+type UserInputs = {
+  address: string
+  descriptors: Descriptors
+  electrum: string | null
+  feeRate: number | null
+  network: string
+  psbt: string
+}
+
+export function clearStatusIndicators(element: HTMLElement) {
+  element.classList.remove('input-success')
+  element.classList.remove('input-error')
+  element.classList.remove('input-warning')
+  element.classList.remove('textarea-success')
+  element.classList.remove('textarea-error')
+  element.classList.remove('textarea-warning')
+}
+
+export function getUserInputs(): UserInputs {
+  const address = DOM.inputs.address.value.trim()
+  const autoChange = DOM.checkboxes.change.checked
+  const receive = DOM.inputs.receive.value.trim()
+  const change = DOM.inputs.change?.value.trim() || null
+  const electrum = DOM.inputs.electrum?.value.trim() || null
+  const feeRate = Number(DOM.inputs.feeRate?.value.trim()) || null
+  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
+  const psbt = DOM.outputs.psbtTextArea.value.trim()
+
+  return {
+    address,
+    descriptors: {
+      receive,
+      change,
+      auto_change: autoChange,
+    },
+    electrum,
+    feeRate,
+    network,
+    psbt,
+  }
+}
+
+export function handleError(e: unknown) {
+  if (isTempuraError(e)) {
+    console.log(e.error_type, e.message)
+    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    return
+  }
+
+  if (e instanceof Error) {
+    console.error(e)
+    DOM.outputs.tempMessage.textContent = e.message
+    return
+  }
+
+  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+}
 
 export function initializeDOM() {
   let tempMessage: HTMLDivElement | undefined = undefined
@@ -113,6 +173,11 @@ export function initializeDOM() {
       tempMessage.textContent = error.message
     }
   }
+}
+
+function isTempuraError(e: unknown): e is TempuraError {
+  const tempuraError = e as TempuraError
+  return !!(tempuraError.error_type && tempuraError.message)
 }
 
 function requireDomElement<T extends HTMLElement>(name: string): T {
