@@ -29,7 +29,9 @@
               </div>
             </div>
             <div class="card-actions justify-end">
-              <button id="clear-messages-btn" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">Clear Messages</button>
+              <button id="clear-messages-button" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">
+                Clear Messages
+              </button>
             </div>
           </div>
         </div>
@@ -159,7 +161,7 @@
             </div>
 
             <!-- Buttons: Fetch balance, New address -->
-            <div class="card-actions justify-end mb-6 hidden" id="standard-wallet-actions">
+            <div class="card-actions justify-end mb-6 hidden" id="wallet-actions">
               <button type="button" class="btn btn-outline btn-primary btn-sm" id="new-address-button">New Address</button>
               <button type="button" class="btn btn-primary btn-sm" id="fetch-wallet-button">Fetch Wallet</button>
             </div>
@@ -167,7 +169,7 @@
         </div>
 
         <!-- Second Card: Send Transaction  -->
-        <div class="card bg-base-300 shadow-xl card-compact hidden" id="recovery-options-card">
+        <div class="card bg-base-300 shadow-xl card-compact hidden" id="recovery-container">
           <div class="card-body">
             <h2 class="card-title">Recovery Options</h2>
             <!-- Destination address -->

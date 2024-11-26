@@ -1,17 +1,9 @@
 import { setThemeBasedOnSystemPreference } from './utilities'
-import { commands } from './bindings'
+import { DOM } from './dom'
 
 const adjustMainContentHeight = () => {
-  const footer = document.getElementById('footer')
-  const mainContent = document.getElementById('main-content')
-
-  if (footer && mainContent) {
-    // Calculate the available height
-    const availableHeight = window.innerHeight - footer.offsetHeight
-
-    // Set the height of the main content
-    mainContent.style.height = `${availableHeight}px`
-  }
+  const availableHeight = window.innerHeight - DOM.containers.footer.offsetHeight
+  DOM.containers.mainContent.style.height = `${availableHeight}px`
 }
 
 // Adjust on load and when the window is resized
@@ -28,11 +20,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.documentElement.setAttribute('data-theme', 'cupcake')
     }
-  })
-
-  const aboutLink = document.getElementById('about-link')
-  aboutLink.addEventListener('click', async (event) => {
-    event.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
 })

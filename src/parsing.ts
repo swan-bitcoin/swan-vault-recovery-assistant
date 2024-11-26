@@ -107,15 +107,16 @@ export function getSignResultAndPsbt(val: unknown): {
 }
 
 export function sanitize(input: string): string {
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }
-  return input.replace(/[&<>"']/g, function (m) {
-    return map[m]
+  const map = new Map([
+    ['&', '&amp;'],
+    ['<', '&lt;'],
+    ['>', '&gt;'],
+    ['"', '&quot;'],
+    ["'", '&#039;'],
+  ])
+
+  return input.replace(/[&<>"']/g, (m: string) => {
+    return map.get(m) || m
   })
 }
 

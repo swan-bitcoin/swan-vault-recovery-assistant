@@ -3,6 +3,7 @@ import { Descriptors, TempuraError } from './bindings'
 type Buttons = {
   address: HTMLButtonElement
   broadcast: HTMLButtonElement
+  clearMessages: HTMLButtonElement
   copyPsbt: HTMLButtonElement
   enumerate: HTMLButtonElement
   estimate: HTMLButtonElement
@@ -21,7 +22,12 @@ type Checkboxes = {
 type Containers = {
   change: HTMLDivElement
   electrum: HTMLDivElement
+  footer: HTMLDivElement
+  mainContent: HTMLDivElement
   network: HTMLDivElement
+  recovery: HTMLDivElement
+  toast: HTMLDivElement
+  walletActions: HTMLDivElement
 }
 
 type Inputs = {
@@ -31,6 +37,10 @@ type Inputs = {
   feeRate: HTMLInputElement
   networkRadios: NodeListOf<HTMLInputElement>
   receive: HTMLInputElement
+}
+
+type Links = {
+  about: HTMLAnchorElement
 }
 
 type Outputs = {
@@ -49,6 +59,7 @@ type DOM = {
   checkboxes: Checkboxes
   containers: Containers
   inputs: Inputs
+  links: Links
   outputs: Outputs
 }
 export let DOM: DOM
@@ -78,7 +89,7 @@ export function getUserInputs(): UserInputs {
   const change = DOM.inputs.change?.value.trim() || null
   const electrum = DOM.inputs.electrum?.value.trim() || null
   const feeRate = Number(DOM.inputs.feeRate?.value.trim()) || null
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
+  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked)!.value
   const psbt = DOM.outputs.psbtTextArea.value.trim()
 
   return {
@@ -119,6 +130,7 @@ export function initializeDOM() {
     const buttons = {
       address: requireDomElement<HTMLButtonElement>('#new-address-button'),
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
+      clearMessages: requireDomElement<HTMLButtonElement>('#clear-messages-button'),
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),
       enumerate: requireDomElement<HTMLButtonElement>('#enumerate-button'),
       estimate: requireDomElement<HTMLButtonElement>('#estimate-button'),
@@ -137,7 +149,12 @@ export function initializeDOM() {
     const containers = {
       change: requireDomElement<HTMLDivElement>('#change-input-container'),
       electrum: requireDomElement<HTMLDivElement>('#electrum-input-container'),
+      footer: requireDomElement<HTMLDivElement>('#footer'),
+      mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
+      recovery: requireDomElement<HTMLDivElement>('#recovery-container'),
+      toast: requireDomElement<HTMLDivElement>('#toast-container'),
+      walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }
 
     const inputs = {
@@ -147,6 +164,10 @@ export function initializeDOM() {
       feeRate: requireDomElement<HTMLInputElement>('#feerate-input'),
       networkRadios: requireDomElements<HTMLInputElement>('input[name="network"]'),
       receive: requireDomElement<HTMLInputElement>('#receive-input'),
+    }
+
+    const links = {
+      about: requireDomElement<HTMLAnchorElement>('#about-link'),
     }
 
     const outputs = {
@@ -165,6 +186,7 @@ export function initializeDOM() {
       checkboxes,
       containers,
       inputs,
+      links,
       outputs,
     }
   } catch (e: unknown) {

@@ -4,11 +4,10 @@ import { isChangeDescriptor } from './utilities'
 import { simpleCheckmark } from './icons'
 
 export const validateDescriptor = async () => {
-  const descriptor = DOM.inputs.receive.value
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
-  const standardWalletActions = document.getElementById('standard-wallet-actions')
+  const { descriptors, network } = getUserInputs()
   clearStatusIndicators(DOM.inputs.receive)
 
+  const descriptor = descriptors.receive
   if (!descriptor) {
     DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.inputs.receive.classList.add('textarea-error')
@@ -29,7 +28,7 @@ export const validateDescriptor = async () => {
       DOM.outputs.tempMessage.textContent =
         'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
       DOM.inputs.receive.classList.add('textarea-warning')
-      standardWalletActions.classList.remove('hidden')
+      DOM.containers.walletActions.classList.remove('hidden')
       return true
     }
 
@@ -37,7 +36,7 @@ export const validateDescriptor = async () => {
     DOM.inputs.receive.classList.add('textarea-success')
     DOM.outputs.tempMessage.textContent =
       'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
-    standardWalletActions.classList.remove('hidden')
+    DOM.containers.walletActions.classList.remove('hidden')
     return true
   } catch (e: unknown) {
     console.error(e)
