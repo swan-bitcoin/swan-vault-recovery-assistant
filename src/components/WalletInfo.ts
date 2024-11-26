@@ -56,10 +56,14 @@ export const WalletInfo = ({ balance, transactions }: WalletInfoProps) => {
                 <span class="badge badge-warning">Unconfirmed ${unconfirmedCount}</span>
                 <span class="badge badge-success">Confirmed ${confirmedCount}</span>
               </div>
-              <div class="flex gap-1">
+              ${
+                firstTransaction?.confirmation_height
+                  ? `<div class="flex gap-1">
                 <p class="text-md flex-grow-0">First Transaction in Block:</p>
                 <span>${firstTransaction.confirmation_height}</span>
-              </div>
+              </div>`
+                  : '<span>No transactions yet</span>'
+              }
               <button class="btn btn-outline btn-ghost btn-sm self-center mt-4 mb-2" id="show-transactions-btn">
                 Show Full List
               </button>
