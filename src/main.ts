@@ -3,7 +3,15 @@ import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps
 import { commands } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
 import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
-import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignResultAndPsbt } from './parsing'
+import {
+  Device,
+  getDevice,
+  getDeviceMessage,
+  getDevicePrompt,
+  getPsbtStatusMessage,
+  getSignResultAndPsbt,
+  sanitize,
+} from './parsing'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 
 const FEE_RATE_WARNING_RATIO = 0.9
@@ -313,7 +321,7 @@ async function sweep() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)

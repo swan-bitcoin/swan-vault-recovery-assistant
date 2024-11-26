@@ -106,6 +106,19 @@ export function getSignResultAndPsbt(val: unknown): {
   return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
 
+export function sanitize(input: string): string {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }
+  return input.replace(/[&<>"']/g, function (m) {
+    return map[m]
+  })
+}
+
 /**
  * parsing utilities, not exported
  */
