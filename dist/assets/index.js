@@ -489,6 +489,7 @@ function initializeDOM() {
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
       recovery: requireDomElement('#recovery-container'),
+      sendTransaction: requireDomElement('#send-transaction-container'),
       toast: requireDomElement('#toast-container'),
       walletActions: requireDomElement('#wallet-actions'),
     }
@@ -1073,6 +1074,8 @@ async function sweep() {
       const warningBubble = createConversationBubble(feeRate.warning)
       DOM.outputs.conversation.appendChild(warningBubble)
     }
+    DOM.containers.sendTransaction.classList.remove('hidden')
+    DOM.containers.sendTransaction.scrollIntoView({ behavior: 'smooth' })
   } catch (e) {
     handleError(e)
   }

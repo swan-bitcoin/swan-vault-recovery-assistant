@@ -26,6 +26,7 @@ type Containers = {
   mainContent: HTMLDivElement
   network: HTMLDivElement
   recovery: HTMLDivElement
+  sendTransaction: HTMLDivElement
   toast: HTMLDivElement
   walletActions: HTMLDivElement
 }
@@ -153,6 +154,7 @@ export function initializeDOM() {
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
       recovery: requireDomElement<HTMLDivElement>('#recovery-container'),
+      sendTransaction: requireDomElement<HTMLDivElement>('#send-transaction-container'),
       toast: requireDomElement<HTMLDivElement>('#toast-container'),
       walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }

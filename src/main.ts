@@ -349,6 +349,9 @@ async function sweep() {
       const warningBubble = createConversationBubble(feeRate.warning)
       DOM.outputs.conversation.appendChild(warningBubble)
     }
+
+    DOM.containers.sendTransaction.classList.remove('hidden')
+    DOM.containers.sendTransaction.scrollIntoView({ behavior: 'smooth' })
   } catch (e: unknown) {
     handleError(e)
   }
