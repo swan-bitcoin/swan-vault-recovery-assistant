@@ -65,8 +65,8 @@ apt-get update && apt-get install -y build-essential curl wget file libwebkit2gt
 1. checkout this repo and cd into it
 
 ```bash
-$ git clone https://github.com/swan-bitcoin/temporal-wallet-kit.git
-$ cd temporal-wallet-kit
+$ git clone https://github.com/swan-bitcoin/tempura.git
+$ cd tempura
 ```
 
 2. install the frontend requirements
