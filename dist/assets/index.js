@@ -329,7 +329,18 @@ const TxRow = (transaction) => {
       </tr>
     `
 }
-const Transactions = (transactions) => transactions.map(TxRow).join('\n')
+const Transactions = (transactions) => {
+  const sortedTransactions = transactions.sort((a, b) => {
+    const isAUnconfirmed = a.confirmation_height === null
+    const isBUnconfirmed = b.confirmation_height === null
+    if (isAUnconfirmed && !isBUnconfirmed) return -1
+    if (!isAUnconfirmed && isBUnconfirmed) return 1
+    const heightA = a.confirmation_height ?? 0
+    const heightB = b.confirmation_height ?? 0
+    return heightB - heightA
+  })
+  return sortedTransactions.map(TxRow).join('\n')
+}
 const Success = (text) => `
 <div class="flex gap-1 items-center">
   <svg
