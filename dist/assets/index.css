@@ -3278,9 +3278,6 @@ input.tab:checked + .tab-content,
 .z-50 {
   z-index: 50;
 }
-.float-right {
-  float: right;
-}
 .mb-2 {
   margin-bottom: 0.5rem;
 }

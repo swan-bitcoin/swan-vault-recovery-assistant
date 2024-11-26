@@ -1,8 +1,7 @@
-import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
-import { Address, Balance, Success, Transactions } from './components'
-import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
+import { Address, RecoveryToast, Success, Transactions, WalletInfo } from './components'
+import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
 import {
   Device,
   getDevice,
@@ -12,6 +11,14 @@ import {
   getSignResultAndPsbt,
   sanitize,
 } from './parsing'
+import {
+  capitalize,
+  closeToast,
+  createConversationBubble,
+  populateTransactionOverview,
+  scrollToLastMessage,
+  showToast,
+} from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 
 const FEE_RATE_WARNING_RATIO = 0.9
@@ -117,17 +124,14 @@ async function loadWallet() {
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
-      `
-      ${Balance({
-        confirmed: balance.confirmed,
-        unconfirmed: balance.untrusted_pending,
-      })}
-      After ${transactions.length} transactions <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>
-      <br/>
-      <button class="btn btn-primary btn-sm float-right" id="begin-recovery-btn">Begin Recovery</button>
-      `
+      WalletInfo({
+        balance: {
+          confirmed: balance.confirmed,
+          untrusted_pending: balance.untrusted_pending,
+        },
+        transactions,
+      })
     )
-    tempuraBubble.classList.add('wallet-info')
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
@@ -135,11 +139,14 @@ async function loadWallet() {
       DOM.outputs.txModal.showModal()
     })
 
-    const beginRecoveryButton = tempuraBubble.querySelector('#begin-recovery-btn')
+    // Show toast message from which to start recovery flow
+    showToast(RecoveryToast())
+    const beginRecoveryButton = document.getElementById('begin-recovery-btn')
     beginRecoveryButton?.addEventListener('click', () => {
       const recoveryOptionsCard = document.getElementById('recovery-options-card')
       recoveryOptionsCard.classList.remove('hidden')
       recoveryOptionsCard.scrollIntoView({ behavior: 'smooth' })
+      closeToast()
     })
 
     instrumentCopyButtons(DOM.outputs.txBody)

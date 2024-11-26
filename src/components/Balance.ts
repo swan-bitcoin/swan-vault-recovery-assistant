@@ -7,7 +7,6 @@ type Balance = {
 
 export const Balance = ({ confirmed, unconfirmed }: Balance) => {
   return `
-      <h1>Your Balance</h1>
       <div class="stat">
         <div class="stat-value">${Sats(confirmed)}</div>
         <div class="stat-desc">Confirmed</div>
