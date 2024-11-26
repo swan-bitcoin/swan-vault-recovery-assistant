@@ -1,6 +1,6 @@
 import { closeToast } from './closeToast'
 
-export const showToast = (content) => {
+export const showToast = (content: string) => {
   const toastContainer = document.getElementById('toast-container')
   toastContainer.classList.remove('hidden')
   toastContainer.innerHTML = content
