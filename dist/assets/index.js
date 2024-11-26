@@ -552,11 +552,10 @@ const validateDescriptor = async () => {
   const descriptor = DOM.inputs.receive.value
   const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
   const standardWalletActions = document.getElementById('standard-wallet-actions')
+  clearStatusIndicators(DOM.inputs.receive)
   if (!descriptor) {
     DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.inputs.receive.classList.add('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-warning')
     return false
   }
   try {
@@ -565,22 +564,16 @@ const validateDescriptor = async () => {
       DOM.outputs.tempMessage.textContent =
         'Descriptor is fine but it is for the wrong network. Open the network settings to the right to change the network!'
       DOM.inputs.receive.classList.add('textarea-error')
-      DOM.inputs.receive.classList.remove('textarea-success')
-      DOM.inputs.receive.classList.remove('textarea-warning')
       return false
     }
     if (isChangeDescriptor(descriptor)) {
       DOM.outputs.tempMessage.textContent =
         'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
       DOM.inputs.receive.classList.add('textarea-warning')
-      DOM.inputs.receive.classList.remove('textarea-success')
-      DOM.inputs.receive.classList.remove('textarea-error')
       standardWalletActions.classList.remove('hidden')
       return true
     }
     DOM.inputs.receive.classList.add('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-warning')
     DOM.outputs.tempMessage.textContent =
       'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
     standardWalletActions.classList.remove('hidden')
@@ -589,8 +582,6 @@ const validateDescriptor = async () => {
     console.error(e)
     DOM.outputs.tempMessage.textContent = 'Invalid wallet configuration!'
     DOM.inputs.receive.classList.add('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-warning')
     return false
   }
 }
@@ -628,9 +619,7 @@ async function validatePsbt() {
 }
 async function validateAddress() {
   const { address, descriptors, network } = getUserInputs()
-  DOM.inputs.address.classList.remove('input-success')
-  DOM.inputs.address.classList.remove('input-error')
-  DOM.inputs.address.classList.remove('input-warning')
+  clearStatusIndicators(DOM.inputs.address)
   if (!address) {
     DOM.outputs.tempMessage.textContent = 'No address provided'
     return false

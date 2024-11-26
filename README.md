@@ -50,7 +50,7 @@ rustup update
 
 2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
 
-3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory after cloning this repository. Download the HWI binaries from [HWI's github releases page](https://github.com/bitcoin-core/HWI/releases) -- this project was last verified against v3.1.0 on 10/16/2024.
+3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. You may also choose to download the HWI binaries yourself from [HWI's github releases page](https://github.com/bitcoin-core/HWI/releases) -- this project was last verified against v3.1.0 on 10/16/2024.
 
 4. other system dependencies
 
@@ -83,6 +83,13 @@ $ pnpm install
 
 ## Testing
 
+Verify you have docker installed (required for all but unit tests)
+
+```bash
+$ docker -v
+Docker version 24.0.7, build 24.0.7
+```
+
 ### Automated testing
 
 `pnpm test` will run both the unit and scenario tests. The scenario tests have further requirements (see below). run `pnpm test:unit` for unit tests only.
@@ -98,13 +105,6 @@ cargo install tauri-driver
 
 ### Manual testing with a simulated 'regtest' bitcoin network
 
-Verify you have docker installed
-
-```bash
-$ docker -v
-Docker version 24.0.7, build 24.0.7
-```
-
 A network simulation script is provided in the `/test` directory. It can be ran with
 
 ```bash
@@ -116,10 +116,6 @@ the script will automatically initialize the `docker compose` stack and bring th
 The `~~ NETWORK READY ~~` message will be printed when the setup is done. A couple wallet descriptors will be generated above this message; one funded wallet and one unfunded wallet. The funded wallet's mnemonic will be printed as well so you can test with any PSBT signing software or a physical hardware device. Make sure the hardware device is initialized in test mode and DO NOT USE THIS MNEMONIC WITH A REAL BITCOIN WALLET!
 
 If you would like to reset the network (destroying all blocks/transactions in the process), simply run `docker compose down` when the simnet script is not running.
-
-## Usage Instructions
-
-Paste one or both descriptors in and hit 'Fetch Balance'. Other features are available the furter down you go, with requirements listed between them. More details coming soon.
 
 ## Recommended IDE Setup
 
