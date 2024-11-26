@@ -1,92 +1,12 @@
-import { DOM, initializeDOM } from './dom'
+import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { commands, Descriptors, type TempuraError } from './bindings'
+import { commands } from './bindings'
 import { Address, Balance, Success, Transactions } from './components'
-import {
-  capitalize,
-  createConversationBubble,
-  isChangeDescriptor,
-  populateTransactionOverview,
-  scrollToLastMessage,
-} from './utilities'
-import { simpleCheckmark } from './icons'
+import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
 import { Device, getDevice, getDeviceMessage, getDevicePrompt, getPsbtStatusMessage, getSignResultAndPsbt } from './parsing'
+import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 
 const FEE_RATE_WARNING_RATIO = 0.9
-
-function isTempuraError(e: unknown): e is TempuraError {
-  const tempuraError = e as TempuraError
-  return !!(tempuraError.error_type && tempuraError.message)
-}
-
-function handleError(e: unknown) {
-  if (isTempuraError(e)) {
-    console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
-    return
-  }
-
-  if (e instanceof Error) {
-    console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
-    return
-  }
-
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
-}
-
-const validateDescriptor = async () => {
-  const descriptor = DOM.inputs.receive.value
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
-  const standardWalletActions = document.getElementById('standard-wallet-actions')
-
-  if (!descriptor) {
-    DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
-    DOM.inputs.receive.classList.add('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-warning')
-    return false
-  }
-
-  try {
-    const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
-    if (!isValidDescriptor) {
-      DOM.outputs.tempMessage.textContent =
-        'Descriptor is fine but it is for the wrong network. Open the network settings to the right to change the network!'
-      DOM.inputs.receive.classList.add('textarea-error')
-      DOM.inputs.receive.classList.remove('textarea-success')
-      DOM.inputs.receive.classList.remove('textarea-warning')
-      return false
-    }
-
-    // Warning for change descriptor
-    if (isChangeDescriptor(descriptor)) {
-      DOM.outputs.tempMessage.textContent =
-        'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
-      DOM.inputs.receive.classList.add('textarea-warning')
-      DOM.inputs.receive.classList.remove('textarea-success')
-      DOM.inputs.receive.classList.remove('textarea-error')
-      standardWalletActions.classList.remove('hidden')
-      return true
-    }
-
-    // Descriptor is valid, show now wallet actions and recovery options card (one way switch)
-    DOM.inputs.receive.classList.add('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-warning')
-    DOM.outputs.tempMessage.textContent =
-      'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
-    standardWalletActions.classList.remove('hidden')
-    return true
-  } catch (e: unknown) {
-    console.error(e)
-    DOM.outputs.tempMessage.textContent = 'Invalid wallet configuration!'
-    DOM.inputs.receive.classList.add('textarea-error')
-    DOM.inputs.receive.classList.remove('textarea-success')
-    DOM.inputs.receive.classList.remove('textarea-warning')
-    return false
-  }
-}
 
 type FeeRate = {
   value: number | null
@@ -95,7 +15,7 @@ type FeeRate = {
 }
 
 async function getFeeRate(): Promise<FeeRate> {
-  const { feeRate, network, electrum } = getInputs()
+  const { feeRate, network, electrum } = getUserInputs()
 
   let estimate: number
   try {
@@ -133,39 +53,6 @@ const updateSignHistory = (device: Device) => {
   stepsList.appendChild(newStep)
 }
 
-type Inputs = {
-  address: string
-  descriptors: Descriptors
-  electrum: string | null
-  feeRate: number | null
-  network: string
-  psbt: string
-}
-
-function getInputs(): Inputs {
-  const address = DOM.inputs.address.value.trim()
-  const autoChange = DOM.checkboxes.change.checked
-  const receive = DOM.inputs.receive.value.trim()
-  const change = DOM.inputs.change?.value.trim() || null
-  const electrum = DOM.inputs.electrum?.value.trim() || null
-  const feeRate = Number(DOM.inputs.feeRate?.value.trim()) || null
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
-  const psbt = DOM.outputs.psbtTextArea.value.trim()
-
-  return {
-    address,
-    descriptors: {
-      receive,
-      change,
-      auto_change: autoChange,
-    },
-    electrum,
-    feeRate,
-    network,
-    psbt,
-  }
-}
-
 function require(value: unknown, itemName: string) {
   if (!value) {
     const message = itemName.concat(' is required')
@@ -175,7 +62,7 @@ function require(value: unknown, itemName: string) {
 }
 
 async function broadcast() {
-  const { descriptors, electrum, network, psbt } = getInputs()
+  const { descriptors, electrum, network, psbt } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   require(psbt, 'PSBT')
@@ -194,7 +81,7 @@ async function broadcast() {
 }
 
 async function enumerate() {
-  const { network } = getInputs()
+  const { network } = getUserInputs()
 
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
@@ -210,7 +97,7 @@ async function enumerate() {
 }
 
 async function loadWallet() {
-  const { descriptors, electrum, network } = getInputs()
+  const { descriptors, electrum, network } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   DOM.outputs.tempMessage.textContent = 'Fetching wallet ...'
@@ -287,7 +174,7 @@ async function getAddress() {
     descriptors: { receive },
     electrum,
     network,
-  } = getInputs()
+  } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
   DOM.outputs.tempMessage.textContent = 'Fetching the next unused address for you ...'
@@ -324,7 +211,7 @@ function copyPsbtToClipboard() {
 async function estimateFee() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
-    const { electrum, network } = getInputs()
+    const { electrum, network } = getUserInputs()
     const feeRate = await commands.estimateFee(network, electrum, 1)
     DOM.inputs.feeRate.value = feeRate.toString()
     DOM.outputs.tempMessage.innerHTML = Success('Fee retrieved')
@@ -353,50 +240,6 @@ function pastePsbtFromClipboard() {
     })
 }
 
-function clearStatusIndicators(element: HTMLElement) {
-  element.classList.remove('input-success')
-  element.classList.remove('input-error')
-  element.classList.remove('input-warning')
-  element.classList.remove('textarea-success')
-  element.classList.remove('textarea-error')
-  element.classList.remove('textarea-warning')
-}
-
-async function validatePsbt() {
-  const { psbt, network, descriptors } = getInputs()
-  clearStatusIndicators(DOM.outputs.psbtTextArea)
-
-  try {
-    const isValid = await commands.isPsbt(psbt)
-    if (!isValid) {
-      DOM.outputs.psbtTextArea.classList.add('textarea-error')
-      DOM.outputs.psbtStatus.innerHTML = `
-      <span class="text-error">Invalid PSBT</span>
-    `
-      return
-    }
-
-    const psbtStatus = await commands.psbtStatus(psbt, network, descriptors)
-    if (psbtStatus === 'FullySigned') {
-      DOM.outputs.psbtTextArea.classList.add('textarea-success')
-      DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-success">Fully Signed ${simpleCheckmark}</span>
-      `
-      DOM.buttons.broadcast.classList.remove('btn-disabled')
-    } else if (psbtStatus === 'PartiallySigned') {
-      DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-warning">Partially Signed</span>
-      `
-    } else if (psbtStatus === 'Unsigned') {
-      DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-neutral-500">Unsigned</span>
-      `
-    }
-  } catch (e: unknown) {
-    handleError(e)
-  }
-}
-
 function showChangeInput() {
   if (DOM.checkboxes.change.checked) {
     DOM.containers.change.classList.add('hidden')
@@ -422,7 +265,7 @@ function showNetworkInput() {
 }
 
 async function sign() {
-  const { psbt, descriptors, network } = getInputs()
+  const { psbt, descriptors, network } = getUserInputs()
   require(psbt, 'PSBT')
 
   DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
@@ -451,7 +294,7 @@ async function sign() {
 }
 
 async function sweep() {
-  const inputs = getInputs()
+  const inputs = getUserInputs()
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
@@ -497,52 +340,6 @@ async function sweep() {
   } catch (e: unknown) {
     handleError(e)
   }
-}
-
-async function validateAddress() {
-  const { address, descriptors, network } = getInputs()
-  DOM.inputs.address.classList.remove('input-success')
-  DOM.inputs.address.classList.remove('input-error')
-  DOM.inputs.address.classList.remove('input-warning')
-
-  if (!address) {
-    // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
-    DOM.outputs.tempMessage.textContent = 'No address provided'
-    return false
-  }
-
-  try {
-    const isValid = await commands.isAddress(address)
-    if (!isValid) {
-      DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not valid.'
-      return false
-    }
-
-    const isForNetwork = await commands.isAddressForNetwork(address, network)
-    if (!isForNetwork) {
-      DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not for the selected network'
-      return false
-    }
-
-    const isMine = await commands.isAddressMine(address, network, descriptors)
-    if (isMine) {
-      DOM.outputs.tempMessage.textContent =
-        'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
-      DOM.inputs.address.classList.add('input-warning')
-      return false
-    }
-
-    DOM.inputs.address.classList.add('input-success')
-    DOM.outputs.tempMessage.textContent = 'This address looks good!'
-    return true
-  } catch (e: unknown) {
-    DOM.inputs.address.classList.add('input-error')
-    handleError(e)
-  }
-
-  return false
 }
 
 window.addEventListener('DOMContentLoaded', () => {
