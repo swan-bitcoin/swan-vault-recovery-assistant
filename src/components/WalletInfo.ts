@@ -1,3 +1,4 @@
+import type { Transaction, Balance as BalanceType } from '@/bindings'
 import { countTransactions, getFirstTransaction } from '../utilities'
 import { Balance } from './Balance'
 
@@ -7,7 +8,12 @@ const generateRandomString = (length = 8) => {
     .substring(2, 2 + length)
 }
 
-export const WalletInfo = ({ balance, transactions }) => {
+type WalletInfoProps = {
+  balance: BalanceType
+  transactions: Transaction[]
+}
+
+export const WalletInfo = ({ balance, transactions }: WalletInfoProps) => {
   const { unconfirmedCount, confirmedCount } = countTransactions(transactions)
   const firstTransaction = getFirstTransaction(transactions)
   const tabId = generateRandomString() // without this we get bugs if the user fetches the wallet info more than once

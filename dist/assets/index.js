@@ -859,10 +859,7 @@ async function loadWallet() {
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
       WalletInfo({
-        balance: {
-          confirmed: balance.confirmed,
-          untrusted_pending: balance.untrusted_pending,
-        },
+        balance,
         transactions,
       })
     )
