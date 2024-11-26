@@ -493,6 +493,18 @@ function getSignResultAndPsbt(val) {
     : 'A signature was not added, have you already signed with this device?'
   return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
+function sanitize(input) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  }
+  return input.replace(/[&<>"']/g, function (m) {
+    return map[m]
+  })
+}
 const isDevice = (item) => {
   if (typeof item !== 'object' || item === null) return false
   const device = item
@@ -918,7 +930,7 @@ async function sweep() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${address}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)
