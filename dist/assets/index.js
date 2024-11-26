@@ -32,126 +32,6 @@
     fetch(link.href, fetchOpts)
   }
 })()
-let DOM
-function clearStatusIndicators(element) {
-  element.classList.remove('input-success')
-  element.classList.remove('input-error')
-  element.classList.remove('input-warning')
-  element.classList.remove('textarea-success')
-  element.classList.remove('textarea-error')
-  element.classList.remove('textarea-warning')
-}
-function getUserInputs() {
-  var _a, _b, _c
-  const address = DOM.inputs.address.value.trim()
-  const autoChange = DOM.checkboxes.change.checked
-  const receive = DOM.inputs.receive.value.trim()
-  const change = ((_a = DOM.inputs.change) == null ? void 0 : _a.value.trim()) || null
-  const electrum = ((_b = DOM.inputs.electrum) == null ? void 0 : _b.value.trim()) || null
-  const feeRate = Number((_c = DOM.inputs.feeRate) == null ? void 0 : _c.value.trim()) || null
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
-  const psbt = DOM.outputs.psbtTextArea.value.trim()
-  return {
-    address,
-    descriptors: {
-      receive,
-      change,
-      auto_change: autoChange,
-    },
-    electrum,
-    feeRate,
-    network,
-    psbt,
-  }
-}
-function handleError(e) {
-  if (isTempuraError(e)) {
-    console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
-    return
-  }
-  if (e instanceof Error) {
-    console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
-    return
-  }
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
-}
-function initializeDOM() {
-  let tempMessage = void 0
-  try {
-    tempMessage = requireDomElement('#temporary-message')
-    const buttons = {
-      address: requireDomElement('#new-address-button'),
-      broadcast: requireDomElement('#broadcast-button'),
-      copyPsbt: requireDomElement('#copy-psbt-button'),
-      enumerate: requireDomElement('#enumerate-button'),
-      estimate: requireDomElement('#estimate-button'),
-      load: requireDomElement('#fetch-wallet-button'),
-      pastePsbt: requireDomElement('#paste-psbt-button'),
-      sign: requireDomElement('#sign-button'),
-      sweep: requireDomElement('#sweep-button'),
-    }
-    const checkboxes = {
-      change: requireDomElement('#auto-change-checkbox'),
-      electrum: requireDomElement('#auto-electrum-checkbox'),
-      network: requireDomElement('#network-checkbox'),
-    }
-    const containers = {
-      change: requireDomElement('#change-input-container'),
-      electrum: requireDomElement('#electrum-input-container'),
-      network: requireDomElement('#network-input-container'),
-    }
-    const inputs = {
-      address: requireDomElement('#address-input'),
-      change: requireDomElement('#change-input'),
-      electrum: requireDomElement('#electrum-input'),
-      feeRate: requireDomElement('#feerate-input'),
-      networkRadios: requireDomElements('input[name="network"]'),
-      receive: requireDomElement('#receive-input'),
-    }
-    const outputs = {
-      conversation: requireDomElement('#conversation'),
-      psbtSignHistory: requireDomElement('#psbt-sign-history'),
-      psbtStatus: requireDomElement('#psbt-status'),
-      psbtTextArea: requireDomElement('#psbt-textarea'),
-      tempMessage,
-      transactionOverview: requireDomElement('#transaction-overview-container'),
-      txBody: requireDomElement('#transactions-body'),
-      txModal: requireDomElement('#transactions-modal'),
-    }
-    DOM = {
-      buttons,
-      checkboxes,
-      containers,
-      inputs,
-      outputs,
-    }
-  } catch (e) {
-    const error = e || new Error('Failed to initialize: missing required DOM elements')
-    if (tempMessage) {
-      tempMessage.textContent = error.message
-    }
-  }
-}
-function isTempuraError(e) {
-  const tempuraError = e
-  return !!(tempuraError.error_type && tempuraError.message)
-}
-function requireDomElement(name) {
-  const element = document.querySelector(name)
-  if (!element) {
-    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
-  }
-  return element
-}
-function requireDomElements(name) {
-  const elements = document.querySelectorAll(name)
-  if (elements.length === 0) {
-    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
-  }
-  return elements
-}
 typeof SuppressedError === 'function'
   ? SuppressedError
   : function (error, suppressed, message) {
@@ -329,7 +209,18 @@ const TxRow = (transaction) => {
       </tr>
     `
 }
-const Transactions = (transactions) => transactions.map(TxRow).join('\n')
+const Transactions = (transactions) => {
+  const sortedTransactions = transactions.sort((a, b) => {
+    const isAUnconfirmed = a.confirmation_height === null
+    const isBUnconfirmed = b.confirmation_height === null
+    if (isAUnconfirmed && !isBUnconfirmed) return -1
+    if (!isAUnconfirmed && isBUnconfirmed) return 1
+    const heightA = a.confirmation_height ?? 0
+    const heightB = b.confirmation_height ?? 0
+    return heightB - heightA
+  })
+  return sortedTransactions.map(TxRow).join('\n')
+}
 const Success = (text) => `
 <div class="flex gap-1 items-center">
   <svg
@@ -348,7 +239,6 @@ const Success = (text) => `
 `
 const Balance = ({ confirmed, unconfirmed }) => {
   return `
-      <h1>Your Balance</h1>
       <div class="stat">
         <div class="stat-value">${Sats(confirmed)}</div>
         <div class="stat-desc">Confirmed</div>
@@ -418,6 +308,243 @@ const populateTransactionOverview = ({ address, outbound, fee }) => {
   transactionRowTds[0].textContent = address
   transactionRowTds[1].innerHTML = Sats(outbound)
   transactionRowTds[2].innerHTML = Sats(fee)
+}
+const countTransactions = (transactions) => {
+  let unconfirmedCount = 0
+  let confirmedCount = 0
+  for (const transaction of transactions) {
+    if (transaction.confirmation_height === null) {
+      unconfirmedCount++
+    } else {
+      confirmedCount++
+    }
+  }
+  return {
+    unconfirmedCount,
+    confirmedCount,
+  }
+}
+const getFirstTransaction = (transactions) => {
+  const confirmedTransactions = transactions.filter((tx) => tx.confirmation_height !== null)
+  if (confirmedTransactions.length === 0) {
+    return null
+  }
+  return confirmedTransactions.reduce((firstTx, currentTx) => {
+    return currentTx.confirmation_height < firstTx.confirmation_height ? currentTx : firstTx
+  })
+}
+const closeToast = () => {
+  const toastContainer = document.getElementById('toast-container')
+  toastContainer.innerHTML = ''
+  toastContainer.classList.add('hidden')
+}
+const showToast = (content) => {
+  const toastContainer = document.getElementById('toast-container')
+  toastContainer.classList.remove('hidden')
+  toastContainer.innerHTML = content
+  const closeBtn = document.getElementById('close-toast-btn')
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeToast)
+  }
+}
+const generateRandomString = (length = 8) => {
+  return Math.random()
+    .toString(36)
+    .substring(2, 2 + length)
+}
+const WalletInfo = ({ balance, transactions }) => {
+  const { unconfirmedCount, confirmedCount } = countTransactions(transactions)
+  const firstTransaction = getFirstTransaction(transactions)
+  const tabId = generateRandomString()
+  return `
+      <div class="flex flex-col justify-center items-center wallet-info">
+        <div role="tablist" class="tabs tabs-bordered">
+          <!-- Invisible inputs to push the tabs to the center -->
+          <input type="radio" name="wallet_info_tabs_${tabId}" class="tab opacity-0 pointer-events-none" aria-hidden="true" />
+          <input type="radio" name="wallet_info_tabs_${tabId}" class="tab opacity-0 pointer-events-none" aria-hidden="true" />
+  
+          <!-- Balance Tab -->
+          <input
+            type="radio"
+            name="wallet_info_tabs_${tabId}"
+            role="tab"
+            class="tab"
+            aria-label="Balance"
+            checked="checked"
+          />
+          <div role="tabpanel" class="tab-content rounded-box mt-4 w-80">
+            ${Balance({
+              confirmed: balance.confirmed,
+              unconfirmed: balance.untrusted_pending,
+            })}
+          </div>
+  
+          <!-- Transactions Tab -->
+          <input
+            type="radio"
+            name="wallet_info_tabs_${tabId}"
+            role="tab"
+            class="tab"
+            aria-label="Transactions"
+          />
+          <div role="tabpanel" class="tab-content rounded-box mt-6 w-80">
+            <div class="flex flex-col gap-4 items-start">
+              <div class="flex items-center gap-2">
+                <span class="badge badge-neutral">Total ${transactions.length}</span>
+                <span class="badge badge-warning">Unconfirmed ${unconfirmedCount}</span>
+                <span class="badge badge-success">Confirmed ${confirmedCount}</span>
+              </div>
+              ${
+                (firstTransaction == null ? void 0 : firstTransaction.confirmation_height)
+                  ? `<div class="flex gap-1">
+                <p class="text-md flex-grow-0">First Transaction in Block:</p>
+                <span>${firstTransaction.confirmation_height}</span>
+              </div>`
+                  : '<span>No transactions yet</span>'
+              }
+              <button class="btn btn-outline btn-ghost btn-sm self-center mt-4 mb-2" id="show-transactions-btn">
+                Show Full List
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `
+}
+const RecoveryToast = () => {
+  return `
+    <div class="toast toast-end z-50">
+      <div class="alert alert-info relative">
+        <button id="close-toast-btn" class="btn btn-sm btn-circle btn-ghost absolute top-1 right-1">✕</button>
+        <div class="flex items-center">
+          <span>You can recover your wallet now.</span>
+          <button id="begin-recovery-btn" class="btn btn-link px-1">
+            Start Recovery
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+}
+let DOM
+function clearStatusIndicators(element) {
+  element.classList.remove('input-success')
+  element.classList.remove('input-error')
+  element.classList.remove('input-warning')
+  element.classList.remove('textarea-success')
+  element.classList.remove('textarea-error')
+  element.classList.remove('textarea-warning')
+}
+function getUserInputs() {
+  var _a, _b, _c
+  const address = DOM.inputs.address.value.trim()
+  const autoChange = DOM.checkboxes.change.checked
+  const receive = DOM.inputs.receive.value.trim()
+  const change = ((_a = DOM.inputs.change) == null ? void 0 : _a.value.trim()) || null
+  const electrum = ((_b = DOM.inputs.electrum) == null ? void 0 : _b.value.trim()) || null
+  const feeRate = Number((_c = DOM.inputs.feeRate) == null ? void 0 : _c.value.trim()) || null
+  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
+  const psbt = DOM.outputs.psbtTextArea.value.trim()
+  return {
+    address,
+    descriptors: {
+      receive,
+      change,
+      auto_change: autoChange,
+    },
+    electrum,
+    feeRate,
+    network,
+    psbt,
+  }
+}
+function handleError(e) {
+  if (isTempuraError(e)) {
+    console.log(e.error_type, e.message)
+    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    return
+  }
+  if (e instanceof Error) {
+    console.error(e)
+    DOM.outputs.tempMessage.textContent = e.message
+    return
+  }
+  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+}
+function initializeDOM() {
+  let tempMessage = void 0
+  try {
+    tempMessage = requireDomElement('#temporary-message')
+    const buttons = {
+      address: requireDomElement('#new-address-button'),
+      broadcast: requireDomElement('#broadcast-button'),
+      copyPsbt: requireDomElement('#copy-psbt-button'),
+      enumerate: requireDomElement('#enumerate-button'),
+      estimate: requireDomElement('#estimate-button'),
+      load: requireDomElement('#fetch-wallet-button'),
+      pastePsbt: requireDomElement('#paste-psbt-button'),
+      sign: requireDomElement('#sign-button'),
+      sweep: requireDomElement('#sweep-button'),
+    }
+    const checkboxes = {
+      change: requireDomElement('#auto-change-checkbox'),
+      electrum: requireDomElement('#auto-electrum-checkbox'),
+      network: requireDomElement('#network-checkbox'),
+    }
+    const containers = {
+      change: requireDomElement('#change-input-container'),
+      electrum: requireDomElement('#electrum-input-container'),
+      network: requireDomElement('#network-input-container'),
+    }
+    const inputs = {
+      address: requireDomElement('#address-input'),
+      change: requireDomElement('#change-input'),
+      electrum: requireDomElement('#electrum-input'),
+      feeRate: requireDomElement('#feerate-input'),
+      networkRadios: requireDomElements('input[name="network"]'),
+      receive: requireDomElement('#receive-input'),
+    }
+    const outputs = {
+      conversation: requireDomElement('#conversation'),
+      psbtSignHistory: requireDomElement('#psbt-sign-history'),
+      psbtStatus: requireDomElement('#psbt-status'),
+      psbtTextArea: requireDomElement('#psbt-textarea'),
+      tempMessage,
+      transactionOverview: requireDomElement('#transaction-overview-container'),
+      txBody: requireDomElement('#transactions-body'),
+      txModal: requireDomElement('#transactions-modal'),
+    }
+    DOM = {
+      buttons,
+      checkboxes,
+      containers,
+      inputs,
+      outputs,
+    }
+  } catch (e) {
+    const error = e || new Error('Failed to initialize: missing required DOM elements')
+    if (tempMessage) {
+      tempMessage.textContent = error.message
+    }
+  }
+}
+function isTempuraError(e) {
+  const tempuraError = e
+  return !!(tempuraError.error_type && tempuraError.message)
+}
+function requireDomElement(name) {
+  const element = document.querySelector(name)
+  if (!element) {
+    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
+  }
+  return element
+}
+function requireDomElements(name) {
+  const elements = document.querySelectorAll(name)
+  if (elements.length === 0) {
+    throw new Error(`Failed to initialize: missing required DOM element ${name}`)
+  }
+  return elements
 }
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
@@ -735,17 +862,11 @@ async function loadWallet() {
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
-      `
-      ${Balance({
-        confirmed: balance.confirmed,
-        unconfirmed: balance.untrusted_pending,
-      })}
-      After ${transactions.length} transactions <button class="btn btn-sm btn-link" id="show-transactions-btn">Show List</button>
-      <br/>
-      <button class="btn btn-primary btn-sm float-right" id="begin-recovery-btn">Begin Recovery</button>
-      `
+      WalletInfo({
+        balance,
+        transactions,
+      })
     )
-    tempuraBubble.classList.add('wallet-info')
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton == null
@@ -753,13 +874,15 @@ async function loadWallet() {
       : showListButton.addEventListener('click', () => {
           DOM.outputs.txModal.showModal()
         })
-    const beginRecoveryButton = tempuraBubble.querySelector('#begin-recovery-btn')
+    showToast(RecoveryToast())
+    const beginRecoveryButton = document.getElementById('begin-recovery-btn')
     beginRecoveryButton == null
       ? void 0
       : beginRecoveryButton.addEventListener('click', () => {
           const recoveryOptionsCard = document.getElementById('recovery-options-card')
           recoveryOptionsCard.classList.remove('hidden')
           recoveryOptionsCard.scrollIntoView({ behavior: 'smooth' })
+          closeToast()
         })
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e) {
