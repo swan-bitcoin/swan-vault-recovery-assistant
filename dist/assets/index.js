@@ -482,13 +482,17 @@ function initializeDOM() {
       electrum: requireDomElement('#auto-electrum-checkbox'),
       network: requireDomElement('#network-checkbox'),
     }
+    const radios = {
+      walletConfigurationCollapse: requireDomElement('#wallet-configuration-collapse-radio'),
+      recoveryOptionsCollapse: requireDomElement('#recovery-options-collapse-radio'),
+      sendTransactionCollapse: requireDomElement('#send-transaction-collapse-radio'),
+    }
     const containers = {
       change: requireDomElement('#change-input-container'),
       electrum: requireDomElement('#electrum-input-container'),
       footer: requireDomElement('#footer'),
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
-      recovery: requireDomElement('#recovery-container'),
       toast: requireDomElement('#toast-container'),
       walletActions: requireDomElement('#wallet-actions'),
     }
@@ -516,6 +520,7 @@ function initializeDOM() {
     DOM = {
       buttons,
       checkboxes,
+      radios,
       containers,
       inputs,
       links,
@@ -892,8 +897,7 @@ async function loadWallet() {
     beginRecoveryButton == null
       ? void 0
       : beginRecoveryButton.addEventListener('click', () => {
-          DOM.containers.recovery.classList.remove('hidden')
-          DOM.containers.recovery.scrollIntoView({ behavior: 'smooth' })
+          DOM.radios.recoveryOptionsCollapse.checked = true
           closeToast()
         })
     instrumentCopyButtons(DOM.outputs.txBody)
@@ -1073,6 +1077,7 @@ async function sweep() {
       const warningBubble = createConversationBubble(feeRate.warning)
       DOM.outputs.conversation.appendChild(warningBubble)
     }
+    DOM.radios.sendTransactionCollapse.checked = true
   } catch (e) {
     handleError(e)
   }

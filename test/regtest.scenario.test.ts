@@ -159,6 +159,10 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     inputs.newAddress = await driver.findElement(By.id('new-address-button'))
     expect(inputs.newAddress).toBeTruthy()
 
+    // collapse selector
+    inputs.walletConfigurationCollapse = await driver.findElement(By.id('wallet-configuration-collapse-radio'))
+    expect(inputs.walletConfigurationCollapse).toBeTruthy()
+
     // network selection buttons
     inputs.networkCheckbox = await driver.findElement(By.id('network-checkbox'))
     expect(inputs.networkCheckbox).toBeTruthy()
@@ -388,6 +392,10 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.broadcast.click()
     await waitForUI()
     await expectLatestMessageToMatch(/Broadcast successful!/)
+  })
+
+  it('switches back to wallet configuration', async () => {
+    await inputs.walletConfigurationCollapse.click()
   })
 
   it('can see the balance updated after the transaction is broadcast', async () => {

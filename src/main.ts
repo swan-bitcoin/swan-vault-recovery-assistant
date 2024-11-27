@@ -140,8 +140,7 @@ async function loadWallet() {
     showToast(RecoveryToast())
     const beginRecoveryButton = document.getElementById('begin-recovery-btn')
     beginRecoveryButton?.addEventListener('click', () => {
-      DOM.containers.recovery.classList.remove('hidden')
-      DOM.containers.recovery.scrollIntoView({ behavior: 'smooth' })
+      DOM.radios.recoveryOptionsCollapse.checked = true
       closeToast()
     })
 
@@ -349,6 +348,8 @@ async function sweep() {
       const warningBubble = createConversationBubble(feeRate.warning)
       DOM.outputs.conversation.appendChild(warningBubble)
     }
+
+    DOM.radios.sendTransactionCollapse.checked = true
   } catch (e: unknown) {
     handleError(e)
   }

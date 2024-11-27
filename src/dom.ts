@@ -19,13 +19,18 @@ type Checkboxes = {
   network: HTMLInputElement
 }
 
+type Radios = {
+  walletConfigurationCollapse: HTMLInputElement
+  recoveryOptionsCollapse: HTMLInputElement
+  sendTransactionCollapse: HTMLInputElement
+}
+
 type Containers = {
   change: HTMLDivElement
   electrum: HTMLDivElement
   footer: HTMLDivElement
   mainContent: HTMLDivElement
   network: HTMLDivElement
-  recovery: HTMLDivElement
   toast: HTMLDivElement
   walletActions: HTMLDivElement
 }
@@ -57,6 +62,7 @@ type Outputs = {
 type DOM = {
   buttons: Buttons
   checkboxes: Checkboxes
+  radios: Radios
   containers: Containers
   inputs: Inputs
   links: Links
@@ -146,13 +152,18 @@ export function initializeDOM() {
       network: requireDomElement<HTMLInputElement>('#network-checkbox'),
     }
 
+    const radios = {
+      walletConfigurationCollapse: requireDomElement<HTMLInputElement>('#wallet-configuration-collapse-radio'),
+      recoveryOptionsCollapse: requireDomElement<HTMLInputElement>('#recovery-options-collapse-radio'),
+      sendTransactionCollapse: requireDomElement<HTMLInputElement>('#send-transaction-collapse-radio'),
+    }
+
     const containers = {
       change: requireDomElement<HTMLDivElement>('#change-input-container'),
       electrum: requireDomElement<HTMLDivElement>('#electrum-input-container'),
       footer: requireDomElement<HTMLDivElement>('#footer'),
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
-      recovery: requireDomElement<HTMLDivElement>('#recovery-container'),
       toast: requireDomElement<HTMLDivElement>('#toast-container'),
       walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }
@@ -184,6 +195,7 @@ export function initializeDOM() {
     DOM = {
       buttons,
       checkboxes,
+      radios,
       containers,
       inputs,
       links,
