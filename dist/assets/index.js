@@ -269,7 +269,7 @@ const showClearMessagesButton = () => {
     clearMessagesButton.classList.remove('hidden')
   }
 }
-const createConversationBubble = (content, isUserSpeaking = false) => {
+const createConversationBubble = (content, isUserSpeaking = false, dangerouslySetInnerHTML = false) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
   const avatar = document.createElement('div')
@@ -277,7 +277,11 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   avatar.innerHTML = `<span class="text-4xl">${isUserSpeaking ? '👨‍💻' : '🍤'}</span>`
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
-  bubble.innerText = content
+  if (dangerouslySetInnerHTML) {
+    bubble.innerHTML = content
+  } else {
+    bubble.innerText = content
+  }
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
   showConversation()
@@ -865,7 +869,9 @@ async function loadWallet() {
       WalletInfo({
         balance,
         transactions,
-      })
+      }),
+      false,
+      true
     )
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
@@ -926,7 +932,7 @@ async function getAddress() {
     DOM.outputs.conversation.appendChild(userBubble)
     const { address } = await commands.address(network, receive, electrum)
     DOM.outputs.tempMessage.textContent = 'Address retrieved successfully!'
-    const tempuraBubble = createConversationBubble(Address({ address }))
+    const tempuraBubble = createConversationBubble(Address({ address }), false, true)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     instrumentCopyButtons(tempuraBubble)
   } catch (e) {
@@ -1043,6 +1049,7 @@ async function sweep() {
   try {
     const userBubble = createConversationBubble(
       `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      true,
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)
@@ -1054,7 +1061,7 @@ async function sweep() {
     validatePsbt()
     DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
     DOM.outputs.tempMessage.textContent = 'Sign next?'
-    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
+    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'), false, true)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     if (feeRate.warning) {
       const warningBubble = createConversationBubble(feeRate.warning)
