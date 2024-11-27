@@ -8,6 +8,8 @@ export const closeToast = () => {
 export const showToast = (content: string) => {
   DOM.containers.toast.classList.remove('hidden')
   DOM.containers.toast.innerHTML = content
-  // TODO: Toast content needs to add the close button
-  // DOM.buttons.closeToast.addEventListener('click', closeToast)
+  const closeBtn = document.getElementById('close-toast-btn')
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeToast)
+  }
 }

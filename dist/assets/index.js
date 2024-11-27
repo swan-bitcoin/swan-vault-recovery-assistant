@@ -782,6 +782,10 @@ const closeToast = () => {
 const showToast = (content) => {
   DOM.containers.toast.classList.remove('hidden')
   DOM.containers.toast.innerHTML = content
+  const closeBtn = document.getElementById('close-toast-btn')
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeToast)
+  }
 }
 const FEE_RATE_WARNING_RATIO = 0.9
 async function getFeeRate() {
