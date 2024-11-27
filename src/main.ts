@@ -63,7 +63,7 @@ async function getFeeRate(): Promise<FeeRate> {
 const updateSignHistory = (device: Device) => {
   const newStep = document.createElement('li')
   newStep.classList.add('step', 'step-info')
-  newStep.innerHTML = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  newStep.innerText = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
   const stepsList = DOM.outputs.psbtSignHistory
   stepsList.appendChild(newStep)
 }

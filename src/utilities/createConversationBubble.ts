@@ -12,6 +12,7 @@ const showClearMessagesButton = () => {
   }
 }
 
+// content should only be text not HTML
 export const createConversationBubble = (content: string, isUserSpeaking: boolean = false): HTMLDivElement => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
@@ -22,7 +23,7 @@ export const createConversationBubble = (content: string, isUserSpeaking: boolea
 
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
-  bubble.innerHTML = content // Set the innerHTML to the provided content
+  bubble.innerText = content // Set the innerText to the provided content
 
   // Assemble the structure
   chatContainer.appendChild(avatar)

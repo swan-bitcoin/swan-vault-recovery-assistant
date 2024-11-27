@@ -277,7 +277,7 @@ const createConversationBubble = (content, isUserSpeaking = false) => {
   avatar.innerHTML = `<span class="text-4xl">${isUserSpeaking ? '👨‍💻' : '🍤'}</span>`
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
-  bubble.innerHTML = content
+  bubble.innerText = content
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
   showConversation()
@@ -808,7 +808,7 @@ async function getFeeRate() {
 const updateSignHistory = (device) => {
   const newStep = document.createElement('li')
   newStep.classList.add('step', 'step-info')
-  newStep.innerHTML = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  newStep.innerText = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
   const stepsList = DOM.outputs.psbtSignHistory
   stepsList.appendChild(newStep)
 }
