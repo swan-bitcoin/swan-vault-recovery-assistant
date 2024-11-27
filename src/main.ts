@@ -61,7 +61,7 @@ async function getFeeRate(): Promise<FeeRate> {
 const updateSignHistory = (device: Device) => {
   const newStep = document.createElement('li')
   newStep.classList.add('step', 'step-info')
-  newStep.innerHTML = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  newStep.innerText = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
   const stepsList = DOM.outputs.psbtSignHistory
   stepsList.appendChild(newStep)
 }
@@ -125,7 +125,9 @@ async function loadWallet() {
       WalletInfo({
         balance,
         transactions,
-      })
+      }),
+      false,
+      true
     )
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
@@ -192,7 +194,7 @@ async function getAddress() {
     DOM.outputs.conversation.appendChild(userBubble)
     const { address } = await commands.address(network, receive, electrum)
     DOM.outputs.tempMessage.textContent = 'Address retrieved successfully!'
-    const tempuraBubble = createConversationBubble(Address({ address }))
+    const tempuraBubble = createConversationBubble(Address({ address }), false, true)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     instrumentCopyButtons(tempuraBubble)
   } catch (e: unknown) {
@@ -323,6 +325,7 @@ async function sweep() {
   try {
     const userBubble = createConversationBubble(
       `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      true,
       true
     )
     DOM.outputs.conversation.appendChild(userBubble)
@@ -339,7 +342,7 @@ async function sweep() {
     DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
 
     DOM.outputs.tempMessage.textContent = 'Sign next?'
-    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'))
+    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'), false, true)
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
     if (feeRate.warning) {

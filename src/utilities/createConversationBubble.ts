@@ -12,7 +12,12 @@ const showClearMessagesButton = () => {
   }
 }
 
-export const createConversationBubble = (content: string, isUserSpeaking: boolean = false): HTMLDivElement => {
+// if using dangerouslySetInnerHTML option, make sure the content input has been sanitized or encoded to prevent XSS
+export const createConversationBubble = (
+  content: string,
+  isUserSpeaking: boolean = false,
+  dangerouslySetInnerHTML: boolean = false
+): HTMLDivElement => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
 
@@ -22,7 +27,12 @@ export const createConversationBubble = (content: string, isUserSpeaking: boolea
 
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
-  bubble.innerHTML = content // Set the innerHTML to the provided content
+
+  if (dangerouslySetInnerHTML) {
+    bubble.innerHTML = content
+  } else {
+    bubble.innerText = content
+  }
 
   // Assemble the structure
   chatContainer.appendChild(avatar)
