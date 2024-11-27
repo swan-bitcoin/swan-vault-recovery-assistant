@@ -11,7 +11,7 @@
 
   <body class="flex flex-col min-h-screen">
     <!-- Main content section -->
-    <main id="main-content" class="flex flex-grow overflow-hidden p-4">
+    <main id="main-content" class="flex flex-grow p-4">
       <!-- Chat bubble on the left -->
       <div class="flex-col w-2/5 overflow-y-auto no-scrollbar pr-4">
         <div class="card card-normal bg-base-200 shadow-2xl">
@@ -38,11 +38,12 @@
       </div>
 
       <!-- Cards section -->
-      <div class="flex flex-col w-3/5 overflow-y-auto gap-4 pr-4 ml-6">
+      <div class="flex flex-col w-3/5 overflow-y-scroll gap-4 pr-4 ml-6">
         <!-- First Card: Wallet Set Up -->
-        <div class="card bg-base-300 shadow-xl card-compact">
-          <div class="card-body">
-            <h2 class="card-title">Wallet Set Up</h2>
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl">
+          <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
+          <div class="collapse-title text-xl">Wallet Set Up</div>
+          <div class="collapse-content">
             <!-- Receive descriptor -->
             <div class="form-control">
               <div class="label">
@@ -169,9 +170,10 @@
         </div>
 
         <!-- Second Card: Recovery Options -->
-        <div class="card bg-base-300 shadow-xl card-compact hidden" id="recovery-container">
-          <div class="card-body">
-            <h2 class="card-title">Recovery Options</h2>
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="recovery-container">
+          <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
+          <div class="collapse-title text-xl">Recovery Options</div>
+          <div class="collapse-content">
             <!-- Destination address -->
             <div class="form-control mb-3">
               <label class="label">Destination Address</label>
@@ -201,14 +203,13 @@
         </div>
 
         <!-- Third Card: Send Transaction  -->
-        <div class="card bg-base-300 shadow-xl card-compact hidden" id="send-transaction-container">
-          <div class="card-body">
-            <h2 class="card-title">Send Transaction</h2>
-
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="send-transaction-container">
+          <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
+          <div class="collapse-title text-xl">Send Transaction</div>
+          <div class="collapse-content">
             <!-- Transaction -->
             <div class="form-control mb-3 hidden" id="transaction-overview-container">
               <!-- Transaction overview -->
-              <label class="label">Transaction</label>
               <div class="overflow-x-auto">
                 <table class="table table-fixed table-md mb-2">
                   <thead>
@@ -234,7 +235,9 @@
               <div class="flex items-center justify-center">
                 <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
               </div>
-              <!-- PSBT details -->
+            </div>
+            <!-- PSBT details -->
+            <div class="form-control mb-3" id="psbt-details-container">
               <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
                 <span class="label-text text-xs">Show PSBT Details</span>
                 <input id="psbt-details-toggle" type="checkbox" class="toggle" />
@@ -248,7 +251,7 @@
                   placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
                 ></textarea>
                 <!-- PSBT controls -->
-                <div class="card-actions justify-end mt-2 mb-6">
+                <div class="justify-end mt-2 mb-6">
                   <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
                   <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
                 </div>
