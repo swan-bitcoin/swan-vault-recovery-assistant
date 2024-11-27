@@ -307,7 +307,7 @@ const populateTransactionOverview = ({ address, outbound, fee }) => {
   const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
   transactionRowTds[0].textContent = address
   transactionRowTds[1].innerHTML = Sats(outbound)
-  transactionRowTds[2].innerHTML = Sats(fee)
+  transactionRowTds[2].innerHTML = Sats(fee || '')
 }
 const countTransactions = (transactions) => {
   let unconfirmedCount = 0
@@ -332,20 +332,6 @@ const getFirstTransaction = (transactions) => {
   return confirmedTransactions.reduce((firstTx, currentTx) => {
     return currentTx.confirmation_height < firstTx.confirmation_height ? currentTx : firstTx
   })
-}
-const closeToast = () => {
-  const toastContainer = document.getElementById('toast-container')
-  toastContainer.innerHTML = ''
-  toastContainer.classList.add('hidden')
-}
-const showToast = (content) => {
-  const toastContainer = document.getElementById('toast-container')
-  toastContainer.classList.remove('hidden')
-  toastContainer.innerHTML = content
-  const closeBtn = document.getElementById('close-toast-btn')
-  if (closeBtn) {
-    closeBtn.addEventListener('click', closeToast)
-  }
 }
 const generateRandomString = (length = 8) => {
   return Math.random()
@@ -478,6 +464,7 @@ function initializeDOM() {
     const buttons = {
       address: requireDomElement('#new-address-button'),
       broadcast: requireDomElement('#broadcast-button'),
+      clearMessages: requireDomElement('#clear-messages-button'),
       copyPsbt: requireDomElement('#copy-psbt-button'),
       enumerate: requireDomElement('#enumerate-button'),
       estimate: requireDomElement('#estimate-button'),
@@ -494,7 +481,12 @@ function initializeDOM() {
     const containers = {
       change: requireDomElement('#change-input-container'),
       electrum: requireDomElement('#electrum-input-container'),
+      footer: requireDomElement('#footer'),
+      mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
+      recovery: requireDomElement('#recovery-container'),
+      toast: requireDomElement('#toast-container'),
+      walletActions: requireDomElement('#wallet-actions'),
     }
     const inputs = {
       address: requireDomElement('#address-input'),
@@ -503,6 +495,9 @@ function initializeDOM() {
       feeRate: requireDomElement('#feerate-input'),
       networkRadios: requireDomElements('input[name="network"]'),
       receive: requireDomElement('#receive-input'),
+    }
+    const links = {
+      about: requireDomElement('#about-link'),
     }
     const outputs = {
       conversation: requireDomElement('#conversation'),
@@ -519,6 +514,7 @@ function initializeDOM() {
       checkboxes,
       containers,
       inputs,
+      links,
       outputs,
     }
   } catch (e) {
@@ -621,15 +617,15 @@ function getSignResultAndPsbt(val) {
   return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
 function sanitize(input) {
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;',
-  }
-  return input.replace(/[&<>"']/g, function (m) {
-    return map[m]
+  const map = /* @__PURE__ */ new Map([
+    ['&', '&amp;'],
+    ['<', '&lt;'],
+    ['>', '&gt;'],
+    ['"', '&quot;'],
+    ["'", '&#039;'],
+  ])
+  return input.replace(/[&<>"']/g, (m) => {
+    return map.get(m) || m
   })
 }
 const isDevice = (item) => {
@@ -676,10 +672,9 @@ response: ${val}`)
   return parsed
 }
 const validateDescriptor = async () => {
-  const descriptor = DOM.inputs.receive.value
-  const network = Array.from(DOM.inputs.networkRadios).find((radio) => radio.checked).value
-  const standardWalletActions = document.getElementById('standard-wallet-actions')
+  const { descriptors, network } = getUserInputs()
   clearStatusIndicators(DOM.inputs.receive)
+  const descriptor = descriptors.receive
   if (!descriptor) {
     DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.inputs.receive.classList.add('textarea-error')
@@ -697,13 +692,13 @@ const validateDescriptor = async () => {
       DOM.outputs.tempMessage.textContent =
         'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
       DOM.inputs.receive.classList.add('textarea-warning')
-      standardWalletActions.classList.remove('hidden')
+      DOM.containers.walletActions.classList.remove('hidden')
       return true
     }
     DOM.inputs.receive.classList.add('textarea-success')
     DOM.outputs.tempMessage.textContent =
       'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
-    standardWalletActions.classList.remove('hidden')
+    DOM.containers.walletActions.classList.remove('hidden')
     return true
   } catch (e) {
     console.error(e)
@@ -779,6 +774,18 @@ async function validateAddress() {
     handleError(e)
   }
   return false
+}
+const closeToast = () => {
+  DOM.containers.toast.innerHTML = ''
+  DOM.containers.toast.classList.add('hidden')
+}
+const showToast = (content) => {
+  DOM.containers.toast.classList.remove('hidden')
+  DOM.containers.toast.innerHTML = content
+  const closeBtn = document.getElementById('close-toast-btn')
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeToast)
+  }
 }
 const FEE_RATE_WARNING_RATIO = 0.9
 async function getFeeRate() {
@@ -879,9 +886,8 @@ async function loadWallet() {
     beginRecoveryButton == null
       ? void 0
       : beginRecoveryButton.addEventListener('click', () => {
-          const recoveryOptionsCard = document.getElementById('recovery-options-card')
-          recoveryOptionsCard.classList.remove('hidden')
-          recoveryOptionsCard.scrollIntoView({ behavior: 'smooth' })
+          DOM.containers.recovery.classList.remove('hidden')
+          DOM.containers.recovery.scrollIntoView({ behavior: 'smooth' })
           closeToast()
         })
     instrumentCopyButtons(DOM.outputs.txBody)
@@ -892,18 +898,18 @@ async function loadWallet() {
 function instrumentCopyButtons(parent) {
   parent.querySelectorAll('button[name=copy]').forEach((copyButton) => {
     copyButton.addEventListener('click', () => {
-      writeText(copyButton.getAttribute('value'))
+      writeText(copyButton.getAttribute('value') ?? '')
         .then(() => {
           const tooltip = copyButton.closest('.tooltip')
-          tooltip.setAttribute('data-tip', 'Copied')
+          tooltip == null ? void 0 : tooltip.setAttribute('data-tip', 'Copied')
           const copyIcon = copyButton.querySelector('#copy-icon')
-          copyIcon.classList.add('copied')
-          const checkmark = copyIcon.querySelector('#checkmark')
-          checkmark.classList.remove('hidden')
+          copyIcon == null ? void 0 : copyIcon.classList.add('copied')
+          const checkmark = copyIcon == null ? void 0 : copyIcon.querySelector('#checkmark')
+          checkmark == null ? void 0 : checkmark.classList.remove('hidden')
           setTimeout(() => {
-            tooltip.setAttribute('data-tip', 'Copy')
-            checkmark.classList.add('hidden')
-            copyIcon.classList.remove('copied')
+            tooltip == null ? void 0 : tooltip.setAttribute('data-tip', 'Copy')
+            checkmark == null ? void 0 : checkmark.classList.add('hidden')
+            copyIcon == null ? void 0 : copyIcon.classList.remove('copied')
           }, 2e3)
         })
         .catch(() => {
@@ -1034,7 +1040,7 @@ async function sweep() {
   }
   require2(address, 'Address')
   const feeRate = await getFeeRate()
-  if (feeRate.failed) {
+  if (feeRate.failed || feeRate.value === null) {
     DOM.outputs.tempMessage.textContent =
       'Unable to automatically estimate a fee for this network. Please enter a fee rate manually.'
     return
@@ -1066,6 +1072,22 @@ async function sweep() {
 }
 window.addEventListener('DOMContentLoaded', () => {
   initializeDOM()
+  DOM.buttons.address.addEventListener('click', (e) => {
+    e.preventDefault()
+    getAddress()
+  })
+  DOM.buttons.broadcast.addEventListener('click', (e) => {
+    e.preventDefault()
+    broadcast()
+  })
+  DOM.buttons.copyPsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    copyPsbtToClipboard()
+  })
+  DOM.buttons.enumerate.addEventListener('click', (e) => {
+    e.preventDefault()
+    enumerate()
+  })
   DOM.buttons.estimate.addEventListener('click', (e) => {
     e.preventDefault()
     estimateFee()
@@ -1073,18 +1095,6 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.load.addEventListener('click', (e) => {
     e.preventDefault()
     loadWallet()
-  })
-  DOM.buttons.address.addEventListener('click', (e) => {
-    e.preventDefault()
-    getAddress()
-  })
-  DOM.buttons.sweep.addEventListener('click', (e) => {
-    e.preventDefault()
-    sweep()
-  })
-  DOM.buttons.copyPsbt.addEventListener('click', (e) => {
-    e.preventDefault()
-    copyPsbtToClipboard()
   })
   DOM.buttons.pastePsbt.addEventListener('click', (e) => {
     e.preventDefault()
@@ -1094,22 +1104,20 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     sign()
   })
-  DOM.buttons.enumerate.addEventListener('click', (e) => {
+  DOM.buttons.sweep.addEventListener('click', (e) => {
     e.preventDefault()
-    enumerate()
+    sweep()
   })
-  DOM.inputs.address.addEventListener('input', validateAddress)
   DOM.checkboxes.change.addEventListener('click', showChangeInput)
   DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
   DOM.checkboxes.network.addEventListener('click', showNetworkInput)
-  DOM.buttons.broadcast.addEventListener('click', (e) => {
-    e.preventDefault()
-    broadcast()
-  })
-  DOM.outputs.psbtTextArea.addEventListener('input', () => {
-    DOM.buttons.broadcast.classList.remove('btn-disabled')
-    DOM.outputs.psbtSignHistory.innerHTML = ''
-    validatePsbt()
+  DOM.inputs.address.addEventListener('input', validateAddress)
+  DOM.inputs.networkRadios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      DOM.inputs.address.value = ''
+      clearStatusIndicators(DOM.inputs.address)
+      validateDescriptor()
+    })
   })
   DOM.inputs.receive.addEventListener('blur', () => {
     validateDescriptor()
@@ -1124,12 +1132,14 @@ window.addEventListener('DOMContentLoaded', () => {
       e.innerHTML = 'Outdated'
     })
   })
-  DOM.inputs.networkRadios.forEach((radio) => {
-    radio.addEventListener('change', () => {
-      DOM.inputs.address.value = ''
-      clearStatusIndicators(DOM.inputs.address)
-      validateDescriptor()
-    })
+  DOM.outputs.psbtTextArea.addEventListener('input', () => {
+    DOM.buttons.broadcast.classList.remove('btn-disabled')
+    DOM.outputs.psbtSignHistory.innerHTML = ''
+    validatePsbt()
+  })
+  DOM.links.about.addEventListener('click', async (e) => {
+    e.preventDefault()
+    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
   const config = { childList: true }
   const callback = (mutationList) => {
@@ -1141,20 +1151,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   const observer = new MutationObserver(callback)
   observer.observe(DOM.outputs.conversation, config)
-  const clearMessagesBtn = document.getElementById('clear-messages-btn')
-  clearMessagesBtn.addEventListener('click', () => {
+  DOM.buttons.clearMessages.addEventListener('click', () => {
     DOM.outputs.conversation.innerHTML = ''
     DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
-    clearMessagesBtn.classList.add('hidden')
+    DOM.buttons.clearMessages.classList.add('hidden')
   })
 })
 const adjustMainContentHeight = () => {
-  const footer = document.getElementById('footer')
-  const mainContent = document.getElementById('main-content')
-  if (footer && mainContent) {
-    const availableHeight = window.innerHeight - footer.offsetHeight
-    mainContent.style.height = `${availableHeight}px`
-  }
+  const availableHeight = window.innerHeight - DOM.containers.footer.offsetHeight
+  DOM.containers.mainContent.style.height = `${availableHeight}px`
 }
 window.addEventListener('load', adjustMainContentHeight)
 window.addEventListener('resize', adjustMainContentHeight)
@@ -1166,10 +1171,5 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       document.documentElement.setAttribute('data-theme', 'cupcake')
     }
-  })
-  const aboutLink = document.getElementById('about-link')
-  aboutLink.addEventListener('click', async (event) => {
-    event.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
 })

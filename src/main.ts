@@ -11,15 +11,9 @@ import {
   getSignResultAndPsbt,
   sanitize,
 } from './parsing'
-import {
-  capitalize,
-  closeToast,
-  createConversationBubble,
-  populateTransactionOverview,
-  scrollToLastMessage,
-  showToast,
-} from './utilities'
+import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
+import { closeToast, showToast } from './toast'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
@@ -29,6 +23,10 @@ type FeeRate = {
   failed?: boolean
 }
 
+/**
+ * fetches a fee rate estimate from the network and compares it to the user input
+ * if there is one. If there is no user input, the estimate is returned.
+ */
 async function getFeeRate(): Promise<FeeRate> {
   const { feeRate, network, electrum } = getUserInputs()
 
@@ -140,9 +138,8 @@ async function loadWallet() {
     showToast(RecoveryToast())
     const beginRecoveryButton = document.getElementById('begin-recovery-btn')
     beginRecoveryButton?.addEventListener('click', () => {
-      const recoveryOptionsCard = document.getElementById('recovery-options-card')
-      recoveryOptionsCard.classList.remove('hidden')
-      recoveryOptionsCard.scrollIntoView({ behavior: 'smooth' })
+      DOM.containers.recovery.classList.remove('hidden')
+      DOM.containers.recovery.scrollIntoView({ behavior: 'smooth' })
       closeToast()
     })
 
@@ -155,23 +152,23 @@ async function loadWallet() {
 function instrumentCopyButtons(parent: HTMLElement) {
   parent.querySelectorAll<HTMLButtonElement>('button[name=copy]').forEach((copyButton) => {
     copyButton.addEventListener('click', () => {
-      toClipboard(copyButton.getAttribute('value'))
+      toClipboard(copyButton.getAttribute('value') ?? '')
         .then(() => {
           // Change the tooltip text
           const tooltip = copyButton.closest('.tooltip')
-          tooltip.setAttribute('data-tip', 'Copied')
+          tooltip?.setAttribute('data-tip', 'Copied')
 
           // Show a checkmark within the copy icon
           const copyIcon = copyButton.querySelector('#copy-icon')
-          copyIcon.classList.add('copied') // animation effect
-          const checkmark = copyIcon.querySelector('#checkmark')
-          checkmark.classList.remove('hidden')
+          copyIcon?.classList.add('copied') // animation effect
+          const checkmark = copyIcon?.querySelector('#checkmark')
+          checkmark?.classList.remove('hidden')
 
           // Reset after delay
           setTimeout(() => {
-            tooltip.setAttribute('data-tip', 'Copy')
-            checkmark.classList.add('hidden')
-            copyIcon.classList.remove('copied')
+            tooltip?.setAttribute('data-tip', 'Copy')
+            checkmark?.classList.add('hidden')
+            copyIcon?.classList.remove('copied')
           }, 2000)
         })
         .catch(() => {
@@ -316,7 +313,7 @@ async function sweep() {
   require(address, 'Address')
 
   const feeRate = await getFeeRate()
-  if (feeRate.failed) {
+  if (feeRate.failed || feeRate.value === null) {
     DOM.outputs.tempMessage.textContent =
       'Unable to automatically estimate a fee for this network. Please enter a fee rate manually.'
     return
@@ -334,7 +331,7 @@ async function sweep() {
     // Show transaction overview and populate transaction overview table
     DOM.outputs.transactionOverview.classList.remove('hidden')
     populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
-    // Populate PSBT textarea even though it is not shown
+    // Populate PSBT textarea even though it may not be shown
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
 
@@ -357,6 +354,26 @@ async function sweep() {
 window.addEventListener('DOMContentLoaded', () => {
   initializeDOM()
 
+  DOM.buttons.address.addEventListener('click', (e) => {
+    e.preventDefault()
+    getAddress()
+  })
+
+  DOM.buttons.broadcast.addEventListener('click', (e) => {
+    e.preventDefault()
+    broadcast()
+  })
+
+  DOM.buttons.copyPsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    copyPsbtToClipboard()
+  })
+
+  DOM.buttons.enumerate.addEventListener('click', (e) => {
+    e.preventDefault()
+    enumerate()
+  })
+
   DOM.buttons.estimate.addEventListener('click', (e) => {
     e.preventDefault()
     estimateFee()
@@ -365,21 +382,6 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.load.addEventListener('click', (e) => {
     e.preventDefault()
     loadWallet()
-  })
-
-  DOM.buttons.address.addEventListener('click', (e) => {
-    e.preventDefault()
-    getAddress()
-  })
-
-  DOM.buttons.sweep.addEventListener('click', (e) => {
-    e.preventDefault()
-    sweep()
-  })
-
-  DOM.buttons.copyPsbt.addEventListener('click', (e) => {
-    e.preventDefault()
-    copyPsbtToClipboard()
   })
 
   DOM.buttons.pastePsbt.addEventListener('click', (e) => {
@@ -392,20 +394,39 @@ window.addEventListener('DOMContentLoaded', () => {
     sign()
   })
 
-  DOM.buttons.enumerate.addEventListener('click', (e) => {
+  DOM.buttons.sweep.addEventListener('click', (e) => {
     e.preventDefault()
-    enumerate()
+    sweep()
   })
-
-  DOM.inputs.address.addEventListener('input', validateAddress)
 
   DOM.checkboxes.change.addEventListener('click', showChangeInput)
   DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
   DOM.checkboxes.network.addEventListener('click', showNetworkInput)
 
-  DOM.buttons.broadcast.addEventListener('click', (e) => {
-    e.preventDefault()
-    broadcast()
+  DOM.inputs.address.addEventListener('input', validateAddress)
+
+  DOM.inputs.networkRadios.forEach((radio) => {
+    radio.addEventListener('change', () => {
+      DOM.inputs.address.value = ''
+      clearStatusIndicators(DOM.inputs.address)
+      validateDescriptor()
+    })
+  })
+
+  // validation of descriptor
+  DOM.inputs.receive.addEventListener('blur', () => {
+    validateDescriptor()
+    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
+      e.innerHTML = 'Outdated'
+    })
+  })
+
+  DOM.inputs.receive.addEventListener('input', () => {
+    DOM.inputs.receive.value = DOM.inputs.receive.value.replace(/\r?\n|\r/g, '').trim()
+    validateDescriptor()
+    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
+      e.innerHTML = 'Outdated'
+    })
   })
 
   DOM.outputs.psbtTextArea.addEventListener('input', () => {
@@ -414,27 +435,9 @@ window.addEventListener('DOMContentLoaded', () => {
     validatePsbt()
   })
 
-  // Add event listeners for validation of descriptor
-  DOM.inputs.receive.addEventListener('blur', () => {
-    validateDescriptor()
-    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
-      e.innerHTML = 'Outdated'
-    })
-  })
-  DOM.inputs.receive.addEventListener('input', () => {
-    // Clean up the input
-    DOM.inputs.receive.value = DOM.inputs.receive.value.replace(/\r?\n|\r/g, '').trim()
-    validateDescriptor()
-    DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
-      e.innerHTML = 'Outdated'
-    })
-  })
-  DOM.inputs.networkRadios.forEach((radio) => {
-    radio.addEventListener('change', () => {
-      DOM.inputs.address.value = ''
-      clearStatusIndicators(DOM.inputs.address)
-      validateDescriptor()
-    })
+  DOM.links.about.addEventListener('click', async (e) => {
+    e.preventDefault()
+    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
   })
 
   // Set up observer to scroll to the last chat message whenever a message is added
@@ -450,10 +453,9 @@ window.addEventListener('DOMContentLoaded', () => {
   observer.observe(DOM.outputs.conversation, config)
 
   // Clear messages via button click
-  const clearMessagesBtn = document.getElementById('clear-messages-btn')
-  clearMessagesBtn.addEventListener('click', () => {
+  DOM.buttons.clearMessages.addEventListener('click', () => {
     DOM.outputs.conversation.innerHTML = ''
     DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
-    clearMessagesBtn.classList.add('hidden')
+    DOM.buttons.clearMessages.classList.add('hidden')
   })
 })

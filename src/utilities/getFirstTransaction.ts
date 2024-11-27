@@ -11,6 +11,6 @@ export const getFirstTransaction = (transactions: Transaction[]): Transaction | 
   }
 
   return confirmedTransactions.reduce((firstTx, currentTx) => {
-    return currentTx.confirmation_height < firstTx.confirmation_height ? currentTx : firstTx
+    return currentTx.confirmation_height! < firstTx.confirmation_height! ? currentTx : firstTx
   })
 }
