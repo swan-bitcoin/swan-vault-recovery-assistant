@@ -424,12 +424,12 @@ fn hwi_path() -> String {
 #[specta::specta]
 async fn address(
   network: String,
-  descriptor: String,
+  descriptors: Descriptors,
   electrum: Option<String>,
 ) -> Result<AddressInfo, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, Descriptors::new(descriptor, None, false))?;
+  let wallet = get_wallet(network, descriptors)?;
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {

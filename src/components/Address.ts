@@ -7,7 +7,7 @@ type Address = {
 export const Address = ({ address }: Address) => {
   return `
     <div class="flex items-center space-x-2 relative">
-      <span class="break-all">${address}</span>
+      <span id="wallet-address" class="break-all">${address}</span>
       ${CopyButton(address)}
     </div>
   `

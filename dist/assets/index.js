@@ -73,8 +73,8 @@ const commands = {
    * * interface functions
    *
    */
-  async address(network, descriptor, electrum) {
-    return await invoke('address', { network, descriptor, electrum })
+  async address(network, descriptors, electrum) {
+    return await invoke('address', { network, descriptors, electrum })
   },
   async broadcast(psbt, network, descriptors, electrum) {
     return await invoke('broadcast', { psbt, network, descriptors, electrum })
@@ -252,7 +252,7 @@ const Balance = ({ confirmed, unconfirmed }) => {
 const Address = ({ address }) => {
   return `
     <div class="flex items-center space-x-2 relative">
-      <span class="break-all">${address}</span>
+      <span id="wallet-address" class="break-all">${address}</span>
       ${CopyButton(address)}
     </div>
   `
@@ -342,17 +342,13 @@ const generateRandomString = (length = 8) => {
     .toString(36)
     .substring(2, 2 + length)
 }
-const WalletInfo = ({ balance, transactions }) => {
+const WalletInfo = ({ balance, transactions, addressInfo }) => {
   const { unconfirmedCount, confirmedCount } = countTransactions(transactions)
   const firstTransaction = getFirstTransaction(transactions)
   const tabId = generateRandomString()
   return `
-      <div class="flex flex-col justify-center items-center wallet-info">
-        <div role="tablist" class="tabs tabs-bordered">
-          <!-- Invisible inputs to push the tabs to the center -->
-          <input type="radio" name="wallet_info_tabs_${tabId}" class="tab opacity-0 pointer-events-none" aria-hidden="true" />
-          <input type="radio" name="wallet_info_tabs_${tabId}" class="tab opacity-0 pointer-events-none" aria-hidden="true" />
-  
+      <div class="wallet-info">
+        <div role="tablist" class="tabs tabs-bordered">  
           <!-- Balance Tab -->
           <input
             type="radio"
@@ -362,13 +358,13 @@ const WalletInfo = ({ balance, transactions }) => {
             aria-label="Balance"
             checked="checked"
           />
-          <div role="tabpanel" class="tab-content rounded-box mt-4 w-80">
+          <div role="tabpanel" class="tab-content rounded-box mt-4">
             ${Balance({
               confirmed: balance.confirmed,
               unconfirmed: balance.untrusted_pending,
             })}
           </div>
-  
+
           <!-- Transactions Tab -->
           <input
             type="radio"
@@ -377,9 +373,9 @@ const WalletInfo = ({ balance, transactions }) => {
             class="tab"
             aria-label="Transactions"
           />
-          <div role="tabpanel" class="tab-content rounded-box mt-6 w-80">
-            <div class="flex flex-col gap-4 items-start">
-              <div class="flex items-center gap-2">
+          <div role="tabpanel" class="tab-content rounded-box mt-4">
+            <div class="flex flex-col gap-4 items-center">
+              <div class="flex gap-2">
                 <span class="badge badge-neutral">Total ${transactions.length}</span>
                 <span class="badge badge-warning">Unconfirmed ${unconfirmedCount}</span>
                 <span class="badge badge-success">Confirmed ${confirmedCount}</span>
@@ -387,14 +383,32 @@ const WalletInfo = ({ balance, transactions }) => {
               ${
                 (firstTransaction == null ? void 0 : firstTransaction.confirmation_height)
                   ? `<div class="flex gap-1">
-                <p class="text-md flex-grow-0">First Transaction in Block:</p>
-                <span>${firstTransaction.confirmation_height}</span>
-              </div>`
+                  <span>First Transaction in Block:</span>
+                  <span>${firstTransaction.confirmation_height}</span>
+                </div>`
                   : '<span>No transactions yet</span>'
               }
-              <button class="btn btn-outline btn-ghost btn-sm self-center mt-4 mb-2" id="show-transactions-btn">
+              <button class="btn btn-outline btn-ghost btn-sm mt-4 mb-2" id="show-transactions-btn">
                 Show Full List
               </button>
+            </div>
+          </div>
+
+          <!-- Receive Tab -->
+          <input
+            type="radio"
+            name="wallet_info_tabs_${tabId}"
+            role="tab"
+            class="tab"
+            aria-label="Receive"
+          />
+          <div role="tabpanel" class="tab-content rounded-box mt-6 mb-4">
+            <div class="indicator w-60">
+              <span class="indicator-item badge badge-primary">Next Unused</span>
+              <span class="indicator-item indicator-bottom badge badge-neutral">#${addressInfo.index}</span>
+              <div class="bg-base-100 flex justify-center rounded-box px-4 py-2">
+                ${Address({ address: addressInfo.address })}
+              </div>
             </div>
           </div>
         </div>
@@ -466,7 +480,6 @@ function initializeDOM() {
   try {
     tempMessage = requireDomElement('#temporary-message')
     const buttons = {
-      address: requireDomElement('#new-address-button'),
       broadcast: requireDomElement('#broadcast-button'),
       clearMessages: requireDomElement('#clear-messages-button'),
       copyPsbt: requireDomElement('#copy-psbt-button'),
@@ -705,8 +718,7 @@ const validateDescriptor = async () => {
       return true
     }
     DOM.inputs.receive.classList.add('textarea-success')
-    DOM.outputs.tempMessage.textContent =
-      'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
+    DOM.outputs.tempMessage.textContent = 'Your wallet configuration is valid. You can fetch your wallet now.'
     DOM.containers.walletActions.classList.remove('hidden')
     return true
   } catch (e) {
@@ -875,16 +887,19 @@ async function loadWallet() {
     const userBubble = createConversationBubble('Fetch my wallet.', true)
     DOM.outputs.conversation.appendChild(userBubble)
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
+    const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
       WalletInfo({
         balance,
         transactions,
+        addressInfo,
       }),
       false,
       true
     )
+    instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton == null
@@ -927,27 +942,6 @@ function instrumentCopyButtons(parent) {
         })
     })
   })
-}
-async function getAddress() {
-  const {
-    descriptors: { receive },
-    electrum,
-    network,
-  } = getUserInputs()
-  const isValid = await validateDescriptor()
-  if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching the next unused address for you ...'
-  try {
-    const userBubble = createConversationBubble('Give me an address!', true)
-    DOM.outputs.conversation.appendChild(userBubble)
-    const { address } = await commands.address(network, receive, electrum)
-    DOM.outputs.tempMessage.textContent = 'Address retrieved successfully!'
-    const tempuraBubble = createConversationBubble(Address({ address }), false, true)
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    instrumentCopyButtons(tempuraBubble)
-  } catch (e) {
-    handleError(e)
-  }
 }
 function copyPsbtToClipboard() {
   const psbt = DOM.outputs.psbtTextArea.value.trim()
@@ -1084,10 +1078,6 @@ async function sweep() {
 }
 window.addEventListener('DOMContentLoaded', () => {
   initializeDOM()
-  DOM.buttons.address.addEventListener('click', (e) => {
-    e.preventDefault()
-    getAddress()
-  })
   DOM.buttons.broadcast.addEventListener('click', (e) => {
     e.preventDefault()
     broadcast()

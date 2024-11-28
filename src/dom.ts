@@ -1,7 +1,6 @@
 import { Descriptors, TempuraError } from './bindings'
 
 type Buttons = {
-  address: HTMLButtonElement
   broadcast: HTMLButtonElement
   clearMessages: HTMLButtonElement
   copyPsbt: HTMLButtonElement
@@ -134,7 +133,6 @@ export function initializeDOM() {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
 
     const buttons = {
-      address: requireDomElement<HTMLButtonElement>('#new-address-button'),
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
       clearMessages: requireDomElement<HTMLButtonElement>('#clear-messages-button'),
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),
