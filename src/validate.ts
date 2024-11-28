@@ -34,8 +34,7 @@ export const validateDescriptor = async () => {
 
     // Descriptor is valid, show now wallet actions and recovery options card (one way switch)
     DOM.inputs.receive.classList.add('textarea-success')
-    DOM.outputs.tempMessage.textContent =
-      'Your wallet configuration is valid. You can now fetch your wallet and perform other actions.'
+    DOM.outputs.tempMessage.textContent = 'Your wallet configuration is valid. You can fetch your wallet now.'
     DOM.containers.walletActions.classList.remove('hidden')
     return true
   } catch (e: unknown) {

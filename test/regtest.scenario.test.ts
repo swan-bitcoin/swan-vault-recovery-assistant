@@ -107,20 +107,30 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     assert(false)
   }
 
-  const expectAnAddress = async () => {
-    await inputs.newAddress.click()
+  const fetchWalletInfo = async () => {
+    await inputs.fetchWallet.click()
     await waitForUI()
-    expect(await outputs.temporaryMessage.getText()).toMatch(/Address retrieved successfully!/)
-    const elements = await outputs.conversation.findElements(By.className('break-all'))
+  }
+
+  const getAddressFromWalletInfo = async () => {
+    const elements = await outputs.conversation.findElements(By.className('wallet-info'))
     expect(elements.length).toBeGreaterThan(0)
-    const address = await elements[elements.length - 1].getText()
+
+    const walletElement = elements[elements.length - 1]
+    const tabs = await walletElement.findElements(By.className('tab'))
+    expect(tabs.length).toBeGreaterThan(2)
+    await tabs[2].click()
+    await waitForUI()
+
+    const addressElement = await walletElement.findElement(By.id('wallet-address'))
+    const address = await addressElement.getText()
+    log('wallet address:', address)
+
     expect(address).toMatch(/^bcrt1/)
     return address
   }
 
-  const expectLatestBalance = async (confirmed: RegExp, unconfirmed: RegExp): Promise<void> => {
-    await inputs.fetchWallet.click()
-    await waitForUI()
+  const expectLatestBalanceFromWalletInfo = async (confirmed: RegExp, unconfirmed: RegExp): Promise<void> => {
     expect(await outputs.temporaryMessage.getText()).toMatch(/Wallet fetched successfully!/)
     const stats = await outputs.conversation.findElements(By.className('stat'))
     expect(stats.length).toBeGreaterThan(1)
@@ -156,8 +166,6 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.feeRate).toBeTruthy()
     inputs.fetchWallet = await driver.findElement(By.id('fetch-wallet-button'))
     expect(inputs.fetchWallet).toBeTruthy()
-    inputs.newAddress = await driver.findElement(By.id('new-address-button'))
-    expect(inputs.newAddress).toBeTruthy()
 
     // collapse selector
     inputs.walletConfigurationCollapse = await driver.findElement(By.id('wallet-configuration-collapse-radio'))
@@ -245,12 +253,13 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see a balance of zero for a brand new wallet', async () => {
     await inputs.receive.sendKeys(receiveDescriptor)
-    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
   })
 
   let address: string
-  it('can fetch an address', async () => {
-    address = await expectAnAddress()
+  it('can view a receive address on the wallet info', async () => {
+    address = await getAddressFromWalletInfo()
   })
 
   let receiveAmount: number
@@ -263,13 +272,15 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   })
 
   it('can see an updated unconfirmed balance after receiving sats', async () => {
-    await expectLatestBalance(REGEX_BALANCE_ZERO, new RegExp(`${receiveAmountFixed} 000 000`))
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(REGEX_BALANCE_ZERO, new RegExp(`${receiveAmountFixed} 000 000`))
   })
 
   it('can see an updated confirmed balance after a block is mined', async () => {
     await client.mineBlocks(1)
     await sleepForBitcoinNetwork()
-    await expectLatestBalance(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   let changeAmount: number
@@ -277,11 +288,13 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   it('can receive sats to a change address', async () => {
     await inputs.receive.clear()
     await inputs.receive.sendKeys(changeDescriptor)
-    const address = await expectAnAddress()
+    await fetchWalletInfo()
+    const address = await getAddressFromWalletInfo()
     changeAmount = getRandom(10, 2000) / 100
     changeAmountFixed = changeAmount.toFixed(2)
     await client.sendToAddressAndConfirm(address, changeAmount)
-    await expectLatestBalance(new RegExp(`${changeAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(new RegExp(`${changeAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   let fullWalletBalance: number
@@ -291,7 +304,8 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     await inputs.receive.sendKeys(receiveDescriptor)
     fullWalletBalance = receiveAmount + changeAmount
     fullWalletBalanceFixed = fullWalletBalance.toFixed(2)
-    await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   it('can toggle the visibility of the change descriptor field', async () => {
@@ -302,14 +316,16 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
   })
 
   it('can see the receive balance only when auto-change is disabled', async () => {
-    await expectLatestBalance(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(new RegExp(`${receiveAmountFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   it('can restore auto-change to see the full balance', async () => {
     await inputs.changeCheckbox.click()
     await waitForUI()
     expect(await inputs.change.isDisplayed()).toBe(false)
-    await expectLatestBalance(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(new RegExp(`${fullWalletBalanceFixed} 000 000`), REGEX_BALANCE_ZERO)
   })
 
   it('begins recovery', async () => {
@@ -400,18 +416,21 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
 
   it('can see the balance updated after the transaction is broadcast', async () => {
     await sleepForBitcoinNetwork()
-    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(REGEX_BALANCE_ZERO, REGEX_BALANCE_ZERO)
   })
 
   it('can see the unconfirmed balance on the target wallet', async () => {
     await inputs.receive.clear()
     await inputs.receive.sendKeys(destinationDescriptor)
-    await expectLatestBalance(REGEX_BALANCE_ZERO, REGEX_BALANCE_NONZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(REGEX_BALANCE_ZERO, REGEX_BALANCE_NONZERO)
   })
 
   it('can see the confirmed balance on the target wallet after a block is mined', async () => {
     await client.mineBlocks(1)
     await sleepForBitcoinNetwork()
-    await expectLatestBalance(REGEX_BALANCE_NONZERO, REGEX_BALANCE_ZERO)
+    await fetchWalletInfo()
+    await expectLatestBalanceFromWalletInfo(REGEX_BALANCE_NONZERO, REGEX_BALANCE_ZERO)
   })
 })

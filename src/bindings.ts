@@ -10,8 +10,8 @@ export const commands = {
  * * interface functions
  * 
  */
-async address(network: string, descriptor: string, electrum: string | null) : Promise<AddressInfo> {
-    return await TAURI_INVOKE("address", { network, descriptor, electrum });
+async address(network: string, descriptors: Descriptors, electrum: string | null) : Promise<AddressInfo> {
+    return await TAURI_INVOKE("address", { network, descriptors, electrum });
 },
 async broadcast(psbt: string, network: string, descriptors: Descriptors, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, descriptors, electrum });

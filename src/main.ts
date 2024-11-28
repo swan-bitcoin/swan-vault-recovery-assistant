@@ -1,6 +1,6 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
-import { Address, RecoveryToast, Success, Transactions, WalletInfo } from './components'
+import { RecoveryToast, Success, Transactions, WalletInfo } from './components'
 import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
 import {
   Device,
@@ -119,16 +119,19 @@ async function loadWallet() {
     const userBubble = createConversationBubble('Fetch my wallet.', true)
     DOM.outputs.conversation.appendChild(userBubble)
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
+    const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble(
       WalletInfo({
         balance,
         transactions,
+        addressInfo,
       }),
       false,
       true
     )
+    instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
@@ -177,28 +180,6 @@ function instrumentCopyButtons(parent: HTMLElement) {
         })
     })
   })
-}
-
-async function getAddress() {
-  const {
-    descriptors: { receive },
-    electrum,
-    network,
-  } = getUserInputs()
-  const isValid = await validateDescriptor()
-  if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching the next unused address for you ...'
-  try {
-    const userBubble = createConversationBubble('Give me an address!', true)
-    DOM.outputs.conversation.appendChild(userBubble)
-    const { address } = await commands.address(network, receive, electrum)
-    DOM.outputs.tempMessage.textContent = 'Address retrieved successfully!'
-    const tempuraBubble = createConversationBubble(Address({ address }), false, true)
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    instrumentCopyButtons(tempuraBubble)
-  } catch (e: unknown) {
-    handleError(e)
-  }
 }
 
 function copyPsbtToClipboard() {
@@ -357,11 +338,6 @@ async function sweep() {
 
 window.addEventListener('DOMContentLoaded', () => {
   initializeDOM()
-
-  DOM.buttons.address.addEventListener('click', (e) => {
-    e.preventDefault()
-    getAddress()
-  })
 
   DOM.buttons.broadcast.addEventListener('click', (e) => {
     e.preventDefault()
