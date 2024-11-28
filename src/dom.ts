@@ -6,6 +6,7 @@ type Buttons = {
   copyPsbt: HTMLButtonElement
   enumerate: HTMLButtonElement
   estimate: HTMLButtonElement
+  existingPsbt: HTMLButtonElement
   load: HTMLButtonElement
   pastePsbt: HTMLButtonElement
   sign: HTMLButtonElement
@@ -16,6 +17,7 @@ type Checkboxes = {
   change: HTMLInputElement
   electrum: HTMLInputElement
   network: HTMLInputElement
+  psbtDetails: HTMLInputElement
 }
 
 type Radios = {
@@ -30,6 +32,7 @@ type Containers = {
   footer: HTMLDivElement
   mainContent: HTMLDivElement
   network: HTMLDivElement
+  psbtDetails: HTMLDivElement
   toast: HTMLDivElement
   walletActions: HTMLDivElement
 }
@@ -41,6 +44,10 @@ type Inputs = {
   feeRate: HTMLInputElement
   networkRadios: NodeListOf<HTMLInputElement>
   receive: HTMLInputElement
+}
+
+type Labels = {
+  psbtDetails: HTMLLabelElement
 }
 
 type Links = {
@@ -64,6 +71,7 @@ type DOM = {
   radios: Radios
   containers: Containers
   inputs: Inputs
+  labels: Labels
   links: Links
   outputs: Outputs
 }
@@ -85,6 +93,24 @@ export function clearStatusIndicators(element: HTMLElement) {
   element.classList.remove('textarea-success')
   element.classList.remove('textarea-error')
   element.classList.remove('textarea-warning')
+}
+
+export const showOnlyPsbtArea = () => {
+  DOM.outputs.psbtTextArea.value = '' // if someone created a psbt before clicking "I have a PSBT"
+  DOM.outputs.transactionOverview.classList.add('hidden') // also if someone created a psbt before
+  DOM.checkboxes.psbtDetails.classList.add('hidden')
+  DOM.labels.psbtDetails.classList.add('hidden')
+  DOM.containers.psbtDetails.classList.remove('hidden')
+  DOM.checkboxes.psbtDetails.checked = true
+  DOM.radios.sendTransactionCollapse.checked = true
+}
+
+export const restorePsbtDetails = () => {
+  DOM.outputs.psbtTextArea.value = ''
+  DOM.checkboxes.psbtDetails.classList.remove('hidden')
+  DOM.labels.psbtDetails.classList.remove('hidden')
+  DOM.containers.psbtDetails.classList.add('hidden')
+  DOM.checkboxes.psbtDetails.checked = false
 }
 
 export function getUserInputs(): UserInputs {
@@ -138,6 +164,7 @@ export function initializeDOM() {
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),
       enumerate: requireDomElement<HTMLButtonElement>('#enumerate-button'),
       estimate: requireDomElement<HTMLButtonElement>('#estimate-button'),
+      existingPsbt: requireDomElement<HTMLButtonElement>('#existing-psbt-button'),
       load: requireDomElement<HTMLButtonElement>('#fetch-wallet-button'),
       pastePsbt: requireDomElement<HTMLButtonElement>('#paste-psbt-button'),
       sign: requireDomElement<HTMLButtonElement>('#sign-button'),
@@ -148,6 +175,7 @@ export function initializeDOM() {
       change: requireDomElement<HTMLInputElement>('#auto-change-checkbox'),
       electrum: requireDomElement<HTMLInputElement>('#auto-electrum-checkbox'),
       network: requireDomElement<HTMLInputElement>('#network-checkbox'),
+      psbtDetails: requireDomElement<HTMLInputElement>('#psbt-details-toggle'),
     }
 
     const radios = {
@@ -162,6 +190,7 @@ export function initializeDOM() {
       footer: requireDomElement<HTMLDivElement>('#footer'),
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
+      psbtDetails: requireDomElement<HTMLDivElement>('#psbt-details-container'),
       toast: requireDomElement<HTMLDivElement>('#toast-container'),
       walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }
@@ -173,6 +202,10 @@ export function initializeDOM() {
       feeRate: requireDomElement<HTMLInputElement>('#feerate-input'),
       networkRadios: requireDomElements<HTMLInputElement>('input[name="network"]'),
       receive: requireDomElement<HTMLInputElement>('#receive-input'),
+    }
+
+    const labels = {
+      psbtDetails: requireDomElement<HTMLLabelElement>('#psbt-details-toggle-label'),
     }
 
     const links = {
@@ -196,6 +229,7 @@ export function initializeDOM() {
       radios,
       containers,
       inputs,
+      labels,
       links,
       outputs,
     }

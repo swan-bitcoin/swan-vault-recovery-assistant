@@ -1,7 +1,15 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
 import { RecoveryToast, Success, Transactions, WalletInfo } from './components'
-import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
+import {
+  clearStatusIndicators,
+  DOM,
+  getUserInputs,
+  handleError,
+  initializeDOM,
+  restorePsbtDetails,
+  showOnlyPsbtArea,
+} from './dom'
 import {
   Device,
   getDevice,
@@ -211,6 +219,11 @@ async function estimateFee() {
   }
 }
 
+const enablePsbtInput = () => {
+  DOM.outputs.tempMessage.textContent = 'You can paste your PSBT now.'
+  showOnlyPsbtArea()
+}
+
 function pastePsbtFromClipboard() {
   fromClipboard()
     .then((psbt) => {
@@ -285,6 +298,7 @@ async function sign() {
 }
 
 async function sweep() {
+  restorePsbtDetails() // probably redundant
   const inputs = getUserInputs()
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
@@ -314,12 +328,11 @@ async function sweep() {
     // Show transaction overview and populate transaction overview table
     DOM.outputs.transactionOverview.classList.remove('hidden')
     populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
+    // Show PSBT details
+    DOM.containers.psbtDetails.classList.remove('hidden')
     // Populate PSBT textarea even though it may not be shown
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
-
-    // Show and scroll to transaction area
-    DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
 
     DOM.outputs.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'), false, true)
@@ -357,6 +370,11 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.estimate.addEventListener('click', (e) => {
     e.preventDefault()
     estimateFee()
+  })
+
+  DOM.buttons.existingPsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    enablePsbtInput()
   })
 
   DOM.buttons.load.addEventListener('click', (e) => {
@@ -407,6 +425,14 @@ window.addEventListener('DOMContentLoaded', () => {
     DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
       e.innerHTML = 'Outdated'
     })
+  })
+
+  DOM.radios.walletConfigurationCollapse.addEventListener('click', () => {
+    restorePsbtDetails()
+  })
+
+  DOM.radios.recoveryOptionsCollapse.addEventListener('click', () => {
+    restorePsbtDetails()
   })
 
   DOM.outputs.psbtTextArea.addEventListener('input', () => {

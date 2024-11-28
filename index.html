@@ -236,8 +236,8 @@
               </div>
             </div>
             <!-- PSBT details -->
-            <div class="form-control mb-3" id="psbt-details-container">
-              <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
+            <div class="form-control mb-3 hidden" id="psbt-details-container">
+              <label id="psbt-details-toggle-label" class="label justify-normal gap-2 mt-1" for="psbt-details-toggle">
                 <span class="label-text text-xs">Show PSBT Details</span>
                 <input id="psbt-details-toggle" type="checkbox" class="toggle" />
               </label>
@@ -337,6 +337,24 @@
             <path d="M18 13l0 .01"></path>
           </svg>
           <button class="link link-hover" id="enumerate-button">Check Device</button>
+        </div>
+        <div class="divider divider-horizontal"></div>
+        <div class="flex gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="24"
+            height="24"
+            stroke-width="2"
+          >
+            <path d="M14 3v4a1 1 0 0 0 1 1h4"></path>
+            <path d="M5 13v-8a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2h-5.5m-9.5 -2h7m-3 -3l3 3l-3 3"></path>
+          </svg>
+          <button class="link link-hover" id="existing-psbt-button">I have a PSBT</button>
         </div>
       </div>
     </footer>

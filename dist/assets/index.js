@@ -439,6 +439,22 @@ function clearStatusIndicators(element) {
   element.classList.remove('textarea-error')
   element.classList.remove('textarea-warning')
 }
+const showOnlyPsbtArea = () => {
+  DOM.outputs.psbtTextArea.value = ''
+  DOM.outputs.transactionOverview.classList.add('hidden')
+  DOM.checkboxes.psbtDetails.classList.add('hidden')
+  DOM.labels.psbtDetails.classList.add('hidden')
+  DOM.containers.psbtDetails.classList.remove('hidden')
+  DOM.checkboxes.psbtDetails.checked = true
+  DOM.radios.sendTransactionCollapse.checked = true
+}
+const restorePsbtDetails = () => {
+  DOM.outputs.psbtTextArea.value = ''
+  DOM.checkboxes.psbtDetails.classList.remove('hidden')
+  DOM.labels.psbtDetails.classList.remove('hidden')
+  DOM.containers.psbtDetails.classList.add('hidden')
+  DOM.checkboxes.psbtDetails.checked = false
+}
 function getUserInputs() {
   var _a, _b, _c
   const address = DOM.inputs.address.value.trim()
@@ -485,6 +501,7 @@ function initializeDOM() {
       copyPsbt: requireDomElement('#copy-psbt-button'),
       enumerate: requireDomElement('#enumerate-button'),
       estimate: requireDomElement('#estimate-button'),
+      existingPsbt: requireDomElement('#existing-psbt-button'),
       load: requireDomElement('#fetch-wallet-button'),
       pastePsbt: requireDomElement('#paste-psbt-button'),
       sign: requireDomElement('#sign-button'),
@@ -494,6 +511,7 @@ function initializeDOM() {
       change: requireDomElement('#auto-change-checkbox'),
       electrum: requireDomElement('#auto-electrum-checkbox'),
       network: requireDomElement('#network-checkbox'),
+      psbtDetails: requireDomElement('#psbt-details-toggle'),
     }
     const radios = {
       walletConfigurationCollapse: requireDomElement('#wallet-configuration-collapse-radio'),
@@ -506,6 +524,7 @@ function initializeDOM() {
       footer: requireDomElement('#footer'),
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
+      psbtDetails: requireDomElement('#psbt-details-container'),
       toast: requireDomElement('#toast-container'),
       walletActions: requireDomElement('#wallet-actions'),
     }
@@ -516,6 +535,9 @@ function initializeDOM() {
       feeRate: requireDomElement('#feerate-input'),
       networkRadios: requireDomElements('input[name="network"]'),
       receive: requireDomElement('#receive-input'),
+    }
+    const labels = {
+      psbtDetails: requireDomElement('#psbt-details-toggle-label'),
     }
     const links = {
       about: requireDomElement('#about-link'),
@@ -536,6 +558,7 @@ function initializeDOM() {
       radios,
       containers,
       inputs,
+      labels,
       links,
       outputs,
     }
@@ -969,6 +992,10 @@ async function estimateFee() {
     handleError(e)
   }
 }
+const enablePsbtInput = () => {
+  DOM.outputs.tempMessage.textContent = 'You can paste your PSBT now.'
+  showOnlyPsbtArea()
+}
 function pastePsbtFromClipboard() {
   readText()
     .then((psbt) => {
@@ -1035,6 +1062,7 @@ async function sign() {
   }
 }
 async function sweep() {
+  restorePsbtDetails()
   const inputs = getUserInputs()
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
@@ -1061,9 +1089,9 @@ async function sweep() {
     clearStatusIndicators(DOM.outputs.psbtTextArea)
     DOM.outputs.transactionOverview.classList.remove('hidden')
     populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
+    DOM.containers.psbtDetails.classList.remove('hidden')
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
-    DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
     DOM.outputs.tempMessage.textContent = 'Sign next?'
     const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'), false, true)
     DOM.outputs.conversation.appendChild(tempuraBubble)
@@ -1093,6 +1121,10 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.estimate.addEventListener('click', (e) => {
     e.preventDefault()
     estimateFee()
+  })
+  DOM.buttons.existingPsbt.addEventListener('click', (e) => {
+    e.preventDefault()
+    enablePsbtInput()
   })
   DOM.buttons.load.addEventListener('click', (e) => {
     e.preventDefault()
@@ -1133,6 +1165,12 @@ window.addEventListener('DOMContentLoaded', () => {
     DOM.outputs.conversation.querySelectorAll('div.wallet-info').forEach((e) => {
       e.innerHTML = 'Outdated'
     })
+  })
+  DOM.radios.walletConfigurationCollapse.addEventListener('click', () => {
+    restorePsbtDetails()
+  })
+  DOM.radios.recoveryOptionsCollapse.addEventListener('click', () => {
+    restorePsbtDetails()
   })
   DOM.outputs.psbtTextArea.addEventListener('input', () => {
     DOM.buttons.broadcast.classList.remove('btn-disabled')
