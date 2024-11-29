@@ -162,7 +162,7 @@ describe('recovery path, user', { timeout: 300_000 /* 5 minutes */ }, function (
     expect(inputs.electrumCheckbox).toBeTruthy()
     inputs.electrum = await driver.findElement(By.id('electrum-input'))
     expect(inputs.electrum).toBeTruthy()
-    inputs.feeRate = await driver.findElement(By.id('feerate-input'))
+    inputs.feeRate = await driver.findElement(By.id('fee-rate-input'))
     expect(inputs.feeRate).toBeTruthy()
     inputs.fetchWallet = await driver.findElement(By.id('fetch-wallet-button'))
     expect(inputs.fetchWallet).toBeTruthy()

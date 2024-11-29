@@ -182,15 +182,34 @@
             <!-- Fee rate -->
             <div class="form-control mb-5">
               <div class="label">
-                <label class="label">Fee Rate</label>
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Auto Fee Rate Estimation</span>
+                  <input
+                    type="checkbox"
+                    id="auto-fee-rate-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
                 <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
-                  What is this for?
+                  What is the fee rate for?
                 </button>
               </div>
-              <div class="flex items-center gap-2">
-                <input class="input input-bordered w-3/12 inline-flex" id="feerate-input" type="number" step="1" min="5" />
-                <label class="label inline-flex" for="feerate-input">sats/vB</label>
-                <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
+              <div id="fee-rate-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Fee Rate</label>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    class="input input-bordered w-3/12 inline-flex"
+                    id="fee-rate-input"
+                    type="number"
+                    step="1"
+                    min="5"
+                  />
+                  <label class="label inline-flex" for="fee-rate-input">sats/vB</label>
+                  <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
+                </div>
               </div>
             </div>
 
@@ -479,8 +498,8 @@
           </p>
         </div>
         <p class="py-2">
-          Setting a fee manually is optional. If left blank, Tempura will automatically estimate the fee rate needed to
-          prioritize your transaction for the next block.
+          Tempura automatically estimates the optimal fee rate to prioritize your transaction for inclusion in the next
+          block. To set the fee rate manually, uncheck the box.
         </p>
       </div>
     </dialog>
