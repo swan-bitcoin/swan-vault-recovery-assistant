@@ -989,28 +989,10 @@ function pastePsbtFromClipboard() {
       DOM.outputs.tempMessage.textContent = 'Failed to copy PSBT to clipboard'
     })
 }
-function showChangeInput() {
-  if (DOM.checkboxes.change.checked) {
-    DOM.containers.change.classList.add('hidden')
-  } else {
-    DOM.containers.change.classList.remove('hidden')
-  }
-}
-function showElectrumInput() {
-  if (DOM.checkboxes.electrum.checked) {
-    DOM.containers.electrum.classList.add('hidden')
-  } else {
-    DOM.containers.electrum.classList.remove('hidden')
-  }
-}
+const toggleChangeInput = () => DOM.containers.change.classList.toggle('hidden', DOM.checkboxes.change.checked)
+const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidden', DOM.checkboxes.electrum.checked)
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
-function showNetworkInput() {
-  if (DOM.checkboxes.network.checked) {
-    DOM.containers.network.classList.add('hidden')
-  } else {
-    DOM.containers.network.classList.remove('hidden')
-  }
-}
+const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
 async function sign() {
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT')
@@ -1113,10 +1095,10 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     sweep()
   })
-  DOM.checkboxes.change.addEventListener('click', showChangeInput)
-  DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
+  DOM.checkboxes.change.addEventListener('click', toggleChangeInput)
+  DOM.checkboxes.electrum.addEventListener('click', toggleElectrumInput)
   DOM.checkboxes.feeRate.addEventListener('click', toggleFeeRateInput)
-  DOM.checkboxes.network.addEventListener('click', showNetworkInput)
+  DOM.checkboxes.network.addEventListener('click', toggleNetworkInput)
   DOM.inputs.address.addEventListener('input', validateAddress)
   DOM.inputs.networkRadios.forEach((radio) => {
     radio.addEventListener('change', () => {
