@@ -15,6 +15,7 @@ type Buttons = {
 type Checkboxes = {
   change: HTMLInputElement
   electrum: HTMLInputElement
+  feeRate: HTMLInputElement
   network: HTMLInputElement
 }
 
@@ -27,6 +28,7 @@ type Radios = {
 type Containers = {
   change: HTMLDivElement
   electrum: HTMLDivElement
+  feeRate: HTMLDivElement
   footer: HTMLDivElement
   mainContent: HTMLDivElement
   network: HTMLDivElement
@@ -147,6 +149,7 @@ export function initializeDOM() {
     const checkboxes = {
       change: requireDomElement<HTMLInputElement>('#auto-change-checkbox'),
       electrum: requireDomElement<HTMLInputElement>('#auto-electrum-checkbox'),
+      feeRate: requireDomElement<HTMLInputElement>('#auto-fee-rate-checkbox'),
       network: requireDomElement<HTMLInputElement>('#network-checkbox'),
     }
 
@@ -159,6 +162,7 @@ export function initializeDOM() {
     const containers = {
       change: requireDomElement<HTMLDivElement>('#change-input-container'),
       electrum: requireDomElement<HTMLDivElement>('#electrum-input-container'),
+      feeRate: requireDomElement<HTMLDivElement>('#fee-rate-input-container'),
       footer: requireDomElement<HTMLDivElement>('#footer'),
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
@@ -170,7 +174,7 @@ export function initializeDOM() {
       address: requireDomElement<HTMLInputElement>('#address-input'),
       change: requireDomElement<HTMLInputElement>('#change-input'),
       electrum: requireDomElement<HTMLInputElement>('#electrum-input'),
-      feeRate: requireDomElement<HTMLInputElement>('#feerate-input'),
+      feeRate: requireDomElement<HTMLInputElement>('#fee-rate-input'),
       networkRadios: requireDomElements<HTMLInputElement>('input[name="network"]'),
       receive: requireDomElement<HTMLInputElement>('#receive-input'),
     }

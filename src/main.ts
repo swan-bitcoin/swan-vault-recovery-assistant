@@ -247,6 +247,8 @@ function showElectrumInput() {
   }
 }
 
+const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
+
 function showNetworkInput() {
   if (DOM.checkboxes.network.checked) {
     DOM.containers.network.classList.add('hidden')
@@ -381,6 +383,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.checkboxes.change.addEventListener('click', showChangeInput)
   DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
+  DOM.checkboxes.feeRate.addEventListener('click', toggleFeeRateInput)
   DOM.checkboxes.network.addEventListener('click', showNetworkInput)
 
   DOM.inputs.address.addEventListener('input', validateAddress)

@@ -493,6 +493,7 @@ function initializeDOM() {
     const checkboxes = {
       change: requireDomElement('#auto-change-checkbox'),
       electrum: requireDomElement('#auto-electrum-checkbox'),
+      feeRate: requireDomElement('#auto-fee-rate-checkbox'),
       network: requireDomElement('#network-checkbox'),
     }
     const radios = {
@@ -503,6 +504,7 @@ function initializeDOM() {
     const containers = {
       change: requireDomElement('#change-input-container'),
       electrum: requireDomElement('#electrum-input-container'),
+      feeRate: requireDomElement('#fee-rate-input-container'),
       footer: requireDomElement('#footer'),
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
@@ -513,7 +515,7 @@ function initializeDOM() {
       address: requireDomElement('#address-input'),
       change: requireDomElement('#change-input'),
       electrum: requireDomElement('#electrum-input'),
-      feeRate: requireDomElement('#feerate-input'),
+      feeRate: requireDomElement('#fee-rate-input'),
       networkRadios: requireDomElements('input[name="network"]'),
       receive: requireDomElement('#receive-input'),
     }
@@ -1001,6 +1003,7 @@ function showElectrumInput() {
     DOM.containers.electrum.classList.remove('hidden')
   }
 }
+const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 function showNetworkInput() {
   if (DOM.checkboxes.network.checked) {
     DOM.containers.network.classList.add('hidden')
@@ -1112,6 +1115,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.checkboxes.change.addEventListener('click', showChangeInput)
   DOM.checkboxes.electrum.addEventListener('click', showElectrumInput)
+  DOM.checkboxes.feeRate.addEventListener('click', toggleFeeRateInput)
   DOM.checkboxes.network.addEventListener('click', showNetworkInput)
   DOM.inputs.address.addEventListener('input', validateAddress)
   DOM.inputs.networkRadios.forEach((radio) => {
