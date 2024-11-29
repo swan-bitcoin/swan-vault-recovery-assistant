@@ -269,7 +269,7 @@ const showClearMessagesButton = () => {
     clearMessagesButton.classList.remove('hidden')
   }
 }
-const createConversationBubble = (content, isUserSpeaking = false, dangerouslySetInnerHTML = false) => {
+const createConversationBubble = ({ content, isUserSpeaking = false, dangerouslySetInnerHTML = false }) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
   const avatar = document.createElement('div')
@@ -854,10 +854,15 @@ async function broadcast() {
   require2(psbt, 'PSBT')
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble('Broadcast the transaction from this PSBT', true)
+    const userBubble = createConversationBubble({
+      content: 'Broadcast the transaction from this PSBT',
+      isUserSpeaking: true,
+    })
     DOM.outputs.conversation.appendChild(userBubble)
     await commands.broadcast(psbt, network, descriptors, electrum)
-    const tempuraBubble = createConversationBubble('Broadcast successful!')
+    const tempuraBubble = createConversationBubble({
+      content: 'Broadcast successful!',
+    })
     DOM.outputs.conversation.appendChild(tempuraBubble)
     DOM.outputs.tempMessage.textContent = 'Anything else?'
   } catch (e) {
@@ -868,10 +873,15 @@ async function enumerate() {
   const { network } = getUserInputs()
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
-    const userBubble = createConversationBubble('Find my device', true)
+    const userBubble = createConversationBubble({
+      content: 'Find my device',
+      isUserSpeaking: true,
+    })
     DOM.outputs.conversation.appendChild(userBubble)
     const response = await commands.enumerate(network)
-    const tempuraBubble = createConversationBubble(getDeviceMessage(response))
+    const tempuraBubble = createConversationBubble({
+      content: getDeviceMessage(response),
+    })
     DOM.outputs.conversation.appendChild(tempuraBubble)
     DOM.outputs.tempMessage.textContent = getDevicePrompt(response)
   } catch (e) {
@@ -884,21 +894,23 @@ async function loadWallet() {
   if (!isValid) return
   DOM.outputs.tempMessage.textContent = 'Fetching wallet ...'
   try {
-    const userBubble = createConversationBubble('Fetch my wallet.', true)
+    const userBubble = createConversationBubble({
+      content: 'Fetch my wallet.',
+      isUserSpeaking: true,
+    })
     DOM.outputs.conversation.appendChild(userBubble)
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
-    const tempuraBubble = createConversationBubble(
-      WalletInfo({
+    const tempuraBubble = createConversationBubble({
+      content: WalletInfo({
         balance,
         transactions,
         addressInfo,
       }),
-      false,
-      true
-    )
+      dangerouslySetInnerHTML: true,
+    })
     instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
@@ -1013,7 +1025,10 @@ async function sign() {
   require2(psbt, 'PSBT')
   DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
-    const userBubble = createConversationBubble('Sign this transaction (PSBT)', true)
+    const userBubble = createConversationBubble({
+      content: 'Sign this transaction (PSBT)',
+      isUserSpeaking: true,
+    })
     DOM.outputs.conversation.appendChild(userBubble)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
@@ -1022,7 +1037,9 @@ async function sign() {
     const response = await commands.sign(psbt, network, device.type)
     const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
-    const tempuraBubble = createConversationBubble(message)
+    const tempuraBubble = createConversationBubble({
+      content: message,
+    })
     DOM.outputs.conversation.appendChild(tempuraBubble)
     validatePsbt()
     if (signed) {
@@ -1051,11 +1068,11 @@ async function sweep() {
   }
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
-    const userBubble = createConversationBubble(
-      `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
-      true,
-      true
-    )
+    const userBubble = createConversationBubble({
+      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      isUserSpeaking: true,
+      dangerouslySetInnerHTML: true,
+    })
     DOM.outputs.conversation.appendChild(userBubble)
     const { psbt, outbound, fee } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
     clearStatusIndicators(DOM.outputs.psbtTextArea)
@@ -1065,10 +1082,16 @@ async function sweep() {
     validatePsbt()
     DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
     DOM.outputs.tempMessage.textContent = 'Sign next?'
-    const tempuraBubble = createConversationBubble(Success('Transaction (PSBT) created!'), false, true)
+    const tempuraBubble = createConversationBubble({
+      content: Success('Transaction (PSBT) created!'),
+      isUserSpeaking: false,
+      dangerouslySetInnerHTML: true,
+    })
     DOM.outputs.conversation.appendChild(tempuraBubble)
     if (feeRate.warning) {
-      const warningBubble = createConversationBubble(feeRate.warning)
+      const warningBubble = createConversationBubble({
+        content: feeRate.warning,
+      })
       DOM.outputs.conversation.appendChild(warningBubble)
     }
     DOM.radios.sendTransactionCollapse.checked = true
