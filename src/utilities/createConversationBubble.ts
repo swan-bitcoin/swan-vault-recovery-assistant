@@ -1,3 +1,9 @@
+type ConversationBubbleProps = {
+  content: string
+  isUserSpeaking?: boolean
+  dangerouslySetInnerHTML?: boolean
+}
+
 const showConversation = () => {
   const conversationContainer = document.getElementById('conversation')
   if (conversationContainer) {
@@ -13,11 +19,11 @@ const showClearMessagesButton = () => {
 }
 
 // if using dangerouslySetInnerHTML option, make sure the content input has been sanitized or encoded to prevent XSS
-export const createConversationBubble = (
-  content: string,
-  isUserSpeaking: boolean = false,
-  dangerouslySetInnerHTML: boolean = false
-): HTMLDivElement => {
+export const createConversationBubble = ({
+  content,
+  isUserSpeaking = false,
+  dangerouslySetInnerHTML = false,
+}: ConversationBubbleProps) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
 
