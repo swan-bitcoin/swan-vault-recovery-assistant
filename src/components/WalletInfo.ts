@@ -49,7 +49,7 @@ export const WalletInfo = ({ balance, transactions, addressInfo }: WalletInfoPro
           />
           <div role="tabpanel" class="tab-content rounded-box mt-4">
             <div class="flex flex-col gap-4 items-center">
-              <div class="flex gap-2">
+              <div class="flex flex-wrap gap-2">
                 <span class="badge badge-neutral">Total ${transactions.length}</span>
                 <span class="badge badge-warning">Unconfirmed ${unconfirmedCount}</span>
                 <span class="badge badge-success">Confirmed ${confirmedCount}</span>
