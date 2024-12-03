@@ -57,7 +57,7 @@ describe('sanity checks. scenario test setup', function () {
 
   it('opened the window', async function () {
     const test = await driver.findElement(By.id('temporary-message')).getText()
-    expect(test).toMatch(/^Hi there!/)
+    expect(test).toMatch(/^Welcome!/)
   })
 })
 

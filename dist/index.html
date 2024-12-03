@@ -24,7 +24,7 @@
                 <span class="text-4xl">🍤</span>
               </div>
               <div class="chat-bubble chat-bubble-primary" id="temporary-message">
-                Hi there! To start, enter your wallet configuration.
+                Welcome! To load your wallet, enter the wallet configuration in the area provided.
               </div>
             </div>
             <div class="card-actions justify-end">
@@ -41,7 +41,7 @@
         <!-- First Card: Wallet Set Up -->
         <div class="collapse collapse-arrow bg-base-300 shadow-xl">
           <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
-          <div class="collapse-title text-xl">Wallet Set Up</div>
+          <div class="collapse-title text-xl">Set Up Wallet</div>
           <div class="collapse-content">
             <!-- Receive descriptor -->
             <div class="form-control">
@@ -61,7 +61,7 @@
             <div class="form-control">
               <div class="label">
                 <div class="flex items-center gap-2">
-                  <span class="label-text">Auto Calculate Change Configuration</span>
+                  <span class="label-text">Calculate Change Configuration</span>
                   <input
                     type="checkbox"
                     id="auto-change-checkbox"
@@ -70,12 +70,12 @@
                   />
                 </div>
                 <button class="btn btn-link no-underline btn-sm" onclick="auto_change_modal.showModal()">
-                  What is auto calculation?
+                  What is a change configuration?
                 </button>
               </div>
               <div id="change-input-container" class="hidden">
                 <div class="label">
-                  <label class="label-text">Change Descriptor</label>
+                  <label class="label-text">Change Configuration (Descriptor)</label>
                 </div>
                 <input class="input w-full" id="change-input" type="text" />
               </div>
@@ -123,7 +123,7 @@
             <div class="form-control mb-5">
               <div class="label">
                 <div class="flex items-center gap-2">
-                  <span class="label-text">I don't need to change my network</span>
+                  <span class="label-text">Use Bitcoin Main Network</span>
                   <input
                     type="checkbox"
                     id="network-checkbox"
@@ -132,7 +132,7 @@
                   />
                 </div>
                 <button class="btn btn-link no-underline btn-sm" onclick="network_modal.showModal()">
-                  Why would I want to change this?
+                  Why would I change my network?
                 </button>
               </div>
               <div id="network-input-container" class="hidden">
@@ -170,7 +170,7 @@
         <!-- Second Card: Recovery Options -->
         <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="recovery-container">
           <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
-          <div class="collapse-title text-xl">Recovery Options</div>
+          <div class="collapse-title text-xl">Recover Wallet</div>
           <div class="collapse-content">
             <!-- Destination address -->
             <div class="form-control mb-3">
@@ -182,7 +182,7 @@
             <div class="form-control mb-5">
               <div class="label">
                 <div class="flex items-center gap-2">
-                  <span class="label-text">Auto Fee Rate Estimation</span>
+                  <span class="label-text">Automatically Estimate Fee Rate</span>
                   <input
                     type="checkbox"
                     id="auto-fee-rate-checkbox"
@@ -191,7 +191,7 @@
                   />
                 </div>
                 <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
-                  What is the fee rate for?
+                  How is the fee rate used?
                 </button>
               </div>
               <div id="fee-rate-input-container" class="hidden">
@@ -214,7 +214,7 @@
 
             <!-- Sweep button -->
             <div class="card-actions justify-end mb-2">
-              <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create sweep PSBT</button>
+              <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create Recovery Transaction</button>
             </div>
           </div>
         </div>
@@ -416,13 +416,17 @@
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Automatic Change Descriptor Calculation</h3>
+        <h3 class="text-lg font-bold">Change Configurations and Calculation</h3>
         <p class="py-4">
-          By default, Tempura automatically calculates the change descriptor paths ending in <code>/1/*</code> from your
-          receive descriptor if the receive descriptor paths end with <code>/0/*</code>, which is the most common format. The
-          same goes for multipath descriptors of type <code>&lt;0;1&gt;</code>.
+          Bitcoin wallets typically separate addresses for receiving transactions from those used to receive change from
+          outgoing transactions. In most cases Tempura can calculate the correct change configuration from the wallet
+          configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter your change
+          configuration.
         </p>
-        <p>Hence, you only need to enter a change descriptor if it is non-standard.</p>
+        <p>
+          Tempura calculates the change configuration from the receive configuration if the receive descriptor paths end with
+          <code>/0/*</code>. The calculated change configuration paths will end in <code>/1/*</code>.
+        </p>
       </div>
     </dialog>
 
@@ -434,14 +438,14 @@
         </form>
         <h3 class="text-lg font-bold">What is an Electrum Server?</h3>
         <p class="py-4">
-          An Electrum server is a special type of computer that helps you connect to the Bitcoin Network. It allows your
-          wallet to quickly check existing balances & transactions and even broadcast new ones. Think of it as a helpful
-          assistant that can interact with the network without requiring your computer to download the entire Bitcoin
-          blockchain.
+          An Electrum server helps you connect to the Bitcoin network. It allows your wallet to quickly check balances, list
+          transactions, and broadcast new ones. It can do this without downloading the entire Bitcoin blockchain. You trust
+          the Electrum server to provide the correct balance and transaction information, and the server operator can
+          potentially link your transactions to your IP address.
         </p>
         <p>
-          An internet connection is required to check your balance, existing transactions, or to broadcast a new transaction.
-          An internet connection is not involved in the signing process.
+          If you have a trusted Electrum server (either on your own node or a trusted friend's), uncheck the box and enter
+          its address.
         </p>
       </div>
     </dialog>
@@ -470,14 +474,13 @@
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Why would I want to change my network?</h3>
+        <h3 class="text-lg font-bold">Why would I change my network?</h3>
         <p class="py-4">
-          Bitcoin is a network of computers. It can be scary to use, because real money is involved. For this reason, the
-          'Testnet' network exists. It's like a sandbox where you can play around with Bitcoin without using real money. It's
-          also possible to create a small local network called 'Regtest' which you can control!
+          For testing purposes, developers may want to use Tempura on networks where the coins involved do not have value.
         </p>
         <p>
-          Developers love these features because they need to test things before releasing them, and Bitcoin is no exception.
+          Each Bitcoin wallet should only be used with the network on which it was created. Tempura will typically detect
+          mismatched wallet configuration and network selections.
         </p>
       </div>
     </dialog>
@@ -492,7 +495,7 @@
         <div class="py-4">
           <p>
             Miners prioritize transactions based on this rate, which reflects how much is paid per "virtual byte" (a measure
-            of transaction complexity). A higher fee rate increases the chances of a quicker confirmation, especially in
+            of transaction complexity). A higher fee rate increases the chance of a prompt confirmation, especially in
             periods of high network activity.
           </p>
         </div>
