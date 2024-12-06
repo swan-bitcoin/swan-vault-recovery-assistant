@@ -1023,6 +1023,7 @@ async function sign() {
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
       content: message,
+      dangerouslySetInnerHTML: true,
     })
     DOM.outputs.conversation.appendChild(tempuraBubble)
     validatePsbt()
