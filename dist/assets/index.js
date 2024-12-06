@@ -346,6 +346,8 @@ const WalletInfo = ({ balance, transactions, addressInfo }) => {
   const { unconfirmedCount, confirmedCount } = countTransactions(transactions)
   const firstTransaction = getFirstTransaction(transactions)
   const tabId = generateRandomString()
+  const confirmed = balance.confirmed
+  const unconfirmed = String(Number(balance.untrusted_pending) + Number(balance.trusted_pending))
   return `
       <div class="wallet-info">
         <div role="tablist" class="tabs tabs-bordered">  
@@ -359,10 +361,7 @@ const WalletInfo = ({ balance, transactions, addressInfo }) => {
             checked="checked"
           />
           <div role="tabpanel" class="tab-content rounded-box mt-4">
-            ${Balance({
-              confirmed: balance.confirmed,
-              unconfirmed: balance.untrusted_pending,
-            })}
+            ${Balance({ confirmed, unconfirmed })}
           </div>
 
           <!-- Transactions Tab -->

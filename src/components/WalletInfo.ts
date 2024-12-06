@@ -20,6 +20,8 @@ export const WalletInfo = ({ balance, transactions, addressInfo }: WalletInfoPro
   const firstTransaction = getFirstTransaction(transactions)
   const tabId = generateRandomString() // without this we get bugs if the user fetches the wallet info more than once
 
+  const confirmed = balance.confirmed
+  const unconfirmed = String(Number(balance.untrusted_pending) + Number(balance.trusted_pending))
   return `
       <div class="wallet-info">
         <div role="tablist" class="tabs tabs-bordered">  
@@ -33,10 +35,7 @@ export const WalletInfo = ({ balance, transactions, addressInfo }: WalletInfoPro
             checked="checked"
           />
           <div role="tabpanel" class="tab-content rounded-box mt-4">
-            ${Balance({
-              confirmed: balance.confirmed,
-              unconfirmed: balance.untrusted_pending,
-            })}
+            ${Balance({ confirmed, unconfirmed })}
           </div>
 
           <!-- Transactions Tab -->
