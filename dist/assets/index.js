@@ -192,8 +192,22 @@ const simpleCheckmark = `
 </svg>
 `
 const TxRow = (transaction) => {
-  const transactionType =
-    transaction.sent === transaction.fee ? 'selfTransfer' : Number(transaction.received) > 0 ? 'received' : 'sent'
+  let transactionType
+  if (Number(transaction.sent) === Number(transaction.received) + Number(transaction.fee)) {
+    transactionType = 'selfTransfer'
+  } else if (Number(transaction.sent) > 0 && Number(transaction.received) > 0) {
+    transactionType = 'sent'
+  } else if (Number(transaction.received) > 0) {
+    transactionType = 'received'
+  } else {
+    transactionType = 'sent'
+  }
+  const amount =
+    transactionType === 'sent'
+      ? `-${Sats(Number(transaction.sent) - Number(transaction.received))}`
+      : transactionType === 'received'
+        ? `+${Sats(Number(transaction.received))}`
+        : `-${Sats(Number(transaction.fee))}`
   return `
       <tr>
         <td>
@@ -201,9 +215,7 @@ const TxRow = (transaction) => {
         </td>
         <td>${transaction.txid}</td>
         <td>${CopyButtonXs(transaction.txid)}</td>
-        <td>
-          ${transactionType === 'selfTransfer' ? '' : transactionType === 'sent' ? Sats(transaction.sent) : Sats(transaction.received)}
-        </td>
+        <td>${amount}</td>
         <td>${Sats(transaction.fee)}</td>
         <td>${transaction.confirmation_height || 'Unconfirmed'}</td>
       </tr>
