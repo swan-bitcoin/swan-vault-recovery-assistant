@@ -20,21 +20,21 @@ const TxRow = (transaction: Transaction) => {
 
   const amount =
     transactionType === 'sent'
-      ? `-${Sats(Number(transaction.sent) - Number(transaction.received))}`
+      ? `&minus;${Sats(Number(transaction.sent) - Number(transaction.received))}`
       : transactionType === 'received'
-        ? `+${Sats(Number(transaction.received))}`
-        : `-${Sats(Number(transaction.fee))}` // selfTransfer reduces balance amount just by the fee
+        ? `&plus;${Sats(Number(transaction.received))}`
+        : `&minus;${Sats(Number(transaction.fee))}` // selfTransfer reduces balance amount just by the fee
 
   return `
       <tr>
         <td>
           ${transactionType === 'selfTransfer' ? selfTransferIcon : transactionType === 'sent' ? sentIcon : receivedIcon}
         </td>
-        <td>${transaction.txid}</td>
+        <td class="text-right [font-variant-numeric:tabular-nums]">${amount}</td>
+        <td class="text-right [font-variant-numeric:tabular-nums]">${Sats(transaction.fee)}</td>
+        <td class="text-center [font-variant-numeric:tabular-nums]">${transaction.confirmation_height || 'Unconfirmed'}</td>
+        <td class="text-center font-mono">${transaction.txid}</td>
         <td>${CopyButtonXs(transaction.txid)}</td>
-        <td>${amount}</td>
-        <td>${Sats(transaction.fee)}</td>
-        <td>${transaction.confirmation_height || 'Unconfirmed'}</td>
       </tr>
     `
 }
