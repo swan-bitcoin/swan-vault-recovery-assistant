@@ -136,9 +136,9 @@ const CopyButton = (value) => `
   </div>
 `
 const CopyButtonXs = (value) => `
-    <div class="tooltip tooltip-accent" data-tip="Copy">
-      <button class="btn btn-square btn-xs btn-info" name="copy", value="${value}">
-        <svg class="h-3 w-3 fill-current transition-transform duration-300 ease-in-out" id="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+    <div class="tooltip tooltip-left tooltip-accent" data-tip="Copy">
+      <button class="btn btn-square btn-xs btn-ghost" name="copy", value="${value}">
+        <svg class="h-4 w-4 fill-current transition-transform duration-300 ease-in-out" id="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
           <g transform="scale(0.5)">${innerPaths}</g>
         </svg>
       </button>
@@ -204,20 +204,20 @@ const TxRow = (transaction) => {
   }
   const amount =
     transactionType === 'sent'
-      ? `-${Sats(Number(transaction.sent) - Number(transaction.received))}`
+      ? `&minus;${Sats(Number(transaction.sent) - Number(transaction.received))}`
       : transactionType === 'received'
-        ? `+${Sats(Number(transaction.received))}`
-        : `-${Sats(Number(transaction.fee))}`
+        ? `&plus;${Sats(Number(transaction.received))}`
+        : `&minus;${Sats(Number(transaction.fee))}`
   return `
       <tr>
         <td>
           ${transactionType === 'selfTransfer' ? selfTransferIcon : transactionType === 'sent' ? sentIcon : receivedIcon}
         </td>
-        <td>${transaction.txid}</td>
+        <td class="text-right [font-variant-numeric:tabular-nums]">${amount}</td>
+        <td class="text-right [font-variant-numeric:tabular-nums]">${Sats(transaction.fee)}</td>
+        <td class="text-center [font-variant-numeric:tabular-nums]">${transaction.confirmation_height || 'Unconfirmed'}</td>
+        <td class="text-center font-mono">${transaction.txid}</td>
         <td>${CopyButtonXs(transaction.txid)}</td>
-        <td>${amount}</td>
-        <td>${Sats(transaction.fee)}</td>
-        <td>${transaction.confirmation_height || 'Unconfirmed'}</td>
       </tr>
     `
 }

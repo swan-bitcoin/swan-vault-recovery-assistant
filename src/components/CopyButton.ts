@@ -16,9 +16,9 @@ export const CopyButton = (value: string) => `
 `
 
 export const CopyButtonXs = (value: string) => `
-    <div class="tooltip tooltip-accent" data-tip="Copy">
-      <button class="btn btn-square btn-xs btn-info" name="copy", value="${value}">
-        <svg class="h-3 w-3 fill-current transition-transform duration-300 ease-in-out" id="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+    <div class="tooltip tooltip-left tooltip-accent" data-tip="Copy">
+      <button class="btn btn-square btn-xs btn-ghost" name="copy", value="${value}">
+        <svg class="h-4 w-4 fill-current transition-transform duration-300 ease-in-out" id="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
           <g transform="scale(0.5)">${innerPaths}</g>
         </svg>
       </button>

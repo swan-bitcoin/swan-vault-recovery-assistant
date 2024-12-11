@@ -3214,6 +3214,13 @@ details.collapse summary::-webkit-details-marker {
   right: auto;
   bottom: var(--tooltip-offset);
 }
+.tooltip-left:before {
+  transform: translateY(-50%);
+  top: 50%;
+  left: auto;
+  right: var(--tooltip-offset);
+  bottom: auto;
+}
 .tooltip-right:before {
   transform: translateY(-50%);
   top: 50%;
@@ -3496,6 +3503,14 @@ details.collapse summary::-webkit-details-marker {
   right: auto;
   bottom: var(--tooltip-tail-offset);
 }
+.tooltip-left:after {
+  transform: translateY(-50%);
+  border-color: transparent transparent transparent var(--tooltip-color);
+  top: 50%;
+  left: auto;
+  right: calc(var(--tooltip-tail-offset) + 0.0625rem);
+  bottom: auto;
+}
 .tooltip-right:after {
   transform: translateY(-50%);
   border-color: transparent var(--tooltip-color) transparent transparent;
@@ -3595,9 +3610,6 @@ details.collapse summary::-webkit-details-marker {
 .hidden {
   display: none;
 }
-.h-3 {
-  height: 0.75rem;
-}
 .h-36 {
   height: 9rem;
 }
@@ -3618,9 +3630,6 @@ details.collapse summary::-webkit-details-marker {
 }
 .w-11\/12 {
   width: 91.666667%;
-}
-.w-3 {
-  width: 0.75rem;
 }
 .w-3\/12 {
   width: 25%;
@@ -3776,6 +3785,15 @@ details.collapse summary::-webkit-details-marker {
 .pr-4 {
   padding-right: 1rem;
 }
+.text-center {
+  text-align: center;
+}
+.text-right {
+  text-align: right;
+}
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
 .text-4xl {
   font-size: 2.25rem;
   line-height: 2.5rem;
@@ -3902,6 +3920,9 @@ details.collapse summary::-webkit-details-marker {
 }
 .ease-in-out {
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+.\[font-variant-numeric\:tabular-nums\] {
+  font-variant-numeric: tabular-nums;
 }
 
 .copied {
