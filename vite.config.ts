@@ -7,6 +7,10 @@ export default defineConfig(async () => ({
   build: {
     minify: false,
     rollupOptions: {
+      input: {
+        index: './index.html',
+        about: './about.html',
+      },
       output: {
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
