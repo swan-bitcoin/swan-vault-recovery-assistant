@@ -67,7 +67,47 @@ jobs:
             !src-tauri/target/release/bundle
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
-      - name: Build project
+      - name: Import Apple Developer Certificate
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security find-identity -v -p codesigning build.keychain
+
+      - name: Verify Apple Developer Certificate
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
+        run: |
+          CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
+          CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
+          echo "APPLE_SIGNING_IDENTITY=$CERT_ID" >> $GITHUB_ENV
+          echo "Apple Developer Certificate imported."
+
+      - name: Save Apple API Key
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
+        env:
+          APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
+        run: |
+          APPLE_API_KEY_PATH=$HOME/apple_api.key
+          echo ${APPLE_API_KEY_B64} | base64 -d > $APPLE_API_KEY_PATH
+          echo "APPLE_API_KEY_PATH=$APPLE_API_KEY_PATH" >> $GITHUB_ENV
+          echo "Apple API Key saved."
+
+      - name: Build project (signed Mac app)
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: pnpm tauri build
+
+      - name: Build project (unsigned)
+        if: ${{ matrix.os != 'macos-latest' || matrix.isPR }}
         run: pnpm tauri build
 
       - name: Check for git diffs after build
