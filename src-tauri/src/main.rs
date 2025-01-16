@@ -208,8 +208,8 @@ fn get_blockchain(
   let connection = match electrum {
     Some(electrum) => electrum,
     None => match network {
-      Network::Testnet => "electrum.blockstream.info:60001".to_string(),
-      Network::Bitcoin => "blockstream.info:110".to_string(),
+      Network::Testnet => "ssl://electrum.blockstream.info:60002".to_string(),
+      Network::Bitcoin => "ssl://blockstream.info:993".to_string(),
       Network::Regtest => "localhost:50021".to_string(),
       _ => {
         return Err(TempuraError::new(
