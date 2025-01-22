@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tempura</title>
+    <script type="module" crossorigin src="/assets/index.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/layout.js" />
+    <link rel="stylesheet" crossorigin href="/assets/layout.css" />
+  </head>
+
+  <body class="flex flex-col min-h-screen">
+    <!-- Main content section -->
+    <main id="main-content" class="flex flex-grow p-4">
+      <!-- Chat bubble on the left -->
+      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar pr-4">
+        <div class="card card-normal bg-base-200 shadow-2xl">
+          <div class="card-body">
+            <h2 class="card-title">Chat</h2>
+            <!-- Persistent conversation -->
+            <div id="conversation"></div>
+            <!-- Temporary feedback -->
+            <div class="chat chat-start">
+              <div class="chat-image avatar">
+                <span class="text-4xl">🍤</span>
+              </div>
+              <div class="chat-bubble chat-bubble-primary" id="temporary-message">
+                Welcome! To load your wallet, enter the wallet configuration in the area provided.
+              </div>
+            </div>
+            <div class="card-actions justify-end">
+              <button id="clear-messages-button" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">
+                Clear Messages
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cards section -->
+      <div class="flex flex-col w-7/12 overflow-y-scroll gap-4 pr-4 ml-6">
+        <!-- First Card: Wallet Set Up -->
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl">
+          <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
+          <div class="collapse-title text-xl">Set Up Wallet</div>
+          <div class="collapse-content">
+            <!-- Receive descriptor -->
+            <div class="form-control">
+              <div class="label">
+                <label class="label-text">Wallet Configuration (Descriptor)</label>
+                <button class="btn btn-link no-underline btn-sm" onclick="wallet_config_modal.showModal()">
+                  Where can I find this?
+                </button>
+              </div>
+              <textarea
+                id="receive-input"
+                class="textarea textarea-bordered textarea-md h-36 break-all w-full leading-normal transition-border-color duration-500 ease-in-out"
+              ></textarea>
+            </div>
+
+            <!-- Change descriptor -->
+            <div class="form-control">
+              <div class="label">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Calculate Change Configuration</span>
+                  <input
+                    type="checkbox"
+                    id="auto-change-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline btn-sm" onclick="auto_change_modal.showModal()">
+                  What is a change configuration?
+                </button>
+              </div>
+              <div id="change-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Change Configuration (Descriptor)</label>
+                </div>
+                <input class="input w-full" id="change-input" type="text" />
+              </div>
+            </div>
+
+            <!-- Custom Electrum server -->
+            <div class="form-control">
+              <div class="label">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Use Default Electrum Server</span>
+                  <input
+                    type="checkbox"
+                    id="auto-electrum-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline btn-sm" onclick="auto_electrum_modal.showModal()">
+                  What is an Electrum Server?
+                </button>
+              </div>
+
+              <div id="electrum-input-container" class="hidden">
+                <div class="label justify-normal items-center gap-2">
+                  <label class="label-text">Electrum Server</label>
+                </div>
+                <div class="flex flex-col items-start">
+                  <input
+                    class="input input-ghost input-bordered w-full max-w-xs"
+                    id="electrum-input"
+                    type="text"
+                    placeholder="ssl://blockstream.info:993"
+                  />
+                  <button
+                    class="btn btn-link no-underline btn-xs px-1 py-0 font-normal"
+                    onclick="electrum_server_modal.showModal()"
+                  >
+                    How to use a custom server?
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Network selection -->
+            <div class="form-control mb-5">
+              <div class="label">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Use Bitcoin Main Network</span>
+                  <input
+                    type="checkbox"
+                    id="network-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline btn-sm" onclick="network_modal.showModal()">
+                  Why would I change my network?
+                </button>
+              </div>
+              <div id="network-input-container" class="hidden">
+                <div class="flex gap-4">
+                  <label class="label cursor-pointer">
+                    <input
+                      id="bitcoin"
+                      value="bitcoin"
+                      type="radio"
+                      name="network"
+                      class="radio checked:bg-orange-500"
+                      checked
+                    />
+                    <span class="label-text ml-2">Bitcoin</span>
+                  </label>
+                  <label class="label cursor-pointer">
+                    <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
+                    <span class="label-text ml-2">Testnet</span>
+                  </label>
+                  <label class="label cursor-pointer">
+                    <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
+                    <span class="label-text ml-2">Regtest</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Buttons: Fetch balance, New address -->
+            <div class="card-actions justify-end mb-6 hidden" id="wallet-actions">
+              <button type="button" class="btn btn-primary btn-sm" id="fetch-wallet-button">Fetch Wallet</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Second Card: Recovery Options -->
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="recovery-container">
+          <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
+          <div class="collapse-title text-xl">Recover Wallet</div>
+          <div class="collapse-content">
+            <!-- Destination address -->
+            <div class="form-control mb-3">
+              <label class="label">Destination Address</label>
+              <input class="input input-bordered" id="address-input" type="text" placeholder="bc1q..." />
+            </div>
+
+            <!-- Fee rate -->
+            <div class="form-control mb-5">
+              <div class="label">
+                <div class="flex items-center gap-2">
+                  <span class="label-text">Automatically Estimate Fee Rate</span>
+                  <input
+                    type="checkbox"
+                    id="auto-fee-rate-checkbox"
+                    checked="checked"
+                    class="checkbox checkbox-info checkbox-sm"
+                  />
+                </div>
+                <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
+                  How is the fee rate used?
+                </button>
+              </div>
+              <div id="fee-rate-input-container" class="hidden">
+                <div class="label">
+                  <label class="label-text">Fee Rate</label>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input
+                    class="input input-bordered w-3/12 inline-flex"
+                    id="fee-rate-input"
+                    type="number"
+                    step="1"
+                    min="5"
+                  />
+                  <label class="label inline-flex" for="fee-rate-input">sats/vB</label>
+                  <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sweep button -->
+            <div class="card-actions justify-end mb-2">
+              <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create Recovery Transaction</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Third Card: Send Transaction  -->
+        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="send-transaction-container">
+          <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
+          <div class="collapse-title text-xl">Send Transaction</div>
+          <div class="collapse-content">
+            <!-- Transaction -->
+            <div class="form-control mb-3 hidden" id="transaction-overview-container">
+              <!-- Transaction overview -->
+              <div class="overflow-x-auto">
+                <table class="table table-fixed table-md mb-2">
+                  <thead>
+                    <tr>
+                      <th>To</th>
+                      <th>Amount</th>
+                      <th>Fee</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transaction-overview-body">
+                    <tr>
+                      <td class="truncate"></td>
+                      <td></td>
+                      <td></td>
+                      <td>
+                        <div id="psbt-status" class="truncate"></div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-center">
+                <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
+              </div>
+            </div>
+            <!-- PSBT details -->
+            <div class="form-control mb-3" id="psbt-details-container">
+              <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
+                <span class="label-text text-xs">Show PSBT Details</span>
+                <input id="psbt-details-toggle" type="checkbox" class="toggle" />
+              </label>
+              <!-- Toggle content-->
+              <div class="psbt-details-toggle-content">
+                <!-- PSBT textarea -->
+                <textarea
+                  class="textarea textarea-bordered h-40 w-full leading-normal"
+                  id="psbt-textarea"
+                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                ></textarea>
+                <!-- PSBT controls -->
+                <div class="flex gap-2 justify-end mt-2 mb-6">
+                  <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+                  <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Device & Broadcast controls -->
+            <div class="card-actions mb-6 justify-center">
+              <button class="btn btn-warning" type="button" id="sign-button">Sign</button>
+              <button class="btn btn-secondary btn-disabled" type="button" id="broadcast-button">Broadcast</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Toast message -->
+    <div id="toast-container" class="hidden"></div>
+
+    <!-- Footer -->
+    <footer id="footer" class="footer footer-center bg-base-200 text-base-content p-5">
+      <div class="flex">
+        <!-- About -->
+        <div class="flex gap-1">
+          🍤
+          <a id="about-link" class="link link-hover" href="#">About</a>
+        </div>
+        <div class="divider divider-horizontal"></div>
+        <!-- GitHub -->
+        <div class="flex items-center gap-1">
+          <svg width="18" height="18" class="h-6 w-6" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M29.3444 30.4765C31.7481 29.977 33.9292 29.1108 35.6247 27.8391C38.5202 25.6676 40 22.3136 40 18.9999C40 16.6752 39.1187 14.505 37.5929 12.6668C36.7427 11.6425 39.2295 3.99989 37.02 5.02919C34.8105 6.05848 31.5708 8.33679 29.8726 7.83398C28.0545 7.29565 26.0733 6.99989 24 6.99989C22.1992 6.99989 20.4679 7.22301 18.8526 7.6344C16.5046 8.23237 14.2591 5.99989 12 5.02919C9.74086 4.05848 10.9736 11.9632 10.3026 12.7944C8.84119 14.6051 8 16.7288 8 18.9999C8 22.3136 9.79086 25.6676 12.6863 27.8391C14.6151 29.2857 17.034 30.2076 19.7401 30.6619"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="butt"
+            ></path>
+            <path
+              d="M19.7397 30.6619C18.5812 31.937 18.002 33.1478 18.002 34.2944C18.002 35.441 18.002 38.3464 18.002 43.0106"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="butt"
+            ></path>
+            <path
+              d="M29.3446 30.4766C30.4423 31.9174 30.9912 33.211 30.9912 34.3576C30.9912 35.5042 30.9912 38.3885 30.9912 43.0107"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="butt"
+            ></path>
+            <path
+              d="M6 31.2155C6.89887 31.3254 7.56554 31.7387 8 32.4554C8.65169 33.5303 11.0742 37.518 13.8251 37.518C15.6591 37.518 17.0515 37.518 18.0024 37.518"
+              stroke="currentColor"
+              stroke-width="4"
+              stroke-linecap="butt"
+            ></path>
+          </svg>
+          <a
+            class="link link-hover text-md"
+            href="https://github.com/swan-bitcoin/tempura"
+            target="_blank"
+            rel="noopener noreferrer"
+            >GitHub
+          </a>
+        </div>
+        <div class="divider divider-horizontal"></div>
+        <div class="flex gap-2">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            x-bind:width="size"
+            x-bind:height="size"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            x-bind:stroke-width="stroke"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="24"
+            height="24"
+            stroke-width="2"
+          >
+            <path d="M2 6m0 2a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2z"></path>
+            <path d="M6 12h4m-2 -2v4"></path>
+            <path d="M15 11l0 .01"></path>
+            <path d="M18 13l0 .01"></path>
+          </svg>
+          <button class="link link-hover" id="enumerate-button">Check Device</button>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Transactions Modal -->
+    <dialog id="transactions-modal" class="modal">
+      <div class="modal-box w-11/12 max-w-5xl">
+        <h3 class="text-lg font-bold">Transactions</h3>
+        <div class="w-full h-96 overflow-x-auto">
+          <table class="table table-xs table-pin-rows">
+            <thead>
+              <tr>
+                <th class="text-center">Type</th>
+                <th class="text-center">Amount (&Delta;)</th>
+                <th class="text-center">Fee</th>
+                <th class="text-center">Confirmed in Block</th>
+                <th class="text-center">Txid</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="transactions-body"></tbody>
+          </table>
+        </div>
+        <div class="modal-action">
+          <form method="dialog">
+            <!-- if there is a button in form, it will close the modal -->
+            <button class="btn btn-sm" autofocus>Close</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Wallet Configuration Modal -->
+    <dialog id="wallet_config_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">There are several ways to find your wallet configuration</h3>
+        <p class="py-4">For Swan Vault recovery, use the descriptor from your "Wallet Configuration":</p>
+        <div class="flex justify-center py-2">
+          <img src="swan_vault_recovery_sheet.png" alt="Swan Vault Recovery Sheet" class="rounded-lg shadow-lg max-w-full" />
+        </div>
+        <p class="py-4">For recovery from Specter, use the "Bitcoin Core Receive Descriptor":</p>
+        <div class="flex justify-center py-2">
+          <img src="specter_recovery_sheet.png" alt="Specter Recovery Sheet" class="rounded-lg shadow-lg max-w-full" />
+        </div>
+        <p class="text-sm text-gray-500 mt-2">
+          You can enter a receive or combined descriptor. Receive descriptors typically start with
+          <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code>; combined descriptors end with
+          <code>/&lt;0;1&gt;/*</code>.
+        </p>
+      </div>
+    </dialog>
+
+    <!-- Auto-change Modal -->
+    <dialog id="auto_change_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Change Configurations and Calculation</h3>
+        <p class="py-4">
+          Bitcoin wallets typically separate addresses for receiving transactions from those used to receive change from
+          outgoing transactions. In most cases Tempura can calculate the correct change configuration from the wallet
+          configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter your change
+          configuration.
+        </p>
+        <p>
+          Tempura calculates the change configuration from the receive configuration if the receive descriptor paths end with
+          <code>/0/*</code>. The calculated change configuration paths will end in <code>/1/*</code>.
+        </p>
+      </div>
+    </dialog>
+
+    <!-- Auto-electrum Modal -->
+    <dialog id="auto_electrum_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">What is an Electrum Server?</h3>
+        <p class="py-4">
+          An Electrum server helps you connect to the Bitcoin network. It allows your wallet to quickly check balances, list
+          transactions, and broadcast new ones. It can do this without downloading the entire Bitcoin blockchain. You trust
+          the Electrum server to provide the correct balance and transaction information, and the server operator can
+          potentially link your transactions to your IP address.
+        </p>
+        <p>
+          If you have a trusted Electrum server (either on your own node or a trusted friend's), uncheck the box and enter
+          its address.
+        </p>
+      </div>
+    </dialog>
+
+    <!-- Electrum Server Modal -->
+    <dialog id="electrum_server_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Using your own server is easy</h3>
+        <div class="py-4">
+          <p>
+            Enter your custom Electrum server in the format <code>server:port</code>. If the server uses SSL, you must
+            specify it at the beginning.
+          </p>
+          <p>For example: <code>ssl://electrum.satoshi.com:50001</code></p>
+        </div>
+        <p class="py-2">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
+      </div>
+    </dialog>
+
+    <!-- Network Modal -->
+    <dialog id="network_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Why would I change my network?</h3>
+        <p class="py-4">
+          For testing purposes, developers may want to use Tempura on networks where the coins involved do not have value.
+        </p>
+        <p>
+          Each Bitcoin wallet should only be used with the network on which it was created. Tempura will typically detect
+          mismatched wallet configuration and network selections.
+        </p>
+      </div>
+    </dialog>
+
+    <!-- Fee Rate Modal -->
+    <dialog id="fee_rate_modal" class="modal">
+      <div class="modal-box">
+        <form method="dialog">
+          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+        </form>
+        <h3 class="text-lg font-bold">Understanding the Fee Rate</h3>
+        <div class="py-4">
+          <p>
+            Miners prioritize transactions based on this rate, which reflects how much is paid per "virtual byte" (a measure
+            of transaction complexity). A higher fee rate increases the chance of a prompt confirmation, especially in
+            periods of high network activity.
+          </p>
+        </div>
+        <p class="py-2">
+          Tempura automatically estimates the optimal fee rate to prioritize your transaction for inclusion in the next
+          block. To set the fee rate manually, uncheck the box.
+        </p>
+      </div>
+    </dialog>
+  </body>
+</html>

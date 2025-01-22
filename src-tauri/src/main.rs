@@ -7,6 +7,7 @@ use std::os::windows::process::CommandExt;
 
 use std::process::Command;
 use std::str::FromStr;
+use std::sync::Arc;
 
 #[macro_use]
 mod errors;
@@ -21,15 +22,14 @@ use specta::Type;
 use tauri::Manager;
 
 // bdk and bitcoin imports
+use bdk_electrum::electrum_client::Client;
 use bdk_electrum::BdkElectrumClient;
 use bdk_wallet;
 use bdk_wallet::bitcoin::secp256k1::Secp256k1;
 use bdk_wallet::bitcoin::Amount;
-// use bdk_wallet::database::MemoryDatabase;
-use bdk_electrum::electrum_client::Client;
 use bdk_wallet::bitcoin::Psbt;
 use bdk_wallet::descriptor::IntoWalletDescriptor;
-// use bdk_wallet::SyncOptions;
+use bitcoin_units::fee_rate::FeeRate;
 
 const DEFAULT_STOP_GAP: usize = 100;
 const DEFAULT_BATCH_SIZE: usize = 10;
@@ -186,10 +186,24 @@ pub struct Transaction {
 }
 
 // TODO VUP
-// impl TryFrom<&bdk::TransactionDetails> for Transaction {
+// impl TryFrom<&bdk_wallet::chain::tx_graph::CanonicalTx<'_, std::sync::Arc<bdk_wallet::bitcoin::Transaction>, bdk_wallet::chain::ConfirmationBlockTime>> for Transaction {
+//   impl<'a> TryFrom<&'a bdk_wallet::WalletTx<'a>> for Transaction {
 //   type Error = &'static str;
 
-//   fn try_from(td: &bdk::TransactionDetails) -> Result<Self, Self::Error> {
+//   fn try_from(tx: &bdk_wallet::chain::tx_graph::CanonicalTx<'_, std::sync::Arc<bdk_wallet::bitcoin::Transaction>, bdk_wallet::chain::ConfirmationBlockTime>) -> Result<Self, Self::Error> {
+
+//     let t = Transaction {
+//       version: tx.tx_node.version.into() as i32, // TODO VUP: verify the version conversion
+//       locktime: tx.tx_node.lock_time.to_consensus_u32(),
+//       ins: (&tx.tx_node.input).into_iter().map(|i| i.into()).collect(),
+//       outs: (&tx.tx_node.output).into_iter().map(|o| o.into()).collect(),
+//       txid: tx.tx_node.txid.to_string(),
+//       received: tx.received.to_string(),
+//       sent: tx.sent.to_string(),
+//       fee: tx.fee.unwrap().to_string(),
+//       confirmation_height: tx.chain_position.confirmation_time.clone().map(|ct| ct.height),
+//     }
+
 //     match &td.transaction {
 //       None => Err("Required raw transaction data not present"),
 //       Some(tx) => Ok(Transaction {
@@ -432,6 +446,22 @@ fn hwi_path() -> String {
   String::from("hwi")
 }
 
+fn sync_wallet(
+  wallet: &mut bdk_wallet::Wallet,
+  blockchain: &BdkElectrumClient<Client>,
+) -> Result<(), TempuraError> {
+  let request = wallet.start_full_scan();
+  let update = resolve!(
+    blockchain.full_scan(request, DEFAULT_STOP_GAP, DEFAULT_BATCH_SIZE, false),
+    TempuraErrorType::WalletSyncError
+  );
+  resolve!(
+    wallet.apply_update(update),
+    TempuraErrorType::WalletSyncError
+  );
+  Ok(())
+}
+
 /**
  * interface functions
  */
@@ -445,24 +475,13 @@ async fn address(
 ) -> Result<AddressInfo, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, descriptors)?;
+  let mut wallet = get_wallet(network, descriptors)?;
 
-  // Execute blocking wallet sync and balance retrieval in a separate thread context.
+  // Execute blocking wallet sync in a separate thread context.
   tokio::task::block_in_place(|| {
-    let request = wallet.start_full_scan();
-    let update = resolve!(
-      blockchain.full_scan(request, DEFAULT_STOP_GAP, DEFAULT_BATCH_SIZE, false),
-      TempuraErrorType::WalletSyncError
-    );
-    resolve!(
-      wallet.apply_update(update),
-      TempuraErrorType::WalletSyncError
-    );
+    sync_wallet(&mut wallet, &blockchain)?;
 
-    let addr = resolve!(
-      wallet.next_unused_address(bdk_wallet::KeychainKind::External),
-      TempuraErrorType::AddressError
-    );
+    let addr = wallet.next_unused_address(bdk_wallet::KeychainKind::External);
     Ok(addr.into())
   })
 }
@@ -474,7 +493,7 @@ async fn broadcast(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<bdk_wallet::bitcoin::Txid, TempuraError> {
+) -> Result<(), TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let wallet = get_wallet(network, descriptors)?;
@@ -495,10 +514,11 @@ async fn broadcast(
   }
 
   let tx = resolve!(psbt.extract_tx(), TempuraErrorType::PsbtError);
-  Ok(resolve!(
+  let _txid = resolve!(
     blockchain.transaction_broadcast(&tx),
     TempuraErrorType::TransactionError
-  ))
+  );
+  Ok(())
 }
 
 #[tauri::command]
@@ -512,13 +532,9 @@ async fn estimate_fee(
   let blockchain = get_blockchain(network, electrum)?;
   let blocks = blocks.unwrap_or(1) as usize;
 
-  // FeeRate::to
-
   // BDK may panic here when the electrum server returns a value that it doesn't expect.
   let result = std::panic::catch_unwind(|| {
     bdk_electrum::electrum_client::ElectrumApi::estimate_fee(&blockchain.inner, blocks)
-    // .map(|f| f.as_sat_per_vb())
-    // bdk_wallet::blockchain::Blockchain::estimate_fee(&blockchain, blocks).map(|f| f.as_sat_per_vb())
   });
 
   match result {
@@ -553,19 +569,20 @@ async fn enumerate(network: String) -> Result<String, TempuraError> {
 #[tauri::command]
 #[specta::specta]
 async fn is_address(address: String) -> bool {
-  bdk::bitcoin::Address::from_str(&address).is_ok()
+  bdk_wallet::bitcoin::Address::from_str(&address).is_ok()
 }
 
 #[tauri::command]
 #[specta::specta]
 async fn is_address_for_network(address: String, network: String) -> Result<bool, TempuraError> {
-  let network: bdk::bitcoin::Network = Network::from_str(&network)?.into();
+  let network: bdk_wallet::bitcoin::Network = Network::from_str(&network)?.into();
 
   let addr = resolve!(
-    bdk::bitcoin::Address::from_str(&address),
+    bdk_wallet::bitcoin::Address::from_str(&address),
     TempuraErrorType::AddressError
   );
-  Ok(addr.network == network)
+
+  Ok(addr.is_valid_for_network(network))
 }
 
 #[tauri::command]
@@ -576,39 +593,43 @@ async fn is_address_mine(
   descriptors: Descriptors,
 ) -> Result<bool, TempuraError> {
   let network = Network::from_str(&network)?;
-  let wallet = get_wallet(network, descriptors)?;
-  let network: bdk::bitcoin::Network = network.into();
+  let mut wallet = get_wallet(network, descriptors)?;
+  let network: bdk_wallet::bitcoin::Network = network.into();
 
   let addr = resolve!(
-    bdk::bitcoin::Address::from_str(&address),
+    bdk_wallet::bitcoin::Address::from_str(&address),
     TempuraErrorType::AddressError
   );
 
-  if addr.network != wallet.network() {
-    return Err(TempuraError::new(
+  let addr = addr.require_network(network).map_err(|_| {
+    TempuraError::new(
       TempuraErrorType::AddressError,
       &format!(
         "Mismatched address and network. address: {}, network: {}",
         address, network
       ),
-    ));
-  }
+    )
+  })?;
 
-  resolve!(
-    wallet.ensure_addresses_cached(100),
-    TempuraErrorType::WalletError
+  // TODO VUP: let's make sure this doesn't cause problems with no change descriptor
+  let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::External,
+    receive_index + (DEFAULT_STOP_GAP as u32),
+  );
+  let change_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::Internal);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::Internal,
+    change_index + (DEFAULT_STOP_GAP as u32),
   );
 
-  Ok(resolve!(
-    wallet.is_mine(&addr.payload.script_pubkey()),
-    TempuraErrorType::WalletError
-  ))
+  Ok(wallet.is_mine(addr.script_pubkey()))
 }
 
 #[tauri::command]
 #[specta::specta]
 async fn is_descriptor(descriptor: String) -> bool {
-  bdk::descriptor::ExtendedDescriptor::from_str(&descriptor).is_ok()
+  bdk_wallet::descriptor::ExtendedDescriptor::from_str(&descriptor).is_ok()
 }
 
 #[tauri::command]
@@ -618,14 +639,16 @@ async fn is_descriptor_for_network(
   network: String,
 ) -> Result<bool, TempuraError> {
   let secp = Secp256k1::new();
-  let network: bdk::bitcoin::Network = Network::from_str(&network)?.into();
+  let network: bdk_wallet::bitcoin::Network = Network::from_str(&network)?.into();
   let descriptor =
     split_descriptor_if_multipath(&descriptor)?.map_or(descriptor, |(receive, _)| receive);
 
   match descriptor.into_wallet_descriptor(&secp, network) {
     Ok(_) => Ok(true),
     Err(e) => match e {
-      bdk::descriptor::DescriptorError::Key(bdk::keys::KeyError::InvalidNetwork) => Ok(false),
+      bdk_wallet::descriptor::DescriptorError::Key(bdk_wallet::keys::KeyError::InvalidNetwork) => {
+        Ok(false)
+      }
       _ => Err(TempuraError::new(
         TempuraErrorType::DescriptorError(None),
         &e.to_string(),
@@ -637,7 +660,7 @@ async fn is_descriptor_for_network(
 #[tauri::command]
 #[specta::specta]
 async fn is_psbt(psbt: String) -> bool {
-  return bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt).is_ok();
+  return bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt).is_ok();
 }
 
 #[tauri::command]
@@ -648,14 +671,14 @@ async fn psbt_status(
   descriptors: Descriptors,
 ) -> Result<PsbtSigningStatus, TempuraError> {
   let psbt = resolve!(
-    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
+    bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
     TempuraErrorType::PsbtError
   );
   let network = Network::from_str(&network)?;
   let wallet = get_wallet(network, descriptors)?;
 
   // suceeds if the PSBT is already finalized or the given wallet is able to finalize it
-  match wallet.finalize_psbt(&mut psbt.clone(), bdk::SignOptions::default()) {
+  match wallet.finalize_psbt(&mut psbt.clone(), bdk_wallet::SignOptions::default()) {
     Ok(true) => {
       return Ok(PsbtSigningStatus::FullySigned);
     }
@@ -704,41 +727,45 @@ async fn sweep(
 ) -> Result<PsbtDetails, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, descriptors)?;
+  let mut wallet = get_wallet(network, descriptors)?;
+  let wallet_network = wallet.network();
 
+  // TODO VUP: can we convert the interface to accept a u64 instead of f32?
   if fee_rate < 0.0 {
     return Err(TempuraError::new(
       TempuraErrorType::FeeRateError,
       "Fee rate must be a positive number",
     ));
   }
+  let fee_rate: u64 = fee_rate.ceil() as u64;
+  let fee_rate = FeeRate::from_sat_per_vb(fee_rate).ok_or(TempuraError::new(
+    TempuraErrorType::FeeRateError,
+    "Invalid fee rate",
+  ))?;
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {
-    resolve!(
-      wallet.sync(&blockchain, SyncOptions::default()),
-      TempuraErrorType::WalletSyncError
-    );
+    sync_wallet(&mut wallet, &blockchain)?;
 
     let mut builder = wallet.build_tx();
     let addr = resolve!(
-      bdk::bitcoin::Address::from_str(&address),
+      bdk_wallet::bitcoin::Address::from_str(&address),
       TempuraErrorType::AddressError
     );
-    // check that recipient is on the same network as the wallet
-    if addr.network != wallet.network() {
-      return Err(TempuraError::new(
+
+    let addr = addr.require_network(wallet_network).map_err(|_| {
+      TempuraError::new(
         TempuraErrorType::AddressError,
         &format!(
           "Mismatched address and network. address: {}, network: {}",
           address, network
         ),
-      ));
-    }
+      )
+    })?;
+
     builder.drain_wallet();
-    builder.drain_to(addr.payload.script_pubkey());
-    builder.enable_rbf();
-    builder.fee_rate(bdk::FeeRate::from_sat_per_vb(fee_rate));
+    builder.drain_to(addr.script_pubkey());
+    builder.fee_rate(fee_rate);
 
     let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
     Ok(PsbtDetails::new(psbt))
@@ -754,42 +781,55 @@ async fn wallet(
 ) -> Result<Wallet, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
-  let wallet = get_wallet(network, descriptors)?;
+  let mut wallet = get_wallet(network, descriptors)?;
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {
-    resolve!(
-      wallet.sync(&blockchain, SyncOptions::default()),
-      TempuraErrorType::WalletSyncError
-    );
+    sync_wallet(&mut wallet, &blockchain)?;
 
-    let tds = resolve!(
-      wallet.list_transactions(true),
-      TempuraErrorType::TransactionsError
-    );
-    let transactions_result: Result<Vec<Transaction>, TempuraError> = tds
+    // let t = wallet.transactions().;
+    let txs = wallet.transactions();
+    let transactions_result: Result<Vec<Transaction>, TempuraError> = txs
       .into_iter()
-      .map(|td| {
-        let mut t = resolve!(
-          TryInto::<Transaction>::try_into(&td),
-          TempuraErrorType::TransactionsError
+      .map(|mut tx| {
+        let tx2: bdk_wallet::bitcoin::Transaction = Arc::make_mut(&mut tx.tx_node.tx).clone();
+        let (sent, received) = wallet.sent_and_received(&tx2);
+        let fee = resolve!(
+          wallet.calculate_fee(&tx2),
+          TempuraErrorType::TransactionError
         );
+        let t = Transaction {
+          version: tx.tx_node.version.0, // TODO VUP: verify the version conversion
+          locktime: tx.tx_node.lock_time.to_consensus_u32(),
+          ins: (&tx.tx_node.input).into_iter().map(|i| i.into()).collect(),
+          outs: (&tx.tx_node.output).into_iter().map(|o| o.into()).collect(),
+          txid: tx.tx_node.txid.to_string(),
+          received: received.to_string(),
+          sent: sent.to_string(),
+          fee: fee.to_string(),
+          confirmation_height: tx.chain_position.confirmation_height_upper_bound().clone(),
+        };
 
-        // Populating addresses requires the network, so can't be done in the main `try_into`
-        let bdk_tx = resolve!(
-          td.transaction.ok_or("Missing required raw transaction"),
-          TempuraErrorType::TransactionsError
-        );
-        (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
-          let script = bdk_tx.output[x].script_pubkey.as_script();
-          o.address = bdk::bitcoin::Address::from_script(script, network.into())
-            .ok()
-            .map(|a| a.to_string());
-        });
+        //     let mut t = resolve!(
+        //       TryInto::<Transaction>::try_into(&td),
+        //       TempuraErrorType::TransactionsError
+        //     );
+
+        //     // Populating addresses requires the network, so can't be done in the main `try_into`
+        //     let bdk_tx = resolve!(
+        //       td.transaction.ok_or("Missing required raw transaction"),
+        //       TempuraErrorType::TransactionsError
+        //     );
+        //     (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
+        //       let script = bdk_tx.output[x].script_pubkey.as_script();
+        //       o.address = bdk::bitcoin::Address::from_script(script, network.into())
+        //         .ok()
+        //         .map(|a| a.to_string());
+        //     });
         Ok(t)
       })
       .collect();
-    let balance: Balance = resolve!(wallet.get_balance(), TempuraErrorType::BalanceError).into();
+    let balance: Balance = wallet.balance().into();
     transactions_result.map(|transactions| Wallet {
       balance,
       transactions,
