@@ -292,7 +292,17 @@ fn get_wallet(
       }
       None => change_str,
     };
-    change = match change_str == receive_str {
+
+    // if the calculated change descriptor is the same as the receive descriptor, minus checksum, ignore it.
+    let receive_str_sans_checksum = match receive_str.rfind("#") {
+      Some(i) => {
+        let (receive_str, _) = receive_str.split_at(i);
+        receive_str.to_string()
+      }
+      None => receive_str,
+    };
+
+    change = match change_str == receive_str_sans_checksum {
       true => None,
       false => Some(resolve!(
         change_str.into_wallet_descriptor(&secp, network),
