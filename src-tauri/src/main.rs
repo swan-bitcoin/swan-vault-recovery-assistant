@@ -55,6 +55,7 @@ impl From<bdk_wallet::AddressInfo> for AddressInfo {
 
 // this type is copied from BDK so that we can specta-derive it,
 // but unfortunately u64 is not supported, so we must convert to string.
+// with bdk v1.0.0, we can consider returning f32 with .to_btc() instead of .to_sat()
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct Balance {
   /// All coinbase outputs not yet matured
@@ -70,10 +71,10 @@ pub struct Balance {
 impl From<bdk_wallet::Balance> for Balance {
   fn from(balance: bdk_wallet::Balance) -> Self {
     Balance {
-      immature: balance.immature.to_string(),
-      trusted_pending: balance.trusted_pending.to_string(),
-      untrusted_pending: balance.untrusted_pending.to_string(),
-      confirmed: balance.confirmed.to_string(),
+      immature: balance.immature.to_sat().to_string(),
+      trusted_pending: balance.trusted_pending.to_sat().to_string(),
+      untrusted_pending: balance.untrusted_pending.to_sat().to_string(),
+      confirmed: balance.confirmed.to_sat().to_string(),
     }
   }
 }
@@ -107,28 +108,19 @@ pub struct PsbtDetails {
 }
 
 impl PsbtDetails {
-  pub fn new(psbt: Psbt) -> Self {
+  pub fn new(psbt: Psbt, wallet: &bdk_wallet::Wallet) -> Self {
     let tx = psbt.clone().extract_tx().unwrap();
-    let fee = psbt
-      .fee_amount()
-      // .or(Some(Amount::ZERO))
-      .map(|f| f.to_string());
-
-    // TODO VUP: double check denominations returned against OG.
-    // This Amount class supports converting to string in different demoninations
-    // https://docs.rs/bitcoin/0.32.5/bitcoin/struct.Amount.html#method.to_string_in
-    let sent = tx.output.iter().map(|o| o.value).sum::<Amount>();
-
-    // I'm gonna have to pass the wallet into this function to determine manually which outputs are mine
-    // to determine the sent and received amounts.
+    let fee = psbt.fee_amount().unwrap_or(Amount::ZERO);
+    let (sent, received) = wallet.sent_and_received(&tx);
+    let outbound = sent - received - fee;
 
     PsbtDetails {
       psbt: psbt.to_string(),
       txid: tx.compute_txid().to_string(),
-      received: "".to_string(), // TODO VUP: details.received.to_string(),
-      sent: sent.to_string(),
-      fee,
-      outbound: "".to_string(), // TODO VUP: outbound.to_string(),
+      received: received.to_sat().to_string(),
+      sent: sent.to_sat().to_string(),
+      fee: Some(fee.to_sat().to_string()),
+      outbound: outbound.to_sat().to_string(),
     }
   }
 }
@@ -184,42 +176,6 @@ pub struct Transaction {
   pub fee: String,
   pub confirmation_height: Option<u32>,
 }
-
-// TODO VUP
-// impl TryFrom<&bdk_wallet::chain::tx_graph::CanonicalTx<'_, std::sync::Arc<bdk_wallet::bitcoin::Transaction>, bdk_wallet::chain::ConfirmationBlockTime>> for Transaction {
-//   impl<'a> TryFrom<&'a bdk_wallet::WalletTx<'a>> for Transaction {
-//   type Error = &'static str;
-
-//   fn try_from(tx: &bdk_wallet::chain::tx_graph::CanonicalTx<'_, std::sync::Arc<bdk_wallet::bitcoin::Transaction>, bdk_wallet::chain::ConfirmationBlockTime>) -> Result<Self, Self::Error> {
-
-//     let t = Transaction {
-//       version: tx.tx_node.version.into() as i32, // TODO VUP: verify the version conversion
-//       locktime: tx.tx_node.lock_time.to_consensus_u32(),
-//       ins: (&tx.tx_node.input).into_iter().map(|i| i.into()).collect(),
-//       outs: (&tx.tx_node.output).into_iter().map(|o| o.into()).collect(),
-//       txid: tx.tx_node.txid.to_string(),
-//       received: tx.received.to_string(),
-//       sent: tx.sent.to_string(),
-//       fee: tx.fee.unwrap().to_string(),
-//       confirmation_height: tx.chain_position.confirmation_time.clone().map(|ct| ct.height),
-//     }
-
-//     match &td.transaction {
-//       None => Err("Required raw transaction data not present"),
-//       Some(tx) => Ok(Transaction {
-//         version: tx.version.into(),
-//         locktime: tx.lock_time.to_consensus_u32(),
-//         ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
-//         outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
-//         txid: td.txid.to_string(),
-//         received: td.received.to_string(),
-//         sent: td.sent.to_string(),
-//         fee: td.fee.unwrap().to_string(),
-//         confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
-//       }),
-//     }
-//   }
-// }
 
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct Wallet {
@@ -451,8 +407,16 @@ fn sync_wallet(
   blockchain: &BdkElectrumClient<Client>,
 ) -> Result<(), TempuraError> {
   let request = wallet.start_full_scan();
+
+  // we must fetch_prev_txouts in order to calculate fees.
+  let fetch_prev_txouts = true;
   let update = resolve!(
-    blockchain.full_scan(request, DEFAULT_STOP_GAP, DEFAULT_BATCH_SIZE, false),
+    blockchain.full_scan(
+      request,
+      DEFAULT_STOP_GAP,
+      DEFAULT_BATCH_SIZE,
+      fetch_prev_txouts
+    ),
     TempuraErrorType::WalletSyncError
   );
   resolve!(
@@ -611,7 +575,6 @@ async fn is_address_mine(
     )
   })?;
 
-  // TODO VUP: let's make sure this doesn't cause problems with no change descriptor
   let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
   let _ = wallet.reveal_addresses_to(
     bdk_wallet::KeychainKind::External,
@@ -730,7 +693,6 @@ async fn sweep(
   let mut wallet = get_wallet(network, descriptors)?;
   let wallet_network = wallet.network();
 
-  // TODO VUP: can we convert the interface to accept a u64 instead of f32?
   if fee_rate < 0.0 {
     return Err(TempuraError::new(
       TempuraErrorType::FeeRateError,
@@ -768,7 +730,7 @@ async fn sweep(
     builder.fee_rate(fee_rate);
 
     let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
-    Ok(PsbtDetails::new(psbt))
+    Ok(PsbtDetails::new(psbt, &wallet))
   })
 }
 
@@ -787,46 +749,39 @@ async fn wallet(
   tokio::task::block_in_place(|| {
     sync_wallet(&mut wallet, &blockchain)?;
 
-    // let t = wallet.transactions().;
     let txs = wallet.transactions();
     let transactions_result: Result<Vec<Transaction>, TempuraError> = txs
       .into_iter()
       .map(|mut tx| {
-        let tx2: bdk_wallet::bitcoin::Transaction = Arc::make_mut(&mut tx.tx_node.tx).clone();
-        let (sent, received) = wallet.sent_and_received(&tx2);
+        let bdk_tx: bdk_wallet::bitcoin::Transaction = Arc::make_mut(&mut tx.tx_node.tx).clone();
+        let (sent, received) = wallet.sent_and_received(&bdk_tx);
         let fee = resolve!(
-          wallet.calculate_fee(&tx2),
+          wallet.calculate_fee(&bdk_tx),
           TempuraErrorType::TransactionError
         );
-        let t = Transaction {
-          version: tx.tx_node.version.0, // TODO VUP: verify the version conversion
+        let mut transaction = Transaction {
+          version: tx.tx_node.version.0,
           locktime: tx.tx_node.lock_time.to_consensus_u32(),
           ins: (&tx.tx_node.input).into_iter().map(|i| i.into()).collect(),
           outs: (&tx.tx_node.output).into_iter().map(|o| o.into()).collect(),
           txid: tx.tx_node.txid.to_string(),
-          received: received.to_string(),
-          sent: sent.to_string(),
-          fee: fee.to_string(),
+          received: received.to_sat().to_string(),
+          sent: sent.to_sat().to_string(),
+          fee: fee.to_sat().to_string(),
           confirmation_height: tx.chain_position.confirmation_height_upper_bound().clone(),
         };
 
-        //     let mut t = resolve!(
-        //       TryInto::<Transaction>::try_into(&td),
-        //       TempuraErrorType::TransactionsError
-        //     );
-
-        //     // Populating addresses requires the network, so can't be done in the main `try_into`
-        //     let bdk_tx = resolve!(
-        //       td.transaction.ok_or("Missing required raw transaction"),
-        //       TempuraErrorType::TransactionsError
-        //     );
-        //     (&mut t.outs).into_iter().enumerate().for_each(|(x, o)| {
-        //       let script = bdk_tx.output[x].script_pubkey.as_script();
-        //       o.address = bdk::bitcoin::Address::from_script(script, network.into())
-        //         .ok()
-        //         .map(|a| a.to_string());
-        //     });
-        Ok(t)
+        // attempt to populate the address field for each output
+        (&mut transaction.outs)
+          .into_iter()
+          .enumerate()
+          .for_each(|(x, o)| {
+            let script = bdk_tx.output[x].script_pubkey.as_script();
+            o.address = bdk_wallet::bitcoin::Address::from_script(script, wallet.network())
+              .ok()
+              .map(|a| a.to_string());
+          });
+        Ok(transaction)
       })
       .collect();
     let balance: Balance = wallet.balance().into();

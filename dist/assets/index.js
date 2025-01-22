@@ -314,7 +314,7 @@ const WalletInfo = ({ balance, transactions, addressInfo }) => {
   const firstTransaction = getFirstTransaction(transactions)
   const tabId = generateRandomString()
   const confirmed = balance.confirmed
-  const unconfirmed = String(Number(balance.untrusted_pending) + Number(balance.trusted_pending))
+  const unconfirmed = balance.untrusted_pending + balance.trusted_pending
   return `
       <div class="wallet-info">
         <div role="tablist" class="tabs tabs-bordered">  

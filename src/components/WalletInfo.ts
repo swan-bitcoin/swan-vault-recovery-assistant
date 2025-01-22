@@ -21,7 +21,7 @@ export const WalletInfo = ({ balance, transactions, addressInfo }: WalletInfoPro
   const tabId = generateRandomString() // without this we get bugs if the user fetches the wallet info more than once
 
   const confirmed = balance.confirmed
-  const unconfirmed = String(Number(balance.untrusted_pending) + Number(balance.trusted_pending))
+  const unconfirmed = balance.untrusted_pending + balance.trusted_pending
   return `
       <div class="wallet-info">
         <div role="tablist" class="tabs tabs-bordered">  
