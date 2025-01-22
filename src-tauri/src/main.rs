@@ -1,6 +1,7 @@
 // prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::BTreeMap;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
@@ -9,6 +10,7 @@ use std::str::FromStr;
 
 #[macro_use]
 mod errors;
+use bdk_wallet::psbt::PsbtUtils;
 use errors::{DescriptorType, TempuraError, TempuraErrorType};
 mod network;
 use network::{HwiNetwork, Network};
@@ -19,13 +21,18 @@ use specta::Type;
 use tauri::Manager;
 
 // bdk and bitcoin imports
-use bdk;
-use bdk::bitcoin::secp256k1::Secp256k1;
-use bdk::blockchain::ElectrumBlockchain;
-use bdk::database::MemoryDatabase;
-use bdk::descriptor::IntoWalletDescriptor;
-use bdk::electrum_client::Client;
-use bdk::SyncOptions;
+use bdk_electrum::BdkElectrumClient;
+use bdk_wallet;
+use bdk_wallet::bitcoin::secp256k1::Secp256k1;
+use bdk_wallet::bitcoin::Amount;
+// use bdk_wallet::database::MemoryDatabase;
+use bdk_electrum::electrum_client::Client;
+use bdk_wallet::bitcoin::Psbt;
+use bdk_wallet::descriptor::IntoWalletDescriptor;
+// use bdk_wallet::SyncOptions;
+
+const DEFAULT_STOP_GAP: usize = 100;
+const DEFAULT_BATCH_SIZE: usize = 10;
 
 /**
  * types
@@ -37,8 +44,8 @@ pub struct AddressInfo {
   pub address: String,
 }
 
-impl From<bdk::wallet::AddressInfo> for AddressInfo {
-  fn from(addrinfo: bdk::wallet::AddressInfo) -> Self {
+impl From<bdk_wallet::AddressInfo> for AddressInfo {
+  fn from(addrinfo: bdk_wallet::AddressInfo) -> Self {
     Self {
       index: addrinfo.index,
       address: addrinfo.address.to_string(),
@@ -60,8 +67,8 @@ pub struct Balance {
   pub confirmed: String,
 }
 
-impl From<bdk::Balance> for Balance {
-  fn from(balance: bdk::Balance) -> Self {
+impl From<bdk_wallet::Balance> for Balance {
+  fn from(balance: bdk_wallet::Balance) -> Self {
     Balance {
       immature: balance.immature.to_string(),
       trusted_pending: balance.trusted_pending.to_string(),
@@ -100,20 +107,28 @@ pub struct PsbtDetails {
 }
 
 impl PsbtDetails {
-  pub fn new(psbt: String, details: bdk::TransactionDetails) -> Self {
-    let fee = details.fee.unwrap_or(0);
-    let outbound = details.sent - details.received - fee;
+  pub fn new(psbt: Psbt) -> Self {
+    let tx = psbt.clone().extract_tx().unwrap();
+    let fee = psbt
+      .fee_amount()
+      // .or(Some(Amount::ZERO))
+      .map(|f| f.to_string());
+
+    // TODO VUP: double check denominations returned against OG.
+    // This Amount class supports converting to string in different demoninations
+    // https://docs.rs/bitcoin/0.32.5/bitcoin/struct.Amount.html#method.to_string_in
+    let sent = tx.output.iter().map(|o| o.value).sum::<Amount>();
+
+    // I'm gonna have to pass the wallet into this function to determine manually which outputs are mine
+    // to determine the sent and received amounts.
 
     PsbtDetails {
-      psbt: psbt,
-      txid: details.txid.to_string(),
-      received: details.received.to_string(),
-      sent: details.sent.to_string(),
-      fee: match details.fee {
-        None => None,
-        Some(fee) => Some(fee.to_string()),
-      },
-      outbound: outbound.to_string(),
+      psbt: psbt.to_string(),
+      txid: tx.compute_txid().to_string(),
+      received: "".to_string(), // TODO VUP: details.received.to_string(),
+      sent: sent.to_string(),
+      fee,
+      outbound: "".to_string(), // TODO VUP: outbound.to_string(),
     }
   }
 }
@@ -131,8 +146,8 @@ pub struct TxIn {
   pub vout: u32,
 }
 
-impl From<&bdk::bitcoin::blockdata::transaction::TxIn> for TxIn {
-  fn from(i: &bdk::bitcoin::blockdata::transaction::TxIn) -> Self {
+impl From<&bdk_wallet::bitcoin::blockdata::transaction::TxIn> for TxIn {
+  fn from(i: &bdk_wallet::bitcoin::blockdata::transaction::TxIn) -> Self {
     TxIn {
       txid: i.previous_output.txid.to_string(),
       vout: i.previous_output.vout,
@@ -147,8 +162,8 @@ pub struct TxOut {
   pub amount: String,
 }
 
-impl From<&bdk::bitcoin::blockdata::transaction::TxOut> for TxOut {
-  fn from(o: &bdk::bitcoin::blockdata::transaction::TxOut) -> Self {
+impl From<&bdk_wallet::bitcoin::blockdata::transaction::TxOut> for TxOut {
+  fn from(o: &bdk_wallet::bitcoin::blockdata::transaction::TxOut) -> Self {
     TxOut {
       address: None,
       script: o.script_pubkey.to_asm_string(),
@@ -170,26 +185,27 @@ pub struct Transaction {
   pub confirmation_height: Option<u32>,
 }
 
-impl TryFrom<&bdk::TransactionDetails> for Transaction {
-  type Error = &'static str;
+// TODO VUP
+// impl TryFrom<&bdk::TransactionDetails> for Transaction {
+//   type Error = &'static str;
 
-  fn try_from(td: &bdk::TransactionDetails) -> Result<Self, Self::Error> {
-    match &td.transaction {
-      None => Err("Required raw transaction data not present"),
-      Some(tx) => Ok(Transaction {
-        version: tx.version.into(),
-        locktime: tx.lock_time.to_consensus_u32(),
-        ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
-        outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
-        txid: td.txid.to_string(),
-        received: td.received.to_string(),
-        sent: td.sent.to_string(),
-        fee: td.fee.unwrap().to_string(),
-        confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
-      }),
-    }
-  }
-}
+//   fn try_from(td: &bdk::TransactionDetails) -> Result<Self, Self::Error> {
+//     match &td.transaction {
+//       None => Err("Required raw transaction data not present"),
+//       Some(tx) => Ok(Transaction {
+//         version: tx.version.into(),
+//         locktime: tx.lock_time.to_consensus_u32(),
+//         ins: (&tx.input).into_iter().map(|i| i.into()).collect(),
+//         outs: (&tx.output).into_iter().map(|o| o.into()).collect(),
+//         txid: td.txid.to_string(),
+//         received: td.received.to_string(),
+//         sent: td.sent.to_string(),
+//         fee: td.fee.unwrap().to_string(),
+//         confirmation_height: td.confirmation_time.clone().map(|ct| ct.height),
+//       }),
+//     }
+//   }
+// }
 
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct Wallet {
@@ -204,7 +220,7 @@ pub struct Wallet {
 fn get_blockchain(
   network: Network,
   electrum: Option<String>,
-) -> Result<ElectrumBlockchain, TempuraError> {
+) -> Result<BdkElectrumClient<Client>, TempuraError> {
   let connection = match electrum {
     Some(electrum) => electrum,
     None => match network {
@@ -221,7 +237,7 @@ fn get_blockchain(
   };
 
   let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
-  Ok(ElectrumBlockchain::from(client))
+  Ok(BdkElectrumClient::new(client))
 }
 
 fn get_hwi() -> Result<Command, TempuraError> {
@@ -240,13 +256,13 @@ fn get_hwi() -> Result<Command, TempuraError> {
 fn get_wallet(
   network: Network,
   descriptors: Descriptors,
-) -> Result<bdk::Wallet<MemoryDatabase>, TempuraError> {
+) -> Result<bdk_wallet::Wallet, TempuraError> {
   let secp = Secp256k1::new();
-  let network: bdk::bitcoin::Network = network.into();
+  let network: bdk_wallet::bitcoin::Network = network.into();
 
   type DescriptorTupleType = (
-    bdk::miniscript::Descriptor<bdk::keys::DescriptorPublicKey>,
-    std::collections::HashMap<bdk::keys::DescriptorPublicKey, bdk::keys::DescriptorSecretKey>,
+    bdk_wallet::miniscript::Descriptor<bdk_wallet::keys::DescriptorPublicKey>,
+    BTreeMap<bdk_wallet::keys::DescriptorPublicKey, bdk_wallet::keys::DescriptorSecretKey>,
   );
   let receive: DescriptorTupleType;
   let mut change: Option<DescriptorTupleType> = None;
@@ -315,19 +331,19 @@ fn get_wallet(
     }
   };
 
-  Ok(resolve!(
-    bdk::Wallet::new(
-      receive,
-      change,
-      network,
-      bdk::database::MemoryDatabase::default()
-    ),
-    TempuraErrorType::WalletError
-  ))
+  let wallet_result = if let Some(change) = change {
+    bdk_wallet::Wallet::create(receive, change)
+  } else {
+    bdk_wallet::Wallet::create_single(receive)
+  }
+  .network(network)
+  .create_wallet_no_persist();
+
+  Ok(resolve!(wallet_result, TempuraErrorType::WalletError))
 }
 
 fn is_multipath_descriptor(descriptor: &str) -> bool {
-  bdk::descriptor::ExtendedDescriptor::from_str(descriptor)
+  bdk_wallet::descriptor::ExtendedDescriptor::from_str(descriptor)
     .map(|d| d.is_multipath())
     .unwrap_or(false)
 }
@@ -343,7 +359,7 @@ fn split_descriptor_if_multipath(
   // does not consider the network when converting. BDK throws exceptions if you try to use
   // use the latter with a multipath descriptor on mainnet. yet, we should rely on BDK to
   // perform the conversion rather than parsing the strings manually.
-  let receive = match bdk::descriptor::ExtendedDescriptor::from_str(&descriptor) {
+  let receive = match bdk_wallet::descriptor::ExtendedDescriptor::from_str(&descriptor) {
     Ok(result) => result,
     Err(_) => return Ok(None),
   };
@@ -433,13 +449,18 @@ async fn address(
 
   // Execute blocking wallet sync and balance retrieval in a separate thread context.
   tokio::task::block_in_place(|| {
+    let request = wallet.start_full_scan();
+    let update = resolve!(
+      blockchain.full_scan(request, DEFAULT_STOP_GAP, DEFAULT_BATCH_SIZE, false),
+      TempuraErrorType::WalletSyncError
+    );
     resolve!(
-      wallet.sync(&blockchain, SyncOptions::default()),
+      wallet.apply_update(update),
       TempuraErrorType::WalletSyncError
     );
 
     let addr = resolve!(
-      wallet.get_address(bdk::wallet::AddressIndex::LastUnused),
+      wallet.next_unused_address(bdk_wallet::KeychainKind::External),
       TempuraErrorType::AddressError
     );
     Ok(addr.into())
@@ -453,18 +474,18 @@ async fn broadcast(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<(), TempuraError> {
+) -> Result<bdk_wallet::bitcoin::Txid, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let wallet = get_wallet(network, descriptors)?;
 
   let mut psbt = resolve!(
-    bdk::bitcoin::psbt::PartiallySignedTransaction::from_str(&psbt),
+    bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
     TempuraErrorType::PsbtError
   );
 
   if !resolve!(
-    wallet.finalize_psbt(&mut psbt, bdk::SignOptions::default()),
+    wallet.finalize_psbt(&mut psbt, bdk_wallet::SignOptions::default()),
     TempuraErrorType::PsbtError
   ) {
     return Err(TempuraError::new(
@@ -473,9 +494,9 @@ async fn broadcast(
     ));
   }
 
-  let tx = psbt.extract_tx();
+  let tx = resolve!(psbt.extract_tx(), TempuraErrorType::PsbtError);
   Ok(resolve!(
-    bdk::blockchain::Blockchain::broadcast(&blockchain, &tx),
+    blockchain.transaction_broadcast(&tx),
     TempuraErrorType::TransactionError
   ))
 }
@@ -486,14 +507,18 @@ async fn estimate_fee(
   network: String,
   electrum: Option<String>,
   blocks: Option<u32>,
-) -> Result<f32, TempuraError> {
+) -> Result<f64, TempuraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let blocks = blocks.unwrap_or(1) as usize;
 
+  // FeeRate::to
+
   // BDK may panic here when the electrum server returns a value that it doesn't expect.
   let result = std::panic::catch_unwind(|| {
-    bdk::blockchain::Blockchain::estimate_fee(&blockchain, blocks).map(|f| f.as_sat_per_vb())
+    bdk_electrum::electrum_client::ElectrumApi::estimate_fee(&blockchain.inner, blocks)
+    // .map(|f| f.as_sat_per_vb())
+    // bdk_wallet::blockchain::Blockchain::estimate_fee(&blockchain, blocks).map(|f| f.as_sat_per_vb())
   });
 
   match result {
@@ -715,8 +740,8 @@ async fn sweep(
     builder.enable_rbf();
     builder.fee_rate(bdk::FeeRate::from_sat_per_vb(fee_rate));
 
-    let (psbt, details) = resolve!(builder.finish(), TempuraErrorType::TransactionError);
-    Ok(PsbtDetails::new(psbt.to_string(), details))
+    let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
+    Ok(PsbtDetails::new(psbt))
   })
 }
 
