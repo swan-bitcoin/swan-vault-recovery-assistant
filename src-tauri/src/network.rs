@@ -36,13 +36,13 @@ impl std::str::FromStr for Network {
   }
 }
 
-impl From<Network> for bdk::bitcoin::Network {
+impl From<Network> for bdk_wallet::bitcoin::Network {
   fn from(network: Network) -> Self {
     match network {
-      Network::Bitcoin => bdk::bitcoin::Network::Bitcoin,
-      Network::Testnet => bdk::bitcoin::Network::Testnet,
-      Network::Signet => bdk::bitcoin::Network::Signet,
-      Network::Regtest => bdk::bitcoin::Network::Regtest,
+      Network::Bitcoin => bdk_wallet::bitcoin::Network::Bitcoin,
+      Network::Testnet => bdk_wallet::bitcoin::Network::Testnet,
+      Network::Signet => bdk_wallet::bitcoin::Network::Signet,
+      Network::Regtest => bdk_wallet::bitcoin::Network::Regtest,
     }
   }
 }
