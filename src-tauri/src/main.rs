@@ -370,7 +370,6 @@ fn split_descriptor_if_multipath(
  * some expected locations for the hwi executable will not be found when searching the system PATH.
  *
  * this function will attempt to find the hwi executable in the following locations, by priority:
- *   - the TEMPURA_HWI_PATH environment variable, if specified
  *   - the directory where the binary is running from, or current directory
  *   - the CARGO_TARGET_DIR environment variable, if specified
  */
@@ -387,10 +386,6 @@ fn hwi_path() -> String {
     }
   }
   paths.insert(0, exe_parent_path);
-
-  if let Ok(path) = std::env::var("TEMPURA_HWI_PATH") {
-    paths.insert(0, path);
-  }
 
   // search each directory for the executable
   let hwi_name = if cfg!(windows) { "hwi.exe" } else { "hwi" };
