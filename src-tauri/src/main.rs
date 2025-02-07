@@ -31,8 +31,8 @@ use bdk_wallet::bitcoin::Psbt;
 use bdk_wallet::descriptor::IntoWalletDescriptor;
 use bitcoin_units::fee_rate::FeeRate;
 
-const DEFAULT_STOP_GAP: usize = 100;
-const DEFAULT_BATCH_SIZE: usize = 10;
+const DEFAULT_STOP_GAP: usize = 10;
+const DEFAULT_BATCH_SIZE: usize = 100;
 
 /**
  * types
