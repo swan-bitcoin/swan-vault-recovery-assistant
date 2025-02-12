@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 #[macro_use]
 mod errors;
+use bdk_wallet::bitcoin::psbt;
 use bdk_wallet::psbt::PsbtUtils;
 use errors::{DescriptorType, TempuraError, TempuraErrorType};
 mod network;
@@ -186,6 +187,35 @@ pub struct Wallet {
 /**
  * utilities
  */
+
+/*
+ * this function extracts a (presumably signed) psbt from an hwi response
+ * we do this via 'dumb' string search so avoid bringing in a regex or json crate.
+ */
+fn extract_psbt(response: &str) -> Option<String> {
+  let psbt_key = "\"psbt\": \"";
+  if let Some(start) = response.find(psbt_key) {
+    let value_start = start + psbt_key.len();
+
+    if let Some(end) = response[value_start..].find('"') {
+      let psbt_value = &response[value_start..value_start + end];
+      return Some(psbt_value.to_string());
+    }
+  }
+  None
+}
+
+fn extract_txid(psbt: &str) -> Result<String, TempuraError> {
+  let psbt = resolve!(
+    bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
+    TempuraErrorType::PsbtError
+  );
+  Ok(
+    resolve!(psbt.extract_tx(), TempuraErrorType::PsbtError)
+      .compute_txid()
+      .to_string(),
+  )
+}
 
 fn get_blockchain(
   network: Network,
@@ -674,14 +704,35 @@ async fn sign(psbt: String, network: String, device_type: String) -> Result<Stri
   let network: HwiNetwork = network.into();
   let mut command = get_hwi()?;
 
-  Ok(resolve_io!(command.args([
+  // grab the txid of the transaction before calling the external binary
+  // this allows us to detect malicious or unexpected edits to the transaction.
+  let txid = extract_txid(&psbt)?;
+
+  let response = resolve_io!(command.args([
     "--chain",
     network.as_str(),
     "--device-type",
     &device_type,
     "signtx",
     &psbt
-  ])))
+  ]));
+
+  // check for a malicious or unexpected edit to the transaction
+  let psbt = extract_psbt(&response).ok_or_else(|| {
+    TempuraError::new(
+      TempuraErrorType::HwiError,
+      "Failed to extract PSBT from HWI response",
+    )
+  })?;
+  let signed_txid = extract_txid(&psbt)?;
+  if txid.ne(&signed_txid) {
+    return Err(TempuraError::new(
+      TempuraErrorType::TransactionError,
+      "The signed transaction does not match the original transaction. There may be have been malicious edit to the transaction.",
+    ));
+  }
+
+  Ok(response)
 }
 
 #[tauri::command]
