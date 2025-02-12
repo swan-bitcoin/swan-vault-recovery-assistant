@@ -107,6 +107,14 @@ function initializeDOM() {
       enumerate: requireDomElement('#enumerate-button'),
       estimate: requireDomElement('#estimate-button'),
       load: requireDomElement('#fetch-wallet-button'),
+      modals: {
+        autoChange: requireDomElement('#auto-change-modal-button'),
+        autoElectrum: requireDomElement('#auto-electrum-modal-button'),
+        electrumServer: requireDomElement('#electrum-server-modal-button'),
+        feeRate: requireDomElement('#fee-rate-modal-button'),
+        network: requireDomElement('#network-modal-button'),
+        walletConfig: requireDomElement('#wallet-config-modal-button'),
+      },
       pastePsbt: requireDomElement('#paste-psbt-button'),
       sign: requireDomElement('#sign-button'),
       sweep: requireDomElement('#sweep-button'),
@@ -143,6 +151,15 @@ function initializeDOM() {
     const links = {
       about: requireDomElement('#about-link'),
     }
+    const modals = {
+      autoChange: requireDomElement('#auto-change-modal'),
+      autoElectrum: requireDomElement('#auto-electrum-modal'),
+      electrumServer: requireDomElement('#electrum-server-modal'),
+      feeRate: requireDomElement('#fee-rate-modal'),
+      network: requireDomElement('#network-modal'),
+      transactions: requireDomElement('#transactions-modal'),
+      walletConfig: requireDomElement('#wallet-config-modal'),
+    }
     const outputs = {
       conversation: requireDomElement('#conversation'),
       psbtSignHistory: requireDomElement('#psbt-sign-history'),
@@ -151,19 +168,20 @@ function initializeDOM() {
       tempMessage,
       transactionOverview: requireDomElement('#transaction-overview-container'),
       txBody: requireDomElement('#transactions-body'),
-      txModal: requireDomElement('#transactions-modal'),
     }
     DOM = {
       buttons,
       checkboxes,
-      radios,
       containers,
       inputs,
       links,
+      modals,
+      radios,
       outputs,
     }
   } catch (e) {
     const error = e || new Error('Failed to initialize: missing required DOM elements')
+    console.error(error)
     if (tempMessage) {
       tempMessage.textContent = error.message
     }

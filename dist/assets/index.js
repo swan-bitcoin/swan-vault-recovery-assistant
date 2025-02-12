@@ -749,7 +749,7 @@ async function loadWallet() {
     showListButton == null
       ? void 0
       : showListButton.addEventListener('click', () => {
-          DOM.outputs.txModal.showModal()
+          DOM.modals.transactions.showModal()
         })
     showToast(RecoveryToast())
     const beginRecoveryButton = document.getElementById('begin-recovery-btn')
@@ -936,6 +936,30 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.load.addEventListener('click', (e) => {
     e.preventDefault()
     loadWallet()
+  })
+  DOM.buttons.modals.autoChange.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.autoChange.showModal()
+  })
+  DOM.buttons.modals.autoElectrum.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.autoElectrum.showModal()
+  })
+  DOM.buttons.modals.electrumServer.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.electrumServer.showModal()
+  })
+  DOM.buttons.modals.feeRate.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.feeRate.showModal()
+  })
+  DOM.buttons.modals.network.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.network.showModal()
+  })
+  DOM.buttons.modals.walletConfig.addEventListener('click', (e) => {
+    e.preventDefault()
+    DOM.modals.walletConfig.showModal()
   })
   DOM.buttons.pastePsbt.addEventListener('click', (e) => {
     e.preventDefault()
