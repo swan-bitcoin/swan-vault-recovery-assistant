@@ -17,6 +17,7 @@
     "test:unit": "pnpm test:unit:watch run",
     "test:unit:watch": "vitest --project unit",
     "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
     "postinstall": "tsx scripts/fetch-hwi.ts",
     "prepare": "husky",
     "simnet": "tsx test/scripts/simulate-network.ts",
