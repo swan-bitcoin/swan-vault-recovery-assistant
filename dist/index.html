@@ -16,12 +16,12 @@
 
   <body class="flex flex-col min-h-screen">
     <!-- Main content section -->
-    <main id="main-content" class="flex flex-grow p-4">
+    <main id="main-content" class="flex flex-grow">
       <!-- Chat bubble on the left -->
-      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar pr-4">
-        <div class="card card-normal bg-base-200 shadow-2xl">
-          <div class="card-body">
-            <h2 class="card-title">Chat</h2>
+      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar border-r border-base-300 p-4">
+        <div class="">
+          <div class="">
+            <h2 class="">Chat</h2>
             <!-- Persistent conversation -->
             <div id="conversation"></div>
             <!-- Temporary feedback -->
@@ -43,9 +43,9 @@
       </div>
 
       <!-- Cards section -->
-      <div class="flex flex-col w-7/12 overflow-y-scroll gap-4 pr-4 ml-6">
+      <div class="flex flex-col w-7/12 overflow-y-scroll gap-4 p-4 bg-base-200">
         <!-- First Card: Wallet Set Up -->
-        <div class="collapse collapse-arrow bg-base-300 shadow-xl">
+        <div class="collapse collapse-arrow bg-base-100 border-base-300 border">
           <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
           <div class="collapse-title text-xl">Set Up Wallet</div>
           <div class="collapse-content">
@@ -80,7 +80,7 @@
                   What is a change configuration?
                 </button>
               </div>
-              <div id="change-input-container" class="hidden">
+              <div id="change-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
                 <div class="label">
                   <label class="label-text">Change Configuration (Descriptor)</label>
                 </div>
@@ -105,7 +105,7 @@
                 </button>
               </div>
 
-              <div id="electrum-input-container" class="hidden">
+              <div id="electrum-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
                 <div class="label justify-normal items-center gap-2">
                   <label class="label-text">Electrum Server</label>
                 </div>
@@ -139,7 +139,7 @@
                   Why would I change my network?
                 </button>
               </div>
-              <div id="network-input-container" class="hidden">
+              <div id="network-input-container" class="hidden bg-base-200 p-4 -mx-4 border-y border-base-300">
                 <div class="flex gap-4">
                   <label class="label cursor-pointer">
                     <input
@@ -172,7 +172,7 @@
         </div>
 
         <!-- Second Card: Recovery Options -->
-        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="recovery-container">
+        <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="recovery-container">
           <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
           <div class="collapse-title text-xl">Recover Wallet</div>
           <div class="collapse-content">
@@ -224,7 +224,7 @@
         </div>
 
         <!-- Third Card: Send Transaction  -->
-        <div class="collapse collapse-arrow bg-base-300 shadow-xl" id="send-transaction-container">
+        <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="send-transaction-container">
           <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
           <div class="collapse-title text-xl">Send Transaction</div>
           <div class="collapse-content">
@@ -293,8 +293,8 @@
     <div id="toast-container" class="hidden"></div>
 
     <!-- Footer -->
-    <footer id="footer" class="footer footer-center bg-base-200 text-base-content p-5">
-      <div class="flex">
+    <footer id="footer" class="footer footer-center bg-neutral text-neutral-content p-3">
+      <div class="flex gap-6">
         <!-- About -->
         <div class="flex gap-1">
           🍤
