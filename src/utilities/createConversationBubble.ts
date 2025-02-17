@@ -1,5 +1,6 @@
 type ConversationBubbleProps = {
   content: string
+  footer?: string
   isUserSpeaking?: boolean
   dangerouslySetInnerHTML?: boolean
 }
@@ -21,6 +22,7 @@ const showClearMessagesButton = () => {
 // if using dangerouslySetInnerHTML option, make sure the content input has been sanitized or encoded to prevent XSS
 export const createConversationBubble = ({
   content,
+  footer,
   isUserSpeaking = false,
   dangerouslySetInnerHTML = false,
 }: ConversationBubbleProps) => {
@@ -44,6 +46,13 @@ export const createConversationBubble = ({
   // Assemble the structure
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
+
+  if (footer) {
+    const footerContainer = document.createElement('div')
+    footerContainer.classList.add('chat-footer', 'opacity-50')
+    footerContainer.innerText = footer
+    chatContainer.appendChild(footerContainer)
+  }
 
   showConversation()
   showClearMessagesButton()

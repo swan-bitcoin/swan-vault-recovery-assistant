@@ -921,6 +921,11 @@ html {
   grid-row: span 2 / span 2;
   align-self: flex-end;
 }
+.chat-footer {
+  grid-row-start: 3;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
 .chat-bubble {
   position: relative;
   display: block;

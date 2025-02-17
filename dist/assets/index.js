@@ -244,7 +244,7 @@ const showClearMessagesButton = () => {
     clearMessagesButton.classList.remove('hidden')
   }
 }
-const createConversationBubble = ({ content, isUserSpeaking = false, dangerouslySetInnerHTML = false }) => {
+const createConversationBubble = ({ content, footer, isUserSpeaking = false, dangerouslySetInnerHTML = false }) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', 'animate-in', isUserSpeaking ? 'chat-end' : 'chat-start')
   const avatar = document.createElement('div')
@@ -260,6 +260,12 @@ const createConversationBubble = ({ content, isUserSpeaking = false, dangerously
   }
   chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
+  if (footer) {
+    const footerContainer = document.createElement('div')
+    footerContainer.classList.add('chat-footer', 'opacity-50')
+    footerContainer.innerText = footer
+    chatContainer.appendChild(footerContainer)
+  }
   showConversation()
   showClearMessagesButton()
   return chatContainer
