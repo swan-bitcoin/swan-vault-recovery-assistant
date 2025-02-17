@@ -11,7 +11,15 @@ import {
   getSignResultAndPsbt,
   sanitize,
 } from './parsing'
-import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
+import {
+  capitalize,
+  createConversationBubble,
+  hideTempMessage,
+  populateTransactionOverview,
+  scrollToLastMessage,
+  showTempLoadingMessage,
+  showTempMessage,
+} from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 import { closeToast, showToast } from './toast'
 
@@ -74,6 +82,8 @@ function require(value: unknown, itemName: string) {
   }
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 async function broadcast() {
   const { descriptors, electrum, network, psbt } = getUserInputs()
   const isValid = await validateDescriptor()
@@ -125,7 +135,8 @@ async function loadWallet() {
   const { descriptors, electrum, network } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching wallet ...'
+
+  showTempLoadingMessage('Fetching wallet')
 
   try {
     const userBubble = createConversationBubble({
@@ -133,12 +144,18 @@ async function loadWallet() {
       isUserSpeaking: true,
     })
     DOM.outputs.conversation.appendChild(userBubble)
-    DOM.outputs.tempMessage.innerHTML = '<span class="loading loading-spinner loading-sm"></span>'
-
+    showTempLoadingMessage('Fetching wallet')
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
-    DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
+
+    hideTempMessage()
+
+    const intoBubble = createConversationBubble({
+      content: 'I found the following information about your wallet',
+    })
+
+    //DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble({
       content: WalletInfo({
         balance,
@@ -150,6 +167,8 @@ async function loadWallet() {
     })
     instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(tempuraBubble)
+    DOM.outputs.conversation.appendChild(intoBubble)
+    await sleep(100)
 
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton?.addEventListener('click', () => {
@@ -217,12 +236,13 @@ function copyPsbtToClipboard() {
 }
 
 async function estimateFee() {
-  DOM.outputs.tempMessage.textContent = 'Please wait...'
+  showTempLoadingMessage('Estimating fee')
+
   try {
     const { electrum, network } = getUserInputs()
     const feeRate = await commands.estimateFee(network, electrum, 1)
     DOM.inputs.feeRate.value = feeRate.toString()
-    DOM.outputs.tempMessage.innerHTML = Success('Fee retrieved')
+    showTempMessage('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }

@@ -210,8 +210,15 @@ function requireDomElements(name) {
   }
   return elements
 }
+const hideTempMessage = () => {
+  DOM.outputs.tempMessageContainer.classList.add('hidden')
+}
 const showTempMessage = (content) => {
   DOM.outputs.tempMessage.textContent = content
+  DOM.outputs.tempMessageContainer.classList.remove('hidden')
+}
+const showTempLoadingMessage = (content) => {
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm"></span></div>`
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
 }
 const adjustMainContentHeight = () => {
@@ -230,4 +237,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 })
-export { DOM as D, Sats as S, clearStatusIndicators as c, getUserInputs as g, handleError as h, initializeDOM as i }
+export {
+  DOM as D,
+  Sats as S,
+  hideTempMessage as a,
+  showTempMessage as b,
+  clearStatusIndicators as c,
+  getUserInputs as g,
+  handleError as h,
+  initializeDOM as i,
+  showTempLoadingMessage as s,
+}
