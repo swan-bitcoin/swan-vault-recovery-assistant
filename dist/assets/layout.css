@@ -4026,6 +4026,24 @@ details.collapse summary::-webkit-details-marker {
       scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1)) rotate(var(--tw-exit-rotate, 0));
   }
 }
+.animate-in {
+  animation-name: enter;
+  animation-duration: 150ms;
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-rotate: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+}
+.fade-in {
+  --tw-enter-opacity: 0;
+}
+.slide-in-from-left-2 {
+  --tw-enter-translate-x: -0.5rem;
+}
+.slide-in-from-right-2 {
+  --tw-enter-translate-x: 0.5rem;
+}
 .duration-300 {
   animation-duration: 300ms;
 }
