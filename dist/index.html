@@ -25,14 +25,15 @@
             <!-- Persistent conversation -->
             <div id="conversation"></div>
             <!-- Temporary feedback -->
-            <div class="chat chat-start">
+            <div class="chat chat-start" id="temp-message-container">
               <div class="chat-image avatar">
                 <span class="text-4xl">🍤</span>
               </div>
-              <div class="chat-bubble chat-bubble-primary" id="temporary-message">
+              <div class="chat-bubble chat-bubble-info animate-in border border-red-500" id="temporary-message">
                 Welcome! To load your wallet, enter the wallet configuration in the area provided.
               </div>
             </div>
+
             <div class="card-actions justify-end">
               <button id="clear-messages-button" class="btn btn-xs btn-outline btn-ghost mt-12 hidden">
                 Clear Messages
@@ -43,246 +44,226 @@
       </div>
 
       <!-- Cards section -->
-      <div class="flex flex-col w-7/12 overflow-y-scroll gap-4 p-4 bg-base-200">
-        <!-- First Card: Wallet Set Up -->
-        <div class="collapse collapse-arrow bg-base-100 border-base-300 border">
-          <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
-          <div class="collapse-title text-xl">Set Up Wallet</div>
-          <div class="collapse-content">
-            <!-- Receive descriptor -->
-            <div class="form-control">
-              <div class="label">
-                <label class="label-text">Wallet Configuration (Descriptor)</label>
-                <button id="wallet-config-modal-button" class="btn btn-link no-underline btn-sm">
-                  Where can I find this?
-                </button>
-              </div>
-              <textarea
-                id="receive-input"
-                class="textarea textarea-bordered textarea-md h-36 break-all w-full leading-normal transition-border-color duration-500 ease-in-out"
-              ></textarea>
-              <div id="receive-input-validation-message" class="text-error mt-2"></div>
-            </div>
-
-            <!-- Change descriptor -->
-            <div class="form-control">
-              <div class="label">
-                <div class="flex items-center gap-2">
-                  <span class="label-text">Calculate Change Configuration</span>
-                  <input
-                    type="checkbox"
-                    id="auto-change-checkbox"
-                    checked="checked"
-                    class="checkbox checkbox-info checkbox-sm"
-                  />
-                </div>
-                <button id="auto-change-modal-button" class="btn btn-link no-underline btn-sm">
-                  What is a change configuration?
-                </button>
-              </div>
-              <div id="change-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+      <div class="flex w-7/12 overflow-y-scroll bg-base-200">
+        <div class="flex flex-col gap-4 p-4 bg-base-200 min-h-fit w-full">
+          <!-- First Card: Wallet Set Up -->
+          <div class="collapse collapse-arrow bg-base-100 border-base-300 border">
+            <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
+            <div class="collapse-title text-xl">1. Set Up Wallet</div>
+            <div class="collapse-content">
+              <!-- Receive descriptor -->
+              <div class="form-control mb-4">
                 <div class="label">
-                  <label class="label-text">Change Configuration (Descriptor)</label>
-                </div>
-                <input class="input w-full" id="change-input" type="text" />
-              </div>
-            </div>
-
-            <!-- Custom Electrum server -->
-            <div class="form-control">
-              <div class="label">
-                <div class="flex items-center gap-2">
-                  <span class="label-text">Use Default Electrum Server</span>
-                  <input
-                    type="checkbox"
-                    id="auto-electrum-checkbox"
-                    checked="checked"
-                    class="checkbox checkbox-info checkbox-sm"
-                  />
-                </div>
-                <button id="auto-electrum-modal-button" class="btn btn-link no-underline btn-sm">
-                  What is an Electrum Server?
-                </button>
-              </div>
-
-              <div id="electrum-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
-                <div class="label justify-normal items-center gap-2">
-                  <label class="label-text">Electrum Server</label>
-                </div>
-                <div class="flex flex-col items-start">
-                  <input
-                    class="input input-ghost input-bordered w-full max-w-xs"
-                    id="electrum-input"
-                    type="text"
-                    placeholder="ssl://blockstream.info:993"
-                  />
-                  <button id="electrum-server-modal-button" class="btn btn-link no-underline btn-xs px-1 py-0 font-normal">
-                    How to use a custom server?
+                  <label for="receive-input">Wallet Configuration (Descriptor)</label>
+                  <button id="wallet-config-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
+                    Where can I find this?
                   </button>
                 </div>
-              </div>
-            </div>
-
-            <!-- Network selection -->
-            <div class="form-control mb-5">
-              <div class="label">
-                <div class="flex items-center gap-2">
-                  <span class="label-text">Use Bitcoin Main Network</span>
-                  <input
-                    type="checkbox"
-                    id="network-checkbox"
-                    checked="checked"
-                    class="checkbox checkbox-info checkbox-sm"
-                  />
-                </div>
-                <button id="network-modal-button" class="btn btn-link no-underline btn-sm">
-                  Why would I change my network?
-                </button>
-              </div>
-              <div id="network-input-container" class="hidden bg-base-200 p-4 -mx-4 border-y border-base-300">
-                <div class="flex gap-4">
-                  <label class="label cursor-pointer">
-                    <input
-                      id="bitcoin"
-                      value="bitcoin"
-                      type="radio"
-                      name="network"
-                      class="radio checked:bg-orange-500"
-                      checked
-                    />
-                    <span class="label-text ml-2">Bitcoin</span>
-                  </label>
-                  <label class="label cursor-pointer">
-                    <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
-                    <span class="label-text ml-2">Testnet</span>
-                  </label>
-                  <label class="label cursor-pointer">
-                    <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
-                    <span class="label-text ml-2">Regtest</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Buttons: Fetch balance, New address -->
-            <div class="card-actions justify-end mb-6 hidden" id="wallet-actions">
-              <button type="button" class="btn btn-primary btn-sm" id="fetch-wallet-button">Fetch Wallet</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Second Card: Recovery Options -->
-        <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="recovery-container">
-          <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
-          <div class="collapse-title text-xl">2. Recover Wallet</div>
-          <div class="collapse-content">
-            <!-- Destination address -->
-            <div class="form-control mb-3">
-              <label class="label">Destination Address</label>
-              <input class="input input-bordered" id="address-input" type="text" placeholder="bc1q..." />
-            </div>
-
-            <!-- Fee rate -->
-            <div class="form-control mb-5">
-              <div class="label">
-                <div class="flex items-center gap-2">
-                  <span class="label-text">Automatically Estimate Fee Rate</span>
-                  <input
-                    type="checkbox"
-                    id="auto-fee-rate-checkbox"
-                    checked="checked"
-                    class="checkbox checkbox-info checkbox-sm"
-                  />
-                </div>
-                <button id="fee-rate-modal-button" class="btn btn-link no-underline btn-sm">
-                  How is the fee rate used?
-                </button>
-              </div>
-              <div id="fee-rate-input-container" class="hidden">
-                <div class="label">
-                  <label class="label-text">Fee Rate</label>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input
-                    class="input input-bordered w-3/12 inline-flex"
-                    id="fee-rate-input"
-                    type="number"
-                    step="1"
-                    min="5"
-                  />
-                  <label class="label inline-flex" for="fee-rate-input">sats/vB</label>
-                  <div class="btn btn-info btn-sm btn-outline" type="button" id="estimate-button">Suggest Fee</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Sweep button -->
-            <div class="card-actions justify-end mb-2">
-              <button class="btn btn-primary btn-sm" type="button" id="sweep-button">Create Recovery Transaction</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Third Card: Send Transaction  -->
-        <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="send-transaction-container">
-          <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
-          <div class="collapse-title text-xl">3. Send Transaction</div>
-          <div class="collapse-content">
-            <!-- Transaction -->
-            <div class="form-control mb-3 hidden" id="transaction-overview-container">
-              <!-- Transaction overview -->
-              <div class="overflow-x-auto">
-                <table class="table table-fixed table-md mb-2">
-                  <thead>
-                    <tr>
-                      <th>To</th>
-                      <th>Amount</th>
-                      <th>Fee</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody id="transaction-overview-body">
-                    <tr>
-                      <td class="truncate"></td>
-                      <td></td>
-                      <td></td>
-                      <td>
-                        <div id="psbt-status" class="truncate"></div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div class="flex items-center justify-center">
-                <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
-              </div>
-            </div>
-            <!-- PSBT details -->
-            <div class="form-control mb-3" id="psbt-details-container">
-              <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
-                <span class="label-text text-xs">Show PSBT Details</span>
-                <input id="psbt-details-toggle" type="checkbox" class="toggle" />
-              </label>
-              <!-- Toggle content-->
-              <div class="psbt-details-toggle-content">
-                <!-- PSBT textarea -->
                 <textarea
-                  class="textarea textarea-bordered h-40 w-full leading-normal"
-                  id="psbt-textarea"
-                  placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                  id="receive-input"
+                  placeholder="Wallet configuration typically starts with wsh or wpkh"
+                  class="textarea textarea-bordered textarea-secondary textarea-md h-36 break-all w-full leading-normal transition-border-color"
                 ></textarea>
-                <!-- PSBT controls -->
-                <div class="flex gap-2 justify-end mt-2 mb-6">
-                  <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
-                  <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+                <div id="receive-input-validation-message" class="text-error mt-2"></div>
+              </div>
+
+              <!-- Change descriptor -->
+              <div class="form-control">
+                <div class="label">
+                  <label class="flex items-center gap-2">
+                    <span>Calculate Change Configuration</span>
+                    <input type="checkbox" id="auto-change-checkbox" checked="checked" class="checkbox checkbox-info" />
+                  </label>
+                  <button id="auto-change-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
+                    What is a change configuration?
+                  </button>
+                </div>
+                <div id="change-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                  <div class="label">
+                    <label class="label-text">Change Configuration (Descriptor)</label>
+                  </div>
+                  <input class="input w-full input-accent" id="change-input" type="text" />
                 </div>
               </div>
-            </div>
 
-            <!-- Device & Broadcast controls -->
-            <div class="card-actions mb-6 justify-center">
-              <button class="btn btn-warning" type="button" id="sign-button">Sign</button>
-              <button class="btn btn-secondary btn-disabled" type="button" id="broadcast-button">Broadcast</button>
+              <!-- Custom Electrum server -->
+              <div class="form-control">
+                <div class="label">
+                  <label class="flex items-center gap-2">
+                    <span>Use Default Electrum Server</span>
+                    <input type="checkbox" id="auto-electrum-checkbox" checked="checked" class="checkbox checkbox-info" />
+                  </label>
+                  <button id="auto-electrum-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
+                    What is an Electrum Server?
+                  </button>
+                </div>
+
+                <div id="electrum-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                  <div class="label justify-normal items-center gap-2">
+                    <label class="label-text">Electrum Server</label>
+                  </div>
+                  <div class="flex flex-col items-start">
+                    <input
+                      class="input input-accent w-full max-w-xs"
+                      id="electrum-input"
+                      type="text"
+                      placeholder="ssl://blockstream.info:993"
+                    />
+                    <button id="electrum-server-modal-button" class="btn btn-link no-underline btn-xs px-1 py-0 font-normal">
+                      How to use a custom server?
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Network selection -->
+              <div class="form-control mb-5">
+                <div class="label">
+                  <label class="flex items-center gap-2">
+                    <span>Use Bitcoin Main Network</span>
+                    <input type="checkbox" id="network-checkbox" checked="checked" class="checkbox checkbox-info" />
+                  </label>
+                  <button id="network-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
+                    Why would I change my network?
+                  </button>
+                </div>
+                <div id="network-input-container" class="hidden bg-base-200 p-4 -mx-4 border-y border-base-300">
+                  <div class="flex gap-4">
+                    <label class="label cursor-pointer">
+                      <input
+                        id="bitcoin"
+                        value="bitcoin"
+                        type="radio"
+                        name="network"
+                        class="radio checked:bg-orange-500"
+                        checked
+                      />
+                      <span class="label-text ml-2">Bitcoin</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                      <input id="testnet" value="testnet" type="radio" name="network" class="radio checked:bg-green-500" />
+                      <span class="label-text ml-2">Testnet</span>
+                    </label>
+                    <label class="label cursor-pointer">
+                      <input id="regtest" value="regtest" type="radio" name="network" class="radio checked:bg-blue-500" />
+                      <span class="label-text ml-2">Regtest</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Buttons: Fetch balance, New address -->
+              <div class="card-actions justify-end" id="wallet-actions">
+                <button type="button" class="btn btn-primary" id="fetch-wallet-button">Fetch Wallet</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Second Card: Recovery Options -->
+          <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="recovery-container">
+            <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
+            <div class="collapse-title text-xl">2. Recover Wallet</div>
+            <div class="collapse-content">
+              <!-- Destination address -->
+              <div class="form-control mb-3">
+                <label class="label">Destination Address</label>
+                <input class="input input-bordered input-secondary" id="address-input" type="text" placeholder="bc1q..." />
+              </div>
+
+              <!-- Fee rate -->
+              <div class="form-control mb-5">
+                <div class="label">
+                  <div class="flex items-center gap-2">
+                    <span class="label-text">Automatically Estimate Fee Rate</span>
+                    <input type="checkbox" id="auto-fee-rate-checkbox" checked="checked" class="checkbox checkbox-info" />
+                  </div>
+                  <button id="fee-rate-modal-button" class="btn btn-link no-underline btn-sm font-normal">
+                    How is the fee rate used?
+                  </button>
+                </div>
+                <div id="fee-rate-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                  <div class="label">
+                    <label class="label-text" for="fee-rate-input">Fee Rate</label>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <label class="input input-bordered input-accent flex items-center gap-2">
+                      <input id="fee-rate-input" type="number" step="1" min="5" class="grow" placeholder="Custom Fee rate" />
+                      <span class="badge badge-info">sats/vB</span>
+                    </label>
+                    <button class="btn btn-accent" type="button" id="estimate-button">Suggest Fee</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Sweep button -->
+              <div class="card-actions justify-end mb-2">
+                <button class="btn btn-primary" type="button" id="sweep-button">Create Recovery Transaction</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Third Card: Send Transaction  -->
+          <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="send-transaction-container">
+            <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
+            <div class="collapse-title text-xl">3. Send Transaction</div>
+            <div class="collapse-content">
+              <!-- Transaction -->
+              <div class="form-control mb-3 hidden" id="transaction-overview-container">
+                <!-- Transaction overview -->
+                <div class="overflow-x-auto">
+                  <table class="table table-fixed table-md mb-2">
+                    <thead>
+                      <tr>
+                        <th>To</th>
+                        <th>Amount</th>
+                        <th>Fee</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="transaction-overview-body">
+                      <tr>
+                        <td class="truncate"></td>
+                        <td></td>
+                        <td></td>
+                        <td>
+                          <div id="psbt-status" class="truncate"></div>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="flex items-center justify-center">
+                  <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
+                </div>
+              </div>
+              <!-- PSBT details -->
+              <div class="form-control mb-3" id="psbt-details-container">
+                <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
+                  <span class="label-text text-xs">Show PSBT Details</span>
+                  <input id="psbt-details-toggle" type="checkbox" class="toggle" />
+                </label>
+                <!-- Toggle content-->
+                <div class="psbt-details-toggle-content">
+                  <!-- PSBT textarea -->
+                  <textarea
+                    class="textarea textarea-bordered h-40 w-full leading-normal"
+                    id="psbt-textarea"
+                    placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
+                  ></textarea>
+                  <!-- PSBT controls -->
+                  <div class="flex gap-2 justify-end mt-2 mb-6">
+                    <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
+                    <button class="btn btn-outline btn-sm" type="button" id="paste-psbt-button">Paste PSBT</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Device & Broadcast controls -->
+              <div class="card-actions mb-6 justify-center">
+                <button class="btn btn-warning" type="button" id="sign-button">Sign</button>
+                <button class="btn btn-secondary btn-disabled" type="button" id="broadcast-button">Broadcast</button>
+              </div>
             </div>
           </div>
         </div>
@@ -300,7 +281,6 @@
           🍤
           <a id="about-link" class="link link-hover" href="#">About</a>
         </div>
-        <div class="divider divider-horizontal"></div>
         <!-- GitHub -->
         <div class="flex items-center gap-1">
           <svg width="18" height="18" class="h-6 w-6" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -337,7 +317,7 @@
             >GitHub
           </a>
         </div>
-        <div class="divider divider-horizontal"></div>
+
         <div class="flex gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -395,7 +375,7 @@
     <dialog id="wallet-config-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">There are several ways to find your wallet configuration</h3>
         <p class="py-4">For Swan Vault recovery, use the descriptor from your "Wallet Configuration":</p>
@@ -418,7 +398,7 @@
     <dialog id="auto-change-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">Change Configurations and Calculation</h3>
         <p class="py-4">
@@ -438,7 +418,7 @@
     <dialog id="auto-electrum-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">What is an Electrum Server?</h3>
         <p class="py-4">
@@ -458,7 +438,7 @@
     <dialog id="electrum-server-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">Using your own server is easy</h3>
         <div class="py-4">
@@ -476,7 +456,7 @@
     <dialog id="network-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">Why would I change my network?</h3>
         <p class="py-4">
@@ -493,7 +473,7 @@
     <dialog id="fee-rate-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
-          <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
+          <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
         <h3 class="text-lg font-bold">Understanding the Fee Rate</h3>
         <div class="py-4">

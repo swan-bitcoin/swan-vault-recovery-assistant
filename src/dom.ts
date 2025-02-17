@@ -1,4 +1,5 @@
 import { Descriptors, TempuraError } from './bindings'
+import { showTempMessage } from './utilities'
 
 type Buttons = {
   broadcast: HTMLButtonElement
@@ -79,6 +80,7 @@ type Outputs = {
   psbtStatus: HTMLDivElement
   psbtTextArea: HTMLTextAreaElement
   tempMessage: HTMLDivElement
+  tempMessageContainer: HTMLDivElement
   transactionOverview: HTMLDivElement
   txBody: HTMLTableSectionElement
 }
@@ -141,17 +143,17 @@ export function getUserInputs(): UserInputs {
 export function handleError(e: unknown) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
   }
 
   if (e instanceof Error) {
     console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
+    showTempMessage(e.message)
     return
   }
 
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+  showTempMessage('An unknown error occurred')
 }
 
 export function initializeDOM() {
@@ -236,6 +238,7 @@ export function initializeDOM() {
       psbtStatus: requireDomElement<HTMLDivElement>('#psbt-status'),
       psbtTextArea: requireDomElement<HTMLTextAreaElement>('#psbt-textarea'),
       tempMessage,
+      tempMessageContainer: requireDomElement<HTMLDivElement>('#temp-message-container'),
       transactionOverview: requireDomElement<HTMLDivElement>('#transaction-overview-container'),
       txBody: requireDomElement<HTMLTableSectionElement>('#transactions-body'),
     }

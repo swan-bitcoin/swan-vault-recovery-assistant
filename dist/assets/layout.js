@@ -86,15 +86,15 @@ function getUserInputs() {
 function handleError(e) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
   }
   if (e instanceof Error) {
     console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
+    showTempMessage(e.message)
     return
   }
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+  showTempMessage('An unknown error occurred')
 }
 function initializeDOM() {
   let tempMessage = void 0
@@ -169,6 +169,7 @@ function initializeDOM() {
       psbtStatus: requireDomElement('#psbt-status'),
       psbtTextArea: requireDomElement('#psbt-textarea'),
       tempMessage,
+      tempMessageContainer: requireDomElement('#temp-message-container'),
       transactionOverview: requireDomElement('#transaction-overview-container'),
       txBody: requireDomElement('#transactions-body'),
     }
@@ -208,6 +209,10 @@ function requireDomElements(name) {
     throw new Error(`Failed to initialize: missing required DOM element ${name}`)
   }
   return elements
+}
+const showTempMessage = (content) => {
+  DOM.outputs.tempMessage.textContent = content
+  DOM.outputs.tempMessageContainer.classList.remove('hidden')
 }
 const adjustMainContentHeight = () => {
   const availableHeight = window.innerHeight - DOM.containers.footer.offsetHeight

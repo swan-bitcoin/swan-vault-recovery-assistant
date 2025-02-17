@@ -232,6 +232,22 @@ const Address = ({ address }) => {
     </div>
   `
 }
+const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
+const countTransactions = (transactions) => {
+  let unconfirmedCount = 0
+  let confirmedCount = 0
+  for (const transaction of transactions) {
+    if (transaction.confirmation_height === null) {
+      unconfirmedCount++
+    } else {
+      confirmedCount++
+    }
+  }
+  return {
+    unconfirmedCount,
+    confirmedCount,
+  }
+}
 const showConversation = () => {
   const conversationContainer = document.getElementById('conversation')
   if (conversationContainer) {
@@ -270,38 +286,6 @@ const createConversationBubble = ({ content, footer, isUserSpeaking = false, dan
   showClearMessagesButton()
   return chatContainer
 }
-const isChangeDescriptor = (descriptor) => {
-  const changePattern = /\/1\/\*\)+(?:#\w+)?$/
-  return changePattern.test(descriptor)
-}
-const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
-const scrollToLastMessage = () => {
-  const conversationContainer = document.getElementById('conversation')
-  if (conversationContainer && conversationContainer.lastElementChild) {
-    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
-  }
-}
-const populateTransactionOverview = ({ address, outbound, fee }) => {
-  const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
-  transactionRowTds[0].textContent = address
-  transactionRowTds[1].innerHTML = Sats(outbound)
-  transactionRowTds[2].innerHTML = Sats(fee || '')
-}
-const countTransactions = (transactions) => {
-  let unconfirmedCount = 0
-  let confirmedCount = 0
-  for (const transaction of transactions) {
-    if (transaction.confirmation_height === null) {
-      unconfirmedCount++
-    } else {
-      confirmedCount++
-    }
-  }
-  return {
-    unconfirmedCount,
-    confirmedCount,
-  }
-}
 const getFirstTransaction = (transactions) => {
   const confirmedTransactions = transactions.filter((tx) => tx.confirmation_height !== null)
   if (confirmedTransactions.length === 0) {
@@ -310,6 +294,22 @@ const getFirstTransaction = (transactions) => {
   return confirmedTransactions.reduce((firstTx, currentTx) => {
     return currentTx.confirmation_height < firstTx.confirmation_height ? currentTx : firstTx
   })
+}
+const isChangeDescriptor = (descriptor) => {
+  const changePattern = /\/1\/\*\)+(?:#\w+)?$/
+  return changePattern.test(descriptor)
+}
+const populateTransactionOverview = ({ address, outbound, fee }) => {
+  const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
+  transactionRowTds[0].textContent = address
+  transactionRowTds[1].innerHTML = Sats(outbound)
+  transactionRowTds[2].innerHTML = Sats(fee || '')
+}
+const scrollToLastMessage = () => {
+  const conversationContainer = document.getElementById('conversation')
+  if (conversationContainer && conversationContainer.lastElementChild) {
+    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 const generateRandomString = (length = 8) => {
   return Math.random()
@@ -747,6 +747,7 @@ async function loadWallet() {
       isUserSpeaking: true,
     })
     DOM.outputs.conversation.appendChild(userBubble)
+    DOM.outputs.tempMessage.innerHTML = '<span class="loading loading-spinner loading-sm"></span>'
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
@@ -757,6 +758,7 @@ async function loadWallet() {
         transactions,
         addressInfo,
       }),
+      footer: /* @__PURE__ */ new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
     instrumentCopyButtons(tempuraBubble)

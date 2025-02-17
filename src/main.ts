@@ -133,6 +133,8 @@ async function loadWallet() {
       isUserSpeaking: true,
     })
     DOM.outputs.conversation.appendChild(userBubble)
+    DOM.outputs.tempMessage.innerHTML = '<span class="loading loading-spinner loading-sm"></span>'
+
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
@@ -143,6 +145,7 @@ async function loadWallet() {
         transactions,
         addressInfo,
       }),
+      footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
     instrumentCopyButtons(tempuraBubble)
