@@ -530,33 +530,42 @@ const validateDescriptor = async () => {
   clearStatusIndicators(DOM.inputs.receive)
   const descriptor = descriptors.receive
   if (!descriptor) {
-    DOM.outputs.tempMessage.textContent = 'Wallet configuration is missing!'
     DOM.inputs.receive.classList.add('textarea-error')
+    DOM.feedback.receiveInputValidationMessage.classList.remove('text-warning', 'text-success')
+    DOM.feedback.receiveInputValidationMessage.classList.add('text-error')
+    DOM.feedback.receiveInputValidationMessage.textContent = 'Wallet configuration is missing!'
     return false
   }
   try {
     const isValidDescriptor = await commands.isDescriptorForNetwork(descriptor, network)
     if (!isValidDescriptor) {
-      DOM.outputs.tempMessage.textContent =
-        'Descriptor is fine but it is for the wrong network. Open the network settings to the right to change the network!'
       DOM.inputs.receive.classList.add('textarea-error')
+      DOM.feedback.receiveInputValidationMessage.classList.remove('text-warning', 'text-success')
+      DOM.feedback.receiveInputValidationMessage.classList.add('text-error')
+      DOM.feedback.receiveInputValidationMessage.textContent =
+        'Descriptor is fine but it is for the wrong network. Open the network settings below to change the network!'
       return false
     }
     if (isChangeDescriptor(descriptor)) {
-      DOM.outputs.tempMessage.textContent =
-        'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
       DOM.inputs.receive.classList.add('textarea-warning')
-      DOM.containers.walletActions.classList.remove('hidden')
+      DOM.feedback.receiveInputValidationMessage.classList.remove('text-error', 'text-success')
+      DOM.feedback.receiveInputValidationMessage.classList.add('text-warning')
+      DOM.feedback.receiveInputValidationMessage.textContent =
+        'You seem to be using a change descriptor for your wallet configuration. This may limit wallet functionality, such as showing only a partial balance instead of the full wallet balance.'
       return true
     }
     DOM.inputs.receive.classList.add('textarea-success')
-    DOM.outputs.tempMessage.textContent = 'Your wallet configuration is valid. You can fetch your wallet now.'
-    DOM.containers.walletActions.classList.remove('hidden')
+    DOM.feedback.receiveInputValidationMessage.classList.remove('text-error', 'text-warning')
+    DOM.feedback.receiveInputValidationMessage.classList.add('text-success')
+    DOM.feedback.receiveInputValidationMessage.textContent =
+      'Your wallet configuration is valid. You can fetch your wallet now.'
     return true
   } catch (e) {
     console.error(e)
-    DOM.outputs.tempMessage.textContent = 'Invalid wallet configuration!'
     DOM.inputs.receive.classList.add('textarea-error')
+    DOM.feedback.receiveInputValidationMessage.classList.remove('text-warning', 'text-success')
+    DOM.feedback.receiveInputValidationMessage.classList.add('text-error')
+    DOM.feedback.receiveInputValidationMessage.textContent = 'Invalid wallet configuration!'
     return false
   }
 }

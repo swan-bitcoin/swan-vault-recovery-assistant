@@ -100,6 +100,9 @@ function initializeDOM() {
   let tempMessage = void 0
   try {
     tempMessage = requireDomElement('#temporary-message')
+    const feedback = {
+      receiveInputValidationMessage: requireDomElement('#receive-input-validation-message'),
+    }
     const buttons = {
       broadcast: requireDomElement('#broadcast-button'),
       clearMessages: requireDomElement('#clear-messages-button'),
@@ -173,6 +176,7 @@ function initializeDOM() {
       buttons,
       checkboxes,
       containers,
+      feedback,
       inputs,
       links,
       modals,

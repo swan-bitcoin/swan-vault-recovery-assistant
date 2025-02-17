@@ -37,6 +37,10 @@ type Containers = {
   walletActions: HTMLDivElement
 }
 
+type FeedbackElements = {
+  receiveInputValidationMessage: HTMLDivElement
+}
+
 type Inputs = {
   address: HTMLInputElement
   change: HTMLInputElement
@@ -83,6 +87,7 @@ type DOM = {
   buttons: Buttons
   checkboxes: Checkboxes
   containers: Containers
+  feedback: FeedbackElements
   inputs: Inputs
   links: Links
   modals: Modals
@@ -153,6 +158,10 @@ export function initializeDOM() {
   let tempMessage: HTMLDivElement | undefined = undefined
   try {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
+
+    const feedback = {
+      receiveInputValidationMessage: requireDomElement<HTMLDivElement>('#receive-input-validation-message'),
+    }
 
     const buttons = {
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
@@ -235,6 +244,7 @@ export function initializeDOM() {
       buttons,
       checkboxes,
       containers,
+      feedback,
       inputs,
       links,
       modals,
