@@ -18,7 +18,7 @@
     <!-- Main content section -->
     <main id="main-content" class="flex flex-grow">
       <!-- Chat bubble on the left -->
-      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar border-r border-base-300 p-4">
+      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar border-r p-4">
         <div class="">
           <div class="">
             <h2 class="">Chat</h2>
@@ -44,10 +44,10 @@
       </div>
 
       <!-- Cards section -->
-      <div class="flex w-7/12 overflow-y-scroll bg-base-200">
-        <div class="flex flex-col gap-4 p-4 bg-base-200 min-h-fit w-full">
+      <div class="flex w-7/12 overflow-y-scroll bg-base-300">
+        <div class="flex flex-col gap-4 p-4 bg-base-300 min-h-fit w-full">
           <!-- First Card: Wallet Set Up -->
-          <div class="collapse collapse-arrow bg-base-100 border-base-300 border">
+          <div class="collapse collapse-arrow bg-base-100 border">
             <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
             <div class="collapse-title text-xl">1. Set Up Wallet</div>
             <div class="collapse-content">
@@ -78,7 +78,7 @@
                     What is a change configuration?
                   </button>
                 </div>
-                <div id="change-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                <div id="change-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y">
                   <div class="label">
                     <label class="label-text">Change Configuration (Descriptor)</label>
                   </div>
@@ -98,7 +98,7 @@
                   </button>
                 </div>
 
-                <div id="electrum-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                <div id="electrum-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y">
                   <div class="label justify-normal items-center gap-2">
                     <label class="label-text">Electrum Server</label>
                   </div>
@@ -127,7 +127,7 @@
                     Why would I change my network?
                   </button>
                 </div>
-                <div id="network-input-container" class="hidden bg-base-200 p-4 -mx-4 border-y border-base-300">
+                <div id="network-input-container" class="hidden bg-base-200 p-4 -mx-4 border-y">
                   <div class="flex gap-4">
                     <label class="label cursor-pointer">
                       <input
@@ -160,7 +160,7 @@
           </div>
 
           <!-- Second Card: Recovery Options -->
-          <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="recovery-container">
+          <div class="collapse collapse-arrow bg-base-100 border" id="recovery-container">
             <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
             <div class="collapse-title text-xl">2. Recover Wallet</div>
             <div class="collapse-content">
@@ -181,7 +181,7 @@
                     How is the fee rate used?
                   </button>
                 </div>
-                <div id="fee-rate-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y border-base-300">
+                <div id="fee-rate-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y">
                   <div class="label">
                     <label class="label-text" for="fee-rate-input">Fee Rate</label>
                   </div>
@@ -204,7 +204,7 @@
           </div>
 
           <!-- Third Card: Send Transaction  -->
-          <div class="collapse collapse-arrow bg-base-100 border-base-300 border" id="send-transaction-container">
+          <div class="collapse collapse-arrow bg-base-100 border" id="send-transaction-container">
             <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
             <div class="collapse-title text-xl">3. Send Transaction</div>
             <div class="collapse-content">

@@ -8,17 +8,21 @@ module.exports = {
     themes: [
       {
         swan: {
+          '*': {
+            borderColor: '#C6C6C9',
+          },
+          '--rounded-box': '0.5rem',
           primary: '#002D5E', // <<- Swan Bubble
           'primary-content': '#E4F0FD',
           secondary: '#0070EA', // <<- User Bubble
-          'secondary-content': '#cee1ff',
+          'secondary-content': '#E4F0FD',
           accent: '#7395B6',
-          'accent-content': '#000c00',
-          neutral: '#131000',
-          'neutral-content': '#c9c9c4',
+          'accent-content': '#F1F5F9',
+          neutral: '#0A131B',
+          'neutral-content': '#E4ECF3',
           'base-100': '#fff',
-          'base-200': '#F3F3F4',
-          'base-300': '#DCDCDF',
+          'base-200': '#F9F9FA',
+          'base-300': '#F3F3F4', //'#DCDCDF',
           'base-content': '#141614',
           info: '#E4ECF3', // <<-- Chat Bubble and checkboxes
           'info-content': '#000715',
