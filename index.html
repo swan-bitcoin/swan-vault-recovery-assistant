@@ -392,120 +392,146 @@
 
     <!-- Wallet Configuration Modal -->
     <dialog id="wallet-config-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">There are several ways to find your wallet configuration</h3>
-        <p class="py-4">For Swan Vault recovery, use the descriptor from your "Wallet Configuration":</p>
-        <div class="flex justify-center py-2">
-          <img src="swan_vault_recovery_sheet.png" alt="Swan Vault Recovery Sheet" class="rounded-lg shadow-lg max-w-full" />
+        <h3 class="text-lg font-bold text-balance">There are several ways to find your wallet configuration</h3>
+        <div class="py-4 gap-4 flex flex-col w-full text-pretty">
+          <p>For Swan Vault recovery, use the descriptor from your “Wallet Configuration”:</p>
+
+          <div class="flex justify-center">
+            <img
+              src="swan_vault_recovery_sheet.png"
+              alt="Swan Vault Recovery Sheet"
+              class="rounded-lg shadow-lg max-w-full"
+            />
+          </div>
+
+          <div class="divider"></div>
+
+          <p>For recovery from Specter, use the “Bitcoin Core Receive Descriptor”:</p>
+
+          <div class="flex justify-center">
+            <img src="specter_recovery_sheet.png" alt="Specter Recovery Sheet" class="rounded-lg shadow-lg max-w-full" />
+          </div>
+
+          <p class="text-sm text-gray-500">
+            You can enter a receive or combined descriptor. Receive descriptors typically start with
+            <code class="bg-base-300 py-1 px-2 rounded-md">wsh</code> or
+            <code class="bg-base-300 py-1 px-2 rounded-md">wpkh</code> and end with
+            <code class="bg-base-300 py-1 px-2 rounded-md">/0/*</code>; combined descriptors end with
+            <code class="bg-base-300 py-1 px-2 rounded-md">/&lt;0;1&gt;/*</code>.
+          </p>
         </div>
-        <p class="py-4">For recovery from Specter, use the "Bitcoin Core Receive Descriptor":</p>
-        <div class="flex justify-center py-2">
-          <img src="specter_recovery_sheet.png" alt="Specter Recovery Sheet" class="rounded-lg shadow-lg max-w-full" />
-        </div>
-        <p class="text-sm text-gray-500 mt-2">
-          You can enter a receive or combined descriptor. Receive descriptors typically start with
-          <code>wsh</code> or <code>wpkh</code> and end with <code>/0/*</code>; combined descriptors end with
-          <code>/&lt;0;1&gt;/*</code>.
-        </p>
       </div>
     </dialog>
 
     <!-- Auto-change Modal -->
     <dialog id="auto-change-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Change Configurations and Calculation</h3>
-        <p class="py-4">
-          Bitcoin wallets typically separate addresses for receiving transactions from those used to receive change from
-          outgoing transactions. In most cases Tempura can calculate the correct change configuration from the wallet
-          configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter your change
-          configuration.
-        </p>
-        <p>
-          Tempura calculates the change configuration from the receive configuration if the receive descriptor paths end with
-          <code>/0/*</code>. The calculated change configuration paths will end in <code>/1/*</code>.
-        </p>
+        <h3 class="text-lg font-bold text-balance">Change Configurations and Calculation</h3>
+        <div class="py-4 gap-4 flex flex-col text-pretty">
+          <p>
+            Bitcoin wallets typically separate addresses for receiving transactions from those used to receive change from
+            outgoing transactions. In most cases Tempura can calculate the correct change configuration from the wallet
+            configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter your change
+            configuration.
+          </p>
+          <p>
+            Tempura calculates the change configuration from the receive configuration if the receive descriptor paths end
+            with
+            <code class="bg-base-300 py-1 px-2 rounded-md">/0/*</code>. The calculated change configuration paths will end in
+            <code class="bg-base-300 py-1 px-2 rounded-md">/1/*</code>.
+          </p>
+        </div>
       </div>
     </dialog>
 
     <!-- Auto-electrum Modal -->
     <dialog id="auto-electrum-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">What is an Electrum Server?</h3>
-        <p class="py-4">
-          An Electrum server helps you connect to the Bitcoin network. It allows your wallet to quickly check balances, list
-          transactions, and broadcast new ones. It can do this without downloading the entire Bitcoin blockchain. You trust
-          the Electrum server to provide the correct balance and transaction information, and the server operator can
-          potentially link your transactions to your IP address.
-        </p>
-        <p>
-          If you have a trusted Electrum server (either on your own node or a trusted friend's), uncheck the box and enter
-          its address.
-        </p>
+        <h3 class="text-lg font-bold text-balance">What is an Electrum Server?</h3>
+        <div class="py-4 gap-4 flex flex-col text-pretty">
+          <p>
+            An Electrum server helps you connect to the Bitcoin network. It allows your wallet to quickly check balances,
+            list transactions, and broadcast new ones. It can do this without downloading the entire Bitcoin blockchain. You
+            trust the Electrum server to provide the correct balance and transaction information, and the server operator can
+            potentially link your transactions to your IP address.
+          </p>
+          <p>
+            If you have a trusted Electrum server (either on your own node or a trusted friend's), uncheck the box and enter
+            its address.
+          </p>
+        </div>
       </div>
     </dialog>
 
     <!-- Electrum Server Modal -->
     <dialog id="electrum-server-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Using your own server is easy</h3>
-        <div class="py-4">
+        <h3 class="text-lg font-bold text-balance">Using your own server is easy</h3>
+        <div class="py-4 gap-4 flex flex-col text-pretty">
           <p>
-            Enter your custom Electrum server in the format <code>server:port</code>. If the server uses SSL, you must
-            specify it at the beginning.
+            Enter your custom Electrum server in the format
+            <code class="bg-base-300 py-1 px-2 rounded-md">server:port</code>.<br />
+            If the server uses SSL, you must specify it at the beginning.
           </p>
-          <p>For example: <code>ssl://electrum.satoshi.com:50001</code></p>
+
+          <div class="mockup-code before:hidden">
+            <pre><code>ssl://electrum.satoshi.com:50002</code></pre>
+          </div>
+          <p class="py-2">This is optional, and if left blank, the default server (Blockstream) will be&nbsp;used.</p>
         </div>
-        <p class="py-2">This is optional, and if left blank, the default server (Blockstream) will be used.</p>
       </div>
     </dialog>
 
     <!-- Network Modal -->
     <dialog id="network-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Why would I change my network?</h3>
-        <p class="py-4">
-          For testing purposes, developers may want to use Tempura on networks where the coins involved do not have value.
-        </p>
-        <p>
-          Each Bitcoin wallet should only be used with the network on which it was created. Tempura will typically detect
-          mismatched wallet configuration and network selections.
-        </p>
+        <h3 class="text-lg font-bold text-balance">Why would I change my network?</h3>
+        <div class="py-4 gap-4 flex flex-col text-pretty">
+          <p>
+            For testing purposes, developers may want to use Tempura on networks where the coins involved do not have value.
+          </p>
+          <p>
+            Each Bitcoin wallet should only be used with the network on which it was created. Tempura will typically detect
+            mismatched wallet configuration and network selections.
+          </p>
+        </div>
       </div>
     </dialog>
 
     <!-- Fee Rate Modal -->
     <dialog id="fee-rate-modal" class="modal">
-      <div class="modal-box">
+      <div class="modal-box w-6/12 max-w-2xl">
         <form method="dialog">
           <button class="btn btn-circle p-0 size-8 min-h-8 text-lg absolute right-4 top-4">✕</button>
         </form>
-        <h3 class="text-lg font-bold">Understanding the Fee Rate</h3>
-        <div class="py-4">
+        <h3 class="text-lg font-bold text-balance">Understanding the Fee Rate</h3>
+        <div class="py-4 gap-4 flex flex-col text-pretty">
           <p>
             Miners prioritize transactions based on this rate, which reflects how much is paid per "virtual byte" (a measure
             of transaction complexity). A higher fee rate increases the chance of a prompt confirmation, especially in
             periods of high network activity.
           </p>
+          <p>
+            Tempura automatically estimates the optimal fee rate to prioritize your transaction for inclusion in the next
+            block. To set the fee rate manually, uncheck the box.
+          </p>
         </div>
-        <p class="py-2">
-          Tempura automatically estimates the optimal fee rate to prioritize your transaction for inclusion in the next
-          block. To set the fee rate manually, uncheck the box.
-        </p>
       </div>
     </dialog>
   </body>
