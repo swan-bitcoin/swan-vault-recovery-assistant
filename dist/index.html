@@ -71,8 +71,8 @@
               <div class="form-control">
                 <div class="label">
                   <label class="flex items-center gap-2">
+                    <input type="checkbox" id="auto-change-checkbox" checked="checked" class="checkbox checkbox-secondary" />
                     <span>Calculate Change Configuration</span>
-                    <input type="checkbox" id="auto-change-checkbox" checked="checked" class="checkbox checkbox-info" />
                   </label>
                   <button id="auto-change-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
                     What is a change configuration?
@@ -90,8 +90,13 @@
               <div class="form-control">
                 <div class="label">
                   <label class="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="auto-electrum-checkbox"
+                      checked="checked"
+                      class="checkbox checkbox-secondary"
+                    />
                     <span>Use Default Electrum Server</span>
-                    <input type="checkbox" id="auto-electrum-checkbox" checked="checked" class="checkbox checkbox-info" />
                   </label>
                   <button id="auto-electrum-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
                     What is an Electrum Server?
@@ -120,8 +125,8 @@
               <div class="form-control mb-5">
                 <div class="label">
                   <label class="flex items-center gap-2">
+                    <input type="checkbox" id="network-checkbox" checked="checked" class="checkbox checkbox-secondary" />
                     <span>Use Bitcoin Main Network</span>
-                    <input type="checkbox" id="network-checkbox" checked="checked" class="checkbox checkbox-info" />
                   </label>
                   <button id="network-modal-button" class="btn btn-link no-underline btn-sm font-normal px-0">
                     Why would I change my network?
@@ -173,10 +178,15 @@
               <!-- Fee rate -->
               <div class="form-control mb-5">
                 <div class="label">
-                  <div class="flex items-center gap-2">
-                    <span class="label-text">Automatically Estimate Fee Rate</span>
-                    <input type="checkbox" id="auto-fee-rate-checkbox" checked="checked" class="checkbox checkbox-info" />
-                  </div>
+                  <label class="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="auto-fee-rate-checkbox"
+                      checked="checked"
+                      class="checkbox checkbox-secondary"
+                    />
+                    <span class="">Automatically Estimate Fee Rate</span>
+                  </label>
                   <button id="fee-rate-modal-button" class="btn btn-link no-underline btn-sm font-normal">
                     How is the fee rate used?
                   </button>
@@ -240,8 +250,8 @@
               <!-- PSBT details -->
               <div class="form-control mb-3" id="psbt-details-container">
                 <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
-                  <span class="label-text text-xs">Show PSBT Details</span>
                   <input id="psbt-details-toggle" type="checkbox" class="toggle" />
+                  <span class="">Show PSBT Details</span>
                 </label>
                 <!-- Toggle content-->
                 <div class="psbt-details-toggle-content">

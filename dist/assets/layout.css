@@ -712,9 +712,9 @@ html {
     text-decoration-line: underline;
   }
 
-  .checkbox-info:hover {
+  .checkbox-secondary:hover {
     --tw-border-opacity: 1;
-    border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+    border-color: var(--fallback-s, oklch(var(--s) / var(--tw-border-opacity)));
   }
 
   .label a:hover {
@@ -2106,23 +2106,23 @@ input.tab:checked + .tab-content,
     linear-gradient(-90deg, transparent 80%, var(--chkbg) 80%),
     linear-gradient(0deg, var(--chkbg) 43%, var(--chkfg) 43%, var(--chkfg) 57%, var(--chkbg) 57%);
 }
-.checkbox-info {
-  --chkbg: var(--fallback-in, oklch(var(--in) / 1));
-  --chkfg: var(--fallback-inc, oklch(var(--inc) / 1));
+.checkbox-secondary {
+  --chkbg: var(--fallback-s, oklch(var(--s) / 1));
+  --chkfg: var(--fallback-sc, oklch(var(--sc) / 1));
   --tw-border-opacity: 1;
-  border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+  border-color: var(--fallback-s, oklch(var(--s) / var(--tw-border-opacity)));
 }
-.checkbox-info:focus-visible {
-  outline-color: var(--fallback-in, oklch(var(--in) / 1));
+.checkbox-secondary:focus-visible {
+  outline-color: var(--fallback-s, oklch(var(--s) / 1));
 }
-.checkbox-info:checked,
-.checkbox-info[aria-checked='true'] {
+.checkbox-secondary:checked,
+.checkbox-secondary[aria-checked='true'] {
   --tw-border-opacity: 1;
-  border-color: var(--fallback-in, oklch(var(--in) / var(--tw-border-opacity)));
+  border-color: var(--fallback-s, oklch(var(--s) / var(--tw-border-opacity)));
   --tw-bg-opacity: 1;
-  background-color: var(--fallback-in, oklch(var(--in) / var(--tw-bg-opacity)));
+  background-color: var(--fallback-s, oklch(var(--s) / var(--tw-bg-opacity)));
   --tw-text-opacity: 1;
-  color: var(--fallback-inc, oklch(var(--inc) / var(--tw-text-opacity)));
+  color: var(--fallback-sc, oklch(var(--sc) / var(--tw-text-opacity)));
 }
 @keyframes checkmark {
   0% {
@@ -3867,10 +3867,6 @@ details.collapse summary::-webkit-details-marker {
 .text-xl {
   font-size: 1.25rem;
   line-height: 1.75rem;
-}
-.text-xs {
-  font-size: 0.75rem;
-  line-height: 1rem;
 }
 .font-bold {
   font-weight: 700;
