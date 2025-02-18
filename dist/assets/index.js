@@ -7,7 +7,6 @@ import {
   i as initializeDOM,
   s as showTempLoadingMessage,
   a as hideTempMessage,
-  b as showTempMessage,
 } from './layout.js'
 typeof SuppressedError === 'function'
   ? SuppressedError
@@ -217,15 +216,17 @@ const Success = (text) => `
 `
 const Balance = ({ confirmed, unconfirmed }) => {
   return `
-      <div class="stat">
-        <div class="stat-value">${Sats(confirmed)}</div>
+    <div class="flex flex-col gap-4 py-4">
+      <div class="stat p-0">
+        <div class="stat-value font-normal">${Sats(confirmed)}</div>
         <div class="stat-desc">Confirmed</div>
       </div>
-      <div class="stat">
-        <div class="stat-value">${Sats(unconfirmed)}</div>
+      <div class="stat p-0">
+        <div class="stat-value font-normal">${Sats(unconfirmed)}</div>
         <div class="stat-desc">Unconfirmed</div>
       </div>
-    `
+    </div>
+  `
 }
 const Address = ({ address }) => {
   return `
@@ -604,31 +605,40 @@ async function validateAddress() {
   const { address, descriptors, network } = getUserInputs()
   clearStatusIndicators(DOM.inputs.address)
   if (!address) {
-    DOM.outputs.tempMessage.textContent = 'No address provided'
+    DOM.inputs.address.classList.remove('input-error', 'input-warning', 'input-success')
+    DOM.feedback.addressInputValidationMessage.textContent = ''
     return false
   }
   try {
     const isValid = await commands.isAddress(address)
     if (!isValid) {
       DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not valid.'
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-warning', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-error')
+      DOM.feedback.addressInputValidationMessage.textContent = 'This address is not valid.'
       return false
     }
     const isForNetwork = await commands.isAddressForNetwork(address, network)
     if (!isForNetwork) {
       DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not for the selected network'
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-warning', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-error')
+      DOM.feedback.addressInputValidationMessage.textContent = 'This address is not for the selected network'
       return false
     }
     const isMine = await commands.isAddressMine(address, network, descriptors)
     if (isMine) {
-      DOM.outputs.tempMessage.textContent =
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-error', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-warning')
+      DOM.feedback.addressInputValidationMessage.textContent =
         'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
       DOM.inputs.address.classList.add('input-warning')
       return false
     }
     DOM.inputs.address.classList.add('input-success')
-    DOM.outputs.tempMessage.textContent = 'This address looks good!'
+    DOM.feedback.addressInputValidationMessage.classList.remove('text-error', 'text-warning')
+    DOM.feedback.addressInputValidationMessage.classList.add('text-success')
+    DOM.feedback.addressInputValidationMessage.textContent = 'This address looks good!'
     return true
   } catch (e) {
     DOM.inputs.address.classList.add('input-error')
@@ -668,19 +678,20 @@ const updateSignHistory = (device) => {
   const stepsList = DOM.outputs.psbtSignHistory
   stepsList.appendChild(newStep)
 }
-function require2(value, itemName) {
-  if (!value) {
-    const message = itemName.concat(' is required')
-    DOM.outputs.tempMessage.textContent = message
-    throw new Error(message)
+function require2(value, message, errorElement) {
+  if (value) {
+    errorElement.textContent = ''
+    return
   }
+  errorElement.textContent = message
+  throw new Error(message)
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 async function broadcast() {
   const { descriptors, electrum, network, psbt } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  require2(psbt, 'PSBT')
+  require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble({
@@ -747,7 +758,7 @@ async function loadWallet() {
     })
     instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(balanceInfoBubble)
-    await sleep(100)
+    await sleep(200)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton == null
@@ -762,19 +773,31 @@ async function loadWallet() {
     const beginRecoveryButton = document.createElement('button')
     beginRecoveryButton.id = 'begin-recovery-btn'
     beginRecoveryButton.textContent = 'Start Recovery'
-    beginRecoveryButton.classList.add('btn', 'btn-outline', 'btn-sm')
+    beginRecoveryButton.classList.add('btn', 'btn-outline')
     recoveryMessageContainer.appendChild(recoveryMessage)
     recoveryMessageContainer.appendChild(beginRecoveryButton)
     beginRecoveryButton == null
       ? void 0
-      : beginRecoveryButton.addEventListener('click', () => {
+      : beginRecoveryButton.addEventListener('click', async () => {
+          const isChecked = DOM.radios.recoveryOptionsCollapse.checked
           DOM.radios.recoveryOptionsCollapse.checked = true
+          if (isChecked) {
+            return
+          }
+          const addDestinationAddressMessage = createConversationBubble({
+            content:
+              'Recovering is simple. Add an address in the input on the right. We create a recovery transaction and send the funds to that address next.',
+            isUserSpeaking: false,
+          })
+          await sleep(400)
+          DOM.outputs.conversation.appendChild(addDestinationAddressMessage)
         })
     const beginRecoveryBubble = createConversationBubble({
       content: recoveryMessageContainer,
       isUserSpeaking: false,
       dangerouslySetInnerHTML: true,
     })
+    await sleep(400)
     DOM.outputs.conversation.appendChild(beginRecoveryBubble)
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e) {
@@ -820,12 +843,12 @@ function copyPsbtToClipboard() {
     })
 }
 async function estimateFee() {
-  showTempLoadingMessage('Estimating fee')
   try {
     const { electrum, network } = getUserInputs()
+    DOM.buttons.estimate.classList.add('is-loading')
     const feeRate = await commands.estimateFee(network, electrum, 1)
+    DOM.buttons.estimate.classList.remove('is-loading')
     DOM.inputs.feeRate.value = feeRate.toString()
-    showTempMessage('Fee retrieved')
   } catch (e) {
     handleError(e)
   }
@@ -854,7 +877,7 @@ const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
 async function sign() {
   const { psbt, descriptors, network } = getUserInputs()
-  require2(psbt, 'PSBT')
+  require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
     const userBubble = createConversationBubble({
@@ -891,8 +914,10 @@ async function sweep() {
   if (!isValid) return
   if (!address) {
     DOM.inputs.address.classList.add('input-error')
+  } else {
+    DOM.inputs.address.classList.remove('input-error')
   }
-  require2(address, 'Address')
+  require2(address, 'A destination address is required', DOM.feedback.addressInputValidationMessage)
   const feeRate = await getFeeRate()
   if (feeRate.failed || feeRate.value === null) {
     DOM.outputs.tempMessage.textContent =
@@ -902,7 +927,7 @@ async function sweep() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble({
-      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
       isUserSpeaking: true,
       dangerouslySetInnerHTML: true,
     })
@@ -988,6 +1013,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.buttons.sweep.addEventListener('click', (e) => {
     e.preventDefault()
+    console.log('kfdghjfskdf')
     sweep()
   })
   DOM.checkboxes.change.addEventListener('click', toggleChangeInput)

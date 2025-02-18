@@ -34,12 +34,13 @@ type Containers = {
   footer: HTMLDivElement
   mainContent: HTMLDivElement
   network: HTMLDivElement
-  toast: HTMLDivElement
   walletActions: HTMLDivElement
 }
 
 type FeedbackElements = {
   receiveInputValidationMessage: HTMLDivElement
+  addressInputValidationMessage: HTMLDivElement
+  psbtInputValidationMessage: HTMLDivElement
 }
 
 type Inputs = {
@@ -163,6 +164,8 @@ export function initializeDOM() {
 
     const feedback = {
       receiveInputValidationMessage: requireDomElement<HTMLDivElement>('#receive-input-validation-message'),
+      addressInputValidationMessage: requireDomElement<HTMLDivElement>('#address-input-validation-message'),
+      psbtInputValidationMessage: requireDomElement<HTMLDivElement>('#psbt-input-validation-message'),
     }
 
     const buttons = {
@@ -205,7 +208,6 @@ export function initializeDOM() {
       footer: requireDomElement<HTMLDivElement>('#footer'),
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
-      toast: requireDomElement<HTMLDivElement>('#toast-container'),
       walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }
 

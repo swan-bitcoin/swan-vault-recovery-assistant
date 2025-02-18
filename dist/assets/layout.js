@@ -102,6 +102,8 @@ function initializeDOM() {
     tempMessage = requireDomElement('#temporary-message')
     const feedback = {
       receiveInputValidationMessage: requireDomElement('#receive-input-validation-message'),
+      addressInputValidationMessage: requireDomElement('#address-input-validation-message'),
+      psbtInputValidationMessage: requireDomElement('#psbt-input-validation-message'),
     }
     const buttons = {
       broadcast: requireDomElement('#broadcast-button'),
@@ -140,7 +142,6 @@ function initializeDOM() {
       footer: requireDomElement('#footer'),
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
-      toast: requireDomElement('#toast-container'),
       walletActions: requireDomElement('#wallet-actions'),
     }
     const inputs = {
@@ -218,7 +219,7 @@ const showTempMessage = (content) => {
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
 }
 const showTempLoadingMessage = (content) => {
-  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm"></span></div>`
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${`<span>${content}</span>`}<span class="loading loading-spinner loading-sm"></span></div>`
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
 }
 const adjustMainContentHeight = () => {
@@ -241,7 +242,6 @@ export {
   DOM as D,
   Sats as S,
   hideTempMessage as a,
-  showTempMessage as b,
   clearStatusIndicators as c,
   getUserInputs as g,
   handleError as h,

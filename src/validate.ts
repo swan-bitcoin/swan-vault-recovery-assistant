@@ -100,7 +100,8 @@ export async function validateAddress() {
 
   if (!address) {
     // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
-    DOM.outputs.tempMessage.textContent = 'No address provided'
+    DOM.inputs.address.classList.remove('input-error', 'input-warning', 'input-success')
+    DOM.feedback.addressInputValidationMessage.textContent = ''
     return false
   }
 
@@ -108,27 +109,35 @@ export async function validateAddress() {
     const isValid = await commands.isAddress(address)
     if (!isValid) {
       DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not valid.'
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-warning', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-error')
+      DOM.feedback.addressInputValidationMessage.textContent = 'This address is not valid.'
       return false
     }
 
     const isForNetwork = await commands.isAddressForNetwork(address, network)
     if (!isForNetwork) {
       DOM.inputs.address.classList.add('input-error')
-      DOM.outputs.tempMessage.textContent = 'This address is not for the selected network'
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-warning', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-error')
+      DOM.feedback.addressInputValidationMessage.textContent = 'This address is not for the selected network'
       return false
     }
 
     const isMine = await commands.isAddressMine(address, network, descriptors)
     if (isMine) {
-      DOM.outputs.tempMessage.textContent =
+      DOM.feedback.addressInputValidationMessage.classList.remove('text-error', 'text-success')
+      DOM.feedback.addressInputValidationMessage.classList.add('text-warning')
+      DOM.feedback.addressInputValidationMessage.textContent =
         'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
       DOM.inputs.address.classList.add('input-warning')
       return false
     }
 
     DOM.inputs.address.classList.add('input-success')
-    DOM.outputs.tempMessage.textContent = 'This address looks good!'
+    DOM.feedback.addressInputValidationMessage.classList.remove('text-error', 'text-warning')
+    DOM.feedback.addressInputValidationMessage.classList.add('text-success')
+    DOM.feedback.addressInputValidationMessage.textContent = 'This address looks good!'
     return true
   } catch (e: unknown) {
     DOM.inputs.address.classList.add('input-error')

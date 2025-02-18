@@ -18,7 +18,6 @@ import {
   populateTransactionOverview,
   scrollToLastMessage,
   showTempLoadingMessage,
-  showTempMessage,
 } from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 
@@ -73,12 +72,14 @@ const updateSignHistory = (device: Device) => {
   stepsList.appendChild(newStep)
 }
 
-function require(value: unknown, itemName: string) {
-  if (!value) {
-    const message = itemName.concat(' is required')
-    DOM.outputs.tempMessage.textContent = message
-    throw new Error(message)
+function require(value: unknown, message: string, errorElement: HTMLElement) {
+  if (value) {
+    errorElement.textContent = ''
+    return
   }
+
+  errorElement.textContent = message
+  throw new Error(message)
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -87,7 +88,7 @@ async function broadcast() {
   const { descriptors, electrum, network, psbt } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  require(psbt, 'PSBT')
+  require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
@@ -165,7 +166,7 @@ async function loadWallet() {
     })
     instrumentCopyButtons(tempuraBubble)
     DOM.outputs.conversation.appendChild(balanceInfoBubble)
-    await sleep(100)
+    await sleep(200)
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
     // we may have multiple buttons here, need to make sure they are all instrumented.
@@ -185,13 +186,28 @@ async function loadWallet() {
     const beginRecoveryButton = document.createElement('button')
     beginRecoveryButton.id = 'begin-recovery-btn'
     beginRecoveryButton.textContent = 'Start Recovery'
-    beginRecoveryButton.classList.add('btn', 'btn-outline', 'btn-sm')
+    beginRecoveryButton.classList.add('btn', 'btn-outline')
 
     recoveryMessageContainer.appendChild(recoveryMessage)
     recoveryMessageContainer.appendChild(beginRecoveryButton)
 
-    beginRecoveryButton?.addEventListener('click', () => {
+    beginRecoveryButton?.addEventListener('click', async () => {
+      const isChecked = DOM.radios.recoveryOptionsCollapse.checked
       DOM.radios.recoveryOptionsCollapse.checked = true
+
+      if (isChecked) {
+        return
+      }
+
+      // only show this message once
+      const addDestinationAddressMessage = createConversationBubble({
+        content:
+          'Recovering is simple. Add an address in the input on the right. We create a recovery transaction and send the funds to that address next.',
+        isUserSpeaking: false,
+      })
+
+      await sleep(400)
+      DOM.outputs.conversation.appendChild(addDestinationAddressMessage)
     })
 
     const beginRecoveryBubble = createConversationBubble({
@@ -199,6 +215,8 @@ async function loadWallet() {
       isUserSpeaking: false,
       dangerouslySetInnerHTML: true,
     })
+
+    await sleep(400)
     DOM.outputs.conversation.appendChild(beginRecoveryBubble)
 
     // ----
@@ -256,13 +274,15 @@ function copyPsbtToClipboard() {
 }
 
 async function estimateFee() {
-  showTempLoadingMessage('Estimating fee')
+  //showTempLoadingMessage('Estimating fee')
 
   try {
     const { electrum, network } = getUserInputs()
+    DOM.buttons.estimate.classList.add('is-loading')
     const feeRate = await commands.estimateFee(network, electrum, 1)
+    DOM.buttons.estimate.classList.remove('is-loading')
     DOM.inputs.feeRate.value = feeRate.toString()
-    showTempMessage('Fee retrieved')
+    // showTempMessage('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -295,7 +315,7 @@ const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden
 
 async function sign() {
   const { psbt, descriptors, network } = getUserInputs()
-  require(psbt, 'PSBT')
+  require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
   DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
@@ -330,13 +350,18 @@ async function sign() {
 
 async function sweep() {
   const inputs = getUserInputs()
+
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+
   if (!address) {
     DOM.inputs.address.classList.add('input-error')
+  } else {
+    DOM.inputs.address.classList.remove('input-error')
   }
-  require(address, 'Address')
+
+  require(address, 'A destination address is required', DOM.feedback.addressInputValidationMessage)
 
   const feeRate = await getFeeRate()
   if (feeRate.failed || feeRate.value === null) {
@@ -348,7 +373,7 @@ async function sweep() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble({
-      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
       isUserSpeaking: true,
       dangerouslySetInnerHTML: true,
     })
@@ -456,6 +481,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.buttons.sweep.addEventListener('click', (e) => {
     e.preventDefault()
+    console.log('kfdghjfskdf')
     sweep()
   })
 

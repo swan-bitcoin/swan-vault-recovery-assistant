@@ -173,6 +173,7 @@
               <div class="form-control mb-3">
                 <label class="label">Destination Address</label>
                 <input class="input input-bordered input-secondary" id="address-input" type="text" placeholder="bc1q..." />
+                <div id="address-input-validation-message" class="text-error mt-2"></div>
               </div>
 
               <!-- Fee rate -->
@@ -201,7 +202,14 @@
                       <input id="fee-rate-input" type="number" step="1" min="5" class="grow" placeholder="Custom Fee rate" />
                       <span class="badge badge-info">sats/vB</span>
                     </label>
-                    <button class="btn btn-accent" type="button" id="estimate-button">Suggest Fee</button>
+                    <button class="btn btn-accent group" type="button" id="estimate-button">
+                      <span class="items-center gap-2 hidden group-[.is-loading]:flex">
+                        <span class="loading loading-spinner"></span>
+                        Fetching Fee
+                      </span>
+
+                      <span class="flex items-center gap-2 group-[.is-loading]:hidden"> Suggest Fee </span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -261,6 +269,7 @@
                     id="psbt-textarea"
                     placeholder="cHNidP8BAFICAAAAAaGpWXJ..."
                   ></textarea>
+                  <div id="psbt-input-validation-message" class="text-error mt-2"></div>
                   <!-- PSBT controls -->
                   <div class="flex gap-2 justify-end mt-2 mb-6">
                     <button class="btn btn-outline btn-sm" type="button" id="copy-psbt-button">Copy PSBT</button>
