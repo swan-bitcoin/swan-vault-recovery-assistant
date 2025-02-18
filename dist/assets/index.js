@@ -769,9 +769,9 @@ async function loadWallet() {
       dangerouslySetInnerHTML: true,
     })
     instrumentCopyButtons(tempuraBubble)
-    DOM.outputs.conversation.appendChild(tempuraBubble)
     DOM.outputs.conversation.appendChild(intoBubble)
     await sleep(100)
+    DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton == null
       ? void 0
