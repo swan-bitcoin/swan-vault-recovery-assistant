@@ -3036,6 +3036,17 @@ details.collapse summary::-webkit-details-marker {
   border-radius: 9999px;
   padding: 0px;
 }
+.divider-horizontal {
+  flex-direction: column;
+}
+.divider-horizontal:before {
+  height: 100%;
+  width: 0.125rem;
+}
+.divider-horizontal:after {
+  height: 100%;
+  width: 0.125rem;
+}
 .indicator :where(.indicator-item) {
   bottom: auto;
   inset-inline-end: 0px;
@@ -3258,6 +3269,14 @@ details.collapse summary::-webkit-details-marker {
   height: 15%;
   top: 7%;
   right: 7%;
+}
+.divider-horizontal {
+  margin-left: 1rem;
+  margin-right: 1rem;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  height: auto;
+  width: 1rem;
 }
 .join.join-vertical > :where(*:not(:first-child)) {
   margin-left: 0px;
@@ -3510,6 +3529,17 @@ details.collapse summary::-webkit-details-marker {
   --tooltip-color: var(--fallback-wa, oklch(var(--wa) / 1));
   --tooltip-text-color: var(--fallback-wac, oklch(var(--wac) / 1));
 }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
 .collapse {
   visibility: collapse;
 }
@@ -3660,6 +3690,9 @@ details.collapse summary::-webkit-details-marker {
 }
 .resize {
   resize: both;
+}
+.flex-row {
+  flex-direction: row;
 }
 .flex-col {
   flex-direction: column;
@@ -4005,4 +4038,8 @@ details.collapse summary::-webkit-details-marker {
 
 .group.is-loading .group-\[\.is-loading\]\:hidden {
   display: none;
+}
+
+.\[\&\:not\(\:empty\)\]\:gap-1:not(:empty) {
+  gap: 0.25rem;
 }

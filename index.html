@@ -114,7 +114,10 @@
                       type="text"
                       placeholder="ssl://blockstream.info:993"
                     />
-                    <button id="electrum-server-modal-button" class="btn btn-link no-underline btn-xs px-1 py-0 font-normal">
+                    <button
+                      id="electrum-server-modal-button"
+                      class="btn btn-link no-underline btn-xs px-1 py-0 mt-2 font-normal"
+                    >
                       How to use a custom server?
                     </button>
                   </div>
@@ -192,24 +195,40 @@
                     How is the fee rate used?
                   </button>
                 </div>
-                <div id="fee-rate-input-container" class="hidden bg-base-200 p-4 pt-2 -mx-4 border-y">
-                  <div class="label">
-                    <label class="label-text" for="fee-rate-input">Fee Rate</label>
-                  </div>
+                <div id="fee-rate-input-container" class="hidden bg-base-200 px-4 -mx-4 border-y">
+                  <div class="flex flex-row gap-4">
+                    <div class="flex items-center py-4">
+                      <div class="label sr-only">
+                        <label class="label-text" for="fee-rate-input">Fee Rate</label>
+                      </div>
 
-                  <div class="flex items-center gap-2">
-                    <label class="input input-bordered input-accent flex items-center gap-2">
-                      <input id="fee-rate-input" type="number" step="1" min="5" class="grow" placeholder="Custom Fee rate" />
-                      <span class="badge badge-info">sats/vB</span>
-                    </label>
-                    <button class="btn btn-accent group" type="button" id="estimate-button">
-                      <span class="items-center gap-2 hidden group-[.is-loading]:flex">
-                        <span class="loading loading-spinner"></span>
-                        Fetching Fee
-                      </span>
+                      <div class="flex items-center">
+                        <label class="input input-bordered input-accent flex items-center gap-2">
+                          <input
+                            id="fee-rate-input"
+                            type="number"
+                            step="1"
+                            min="5"
+                            class="grow"
+                            placeholder="Custom Fee rate"
+                          />
+                          <span class="badge badge-info">sats/vB</span>
+                        </label>
+                      </div>
+                    </div>
 
-                      <span class="flex items-center gap-2 group-[.is-loading]:hidden"> Suggest Fee </span>
-                    </button>
+                    <div class="divider divider-horizontal border-border-color [&:not(:empty)]:gap-1">OR</div>
+
+                    <div class="flex items-center py-4">
+                      <button class="btn btn-accent group" type="button" id="estimate-button">
+                        <span class="items-center gap-2 hidden group-[.is-loading]:flex">
+                          <span class="loading loading-spinner"></span>
+                          Fetching Fee
+                        </span>
+
+                        <span class="flex items-center gap-2 group-[.is-loading]:hidden"> Suggest Fee </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
