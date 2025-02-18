@@ -273,8 +273,12 @@ const createConversationBubble = ({ content, footer, isUserSpeaking = false, dan
   bubble.classList.add('chat-bubble', 'animate-in', 'fade-in', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
   bubble.classList.add(isUserSpeaking ? 'slide-in-from-right-2' : 'slide-in-from-left-2')
   if (dangerouslySetInnerHTML) {
-    bubble.innerHTML = content
-  } else {
+    if (content instanceof HTMLElement) {
+      bubble.appendChild(content)
+    } else {
+      bubble.innerHTML = content
+    }
+  } else if (typeof content === 'string') {
     bubble.innerText = content
   }
   chatContainer.appendChild(avatar)
@@ -337,7 +341,7 @@ const WalletInfo = ({ balance, transactions, addressInfo }) => {
             aria-label="Balance"
             checked="checked"
           />
-          <div role="tabpanel" class="tab-content rounded-box mt-4">
+          <div role="tabpanel" class="tab-content rounded-box">
             ${Balance({ confirmed, unconfirmed })}
           </div>
 
@@ -390,21 +394,6 @@ const WalletInfo = ({ balance, transactions, addressInfo }) => {
         </div>
       </div>
     `
-}
-const RecoveryToast = () => {
-  return `
-    <div class="toast toast-end z-50">
-      <div class="alert alert-info relative">
-        <button id="close-toast-btn" class="btn btn-sm btn-circle btn-ghost absolute top-1 right-1">✕</button>
-        <div class="flex items-center">
-          <span>You can recover your wallet now.</span>
-          <button id="begin-recovery-btn" class="btn btn-link px-1">
-            Start Recovery
-          </button>
-        </div>
-      </div>
-    </div>
-  `
 }
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
@@ -647,18 +636,6 @@ async function validateAddress() {
   }
   return false
 }
-const closeToast = () => {
-  DOM.containers.toast.innerHTML = ''
-  DOM.containers.toast.classList.add('hidden')
-}
-const showToast = (content) => {
-  DOM.containers.toast.classList.remove('hidden')
-  DOM.containers.toast.innerHTML = content
-  const closeBtn = document.getElementById('close-toast-btn')
-  if (closeBtn) {
-    closeBtn.addEventListener('click', closeToast)
-  }
-}
 const FEE_RATE_WARNING_RATIO = 0.9
 async function getFeeRate() {
   const { feeRate, network, electrum } = getUserInputs()
@@ -756,7 +733,7 @@ async function loadWallet() {
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     hideTempMessage()
-    const intoBubble = createConversationBubble({
+    const balanceInfoBubble = createConversationBubble({
       content: 'I found the following information about your wallet',
     })
     const tempuraBubble = createConversationBubble({
@@ -769,7 +746,7 @@ async function loadWallet() {
       dangerouslySetInnerHTML: true,
     })
     instrumentCopyButtons(tempuraBubble)
-    DOM.outputs.conversation.appendChild(intoBubble)
+    DOM.outputs.conversation.appendChild(balanceInfoBubble)
     await sleep(100)
     DOM.outputs.conversation.appendChild(tempuraBubble)
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
@@ -778,14 +755,27 @@ async function loadWallet() {
       : showListButton.addEventListener('click', () => {
           DOM.modals.transactions.showModal()
         })
-    showToast(RecoveryToast())
-    const beginRecoveryButton = document.getElementById('begin-recovery-btn')
+    const recoveryMessageContainer = document.createElement('div')
+    recoveryMessageContainer.classList.add('flex', 'flex-col', 'gap-2', 'pb-2')
+    const recoveryMessage = document.createElement('span')
+    recoveryMessage.textContent = 'You can recover your wallet now.'
+    const beginRecoveryButton = document.createElement('button')
+    beginRecoveryButton.id = 'begin-recovery-btn'
+    beginRecoveryButton.textContent = 'Start Recovery'
+    beginRecoveryButton.classList.add('btn', 'btn-outline', 'btn-sm')
+    recoveryMessageContainer.appendChild(recoveryMessage)
+    recoveryMessageContainer.appendChild(beginRecoveryButton)
     beginRecoveryButton == null
       ? void 0
       : beginRecoveryButton.addEventListener('click', () => {
           DOM.radios.recoveryOptionsCollapse.checked = true
-          closeToast()
         })
+    const beginRecoveryBubble = createConversationBubble({
+      content: recoveryMessageContainer,
+      isUserSpeaking: false,
+      dangerouslySetInnerHTML: true,
+    })
+    DOM.outputs.conversation.appendChild(beginRecoveryBubble)
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e) {
     handleError(e)

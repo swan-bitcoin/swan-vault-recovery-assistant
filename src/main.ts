@@ -1,6 +1,6 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
-import { RecoveryToast, Success, Transactions, WalletInfo } from './components'
+import { Success, Transactions, WalletInfo } from './components'
 import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
 import {
   Device,
@@ -21,7 +21,6 @@ import {
   showTempMessage,
 } from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
-import { closeToast, showToast } from './toast'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
@@ -151,11 +150,10 @@ async function loadWallet() {
 
     hideTempMessage()
 
-    const intoBubble = createConversationBubble({
+    const balanceInfoBubble = createConversationBubble({
       content: 'I found the following information about your wallet',
     })
 
-    //DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
     const tempuraBubble = createConversationBubble({
       content: WalletInfo({
         balance,
@@ -166,22 +164,44 @@ async function loadWallet() {
       dangerouslySetInnerHTML: true,
     })
     instrumentCopyButtons(tempuraBubble)
-    DOM.outputs.conversation.appendChild(intoBubble)
+    DOM.outputs.conversation.appendChild(balanceInfoBubble)
     await sleep(100)
     DOM.outputs.conversation.appendChild(tempuraBubble)
 
+    // we may have multiple buttons here, need to make sure they are all instrumented.
+    // ideally we would switch to a non-id selector for this.
     const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
     showListButton?.addEventListener('click', () => {
       DOM.modals.transactions.showModal()
     })
 
-    // Show toast message from which to start recovery flow
-    showToast(RecoveryToast())
-    const beginRecoveryButton = document.getElementById('begin-recovery-btn')
+    // Show message from which to start recovery flow
+    const recoveryMessageContainer = document.createElement('div')
+    recoveryMessageContainer.classList.add('flex', 'flex-col', 'gap-2', 'pb-2')
+
+    const recoveryMessage = document.createElement('span')
+    recoveryMessage.textContent = 'You can recover your wallet now.'
+
+    const beginRecoveryButton = document.createElement('button')
+    beginRecoveryButton.id = 'begin-recovery-btn'
+    beginRecoveryButton.textContent = 'Start Recovery'
+    beginRecoveryButton.classList.add('btn', 'btn-outline', 'btn-sm')
+
+    recoveryMessageContainer.appendChild(recoveryMessage)
+    recoveryMessageContainer.appendChild(beginRecoveryButton)
+
     beginRecoveryButton?.addEventListener('click', () => {
       DOM.radios.recoveryOptionsCollapse.checked = true
-      closeToast()
     })
+
+    const beginRecoveryBubble = createConversationBubble({
+      content: recoveryMessageContainer,
+      isUserSpeaking: false,
+      dangerouslySetInnerHTML: true,
+    })
+    DOM.outputs.conversation.appendChild(beginRecoveryBubble)
+
+    // ----
 
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e: unknown) {

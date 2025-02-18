@@ -1,9 +1,19 @@
-type ConversationBubbleProps = {
+type SafeContent = {
   content: string
+  dangerouslySetInnerHTML?: false
+}
+
+type UnsafeContent = {
+  content: string | HTMLElement
+  dangerouslySetInnerHTML: true
+}
+
+type ConversationBubbleContent = SafeContent | UnsafeContent
+
+type ConversationBubbleProps = {
   footer?: string
   isUserSpeaking?: boolean
-  dangerouslySetInnerHTML?: boolean
-}
+} & ConversationBubbleContent
 
 const showConversation = () => {
   const conversationContainer = document.getElementById('conversation')
@@ -38,8 +48,12 @@ export const createConversationBubble = ({
   bubble.classList.add(isUserSpeaking ? 'slide-in-from-right-2' : 'slide-in-from-left-2')
 
   if (dangerouslySetInnerHTML) {
-    bubble.innerHTML = content
-  } else {
+    if (content instanceof HTMLElement) {
+      bubble.appendChild(content)
+    } else {
+      bubble.innerHTML = content
+    }
+  } else if (typeof content === 'string') {
     bubble.innerText = content
   }
 
