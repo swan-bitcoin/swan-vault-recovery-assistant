@@ -1,7 +1,7 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
 import { Success, Transactions, WalletInfo } from './components'
-import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
+import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM, initializeMode } from './dom'
 import {
   Device,
   getDevice,
@@ -412,6 +412,7 @@ async function sweep() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  initializeMode()
   initializeDOM()
 
   DOM.buttons.broadcast.addEventListener('click', (e) => {
@@ -427,6 +428,11 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.enumerate.addEventListener('click', (e) => {
     e.preventDefault()
     enumerate()
+  })
+
+  DOM.buttons.advancedMode.addEventListener('click', (e) => {
+    e.preventDefault()
+    document.documentElement.classList.toggle('advanced-mode')
   })
 
   DOM.buttons.estimate.addEventListener('click', (e) => {

@@ -12,6 +12,7 @@ type Buttons = {
   pastePsbt: HTMLButtonElement
   sign: HTMLButtonElement
   sweep: HTMLButtonElement
+  advancedMode: HTMLButtonElement
 }
 
 type Checkboxes = {
@@ -157,6 +158,14 @@ export function handleError(e: unknown) {
   showTempMessage('An unknown error occurred')
 }
 
+export function initializeMode() {
+  const isDev = import.meta.env.MODE === 'development'
+
+  if (isDev) {
+    document.documentElement.classList.add('dev-mode')
+  }
+}
+
 export function initializeDOM() {
   let tempMessage: HTMLDivElement | undefined = undefined
   try {
@@ -169,6 +178,7 @@ export function initializeDOM() {
     }
 
     const buttons = {
+      advancedMode: requireDomElement<HTMLButtonElement>('#advanced-mode-button'),
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
       clearMessages: requireDomElement<HTMLButtonElement>('#clear-messages-button'),
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),

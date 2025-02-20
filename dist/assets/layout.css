@@ -1187,13 +1187,6 @@ html {
   place-items: start;
   gap: 0.5rem;
 }
-.footer-center {
-  place-items: center;
-  text-align: center;
-}
-.footer-center > * {
-  place-items: center;
-}
 @media (min-width: 48rem) {
   .footer {
     grid-auto-flow: column;
@@ -3592,6 +3585,9 @@ details.collapse summary::-webkit-details-marker {
 .block {
   display: block;
 }
+.inline-block {
+  display: inline-block;
+}
 .inline {
   display: inline;
 }
@@ -3715,6 +3711,9 @@ details.collapse summary::-webkit-details-marker {
 .justify-center {
   justify-content: center;
 }
+.justify-between {
+  justify-content: space-between;
+}
 .gap-1 {
   gap: 0.25rem;
 }
@@ -3793,6 +3792,10 @@ details.collapse summary::-webkit-details-marker {
 .bg-neutral {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-n, oklch(var(--n) / var(--tw-bg-opacity)));
+}
+.bg-orange-500 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(249 115 22 / var(--tw-bg-opacity));
 }
 .fill-current {
   fill: currentColor;
@@ -4037,6 +4040,35 @@ details.collapse summary::-webkit-details-marker {
 }
 
 .group.is-loading .group-\[\.is-loading\]\:hidden {
+  display: none;
+}
+
+.dev\:block:where(.dev-mode .dev\:block) {
+  display: block;
+}
+
+.dev\:inline-block:where(.dev-mode .dev\:inline-block) {
+  display: inline-block;
+}
+
+.dev\:border-t:where(.dev-mode .dev\:border-t) {
+  border-top-width: 1px;
+}
+
+.dev\:border-orange-500:where(.dev-mode .dev\:border-orange-500) {
+  --tw-border-opacity: 1;
+  border-color: rgb(249 115 22 / var(--tw-border-opacity));
+}
+
+.advanced\:block:where(.advanced-mode .advanced\:block) {
+  display: block;
+}
+
+.advanced\:inline-block:where(.advanced-mode .advanced\:inline-block) {
+  display: inline-block;
+}
+
+.advanced\:hidden:where(.advanced-mode .advanced\:hidden) {
   display: none;
 }
 

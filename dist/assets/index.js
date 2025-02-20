@@ -971,6 +971,10 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     enumerate()
   })
+  DOM.buttons.advancedMode.addEventListener('click', (e) => {
+    e.preventDefault()
+    document.documentElement.classList.toggle('advanced-mode')
+  })
   DOM.buttons.estimate.addEventListener('click', (e) => {
     e.preventDefault()
     estimateFee()

@@ -106,6 +106,7 @@ function initializeDOM() {
       psbtInputValidationMessage: requireDomElement('#psbt-input-validation-message'),
     }
     const buttons = {
+      advancedMode: requireDomElement('#advanced-mode-button'),
       broadcast: requireDomElement('#broadcast-button'),
       clearMessages: requireDomElement('#clear-messages-button'),
       copyPsbt: requireDomElement('#copy-psbt-button'),

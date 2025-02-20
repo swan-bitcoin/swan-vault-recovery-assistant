@@ -2,7 +2,17 @@
 module.exports = {
   darkMode: ['class'], // unclear whether there will be light/dark-mode
   content: ['./src/**/*.ts', '*.html'],
-  plugins: [require('tailwindcss-animate'), require('daisyui')],
+  plugins: [
+    require('tailwindcss-animate'),
+    require('daisyui'),
+    // Add custom plugin for dev and advanced modes
+    function ({ addVariant }) {
+      // Add `dev:` variant
+      addVariant('dev', '&:where(.dev-mode &)')
+      // Add `advanced:` variant
+      addVariant('advanced', '&:where(.advanced-mode &)')
+    },
+  ],
   daisyui: {
     //themes: ['halloween', 'cupcake'],
     themes: [

@@ -68,7 +68,7 @@
               </div>
 
               <!-- Change descriptor -->
-              <div class="form-control">
+              <div class="form-control hidden advanced:block">
                 <div class="label">
                   <label class="flex items-center gap-2">
                     <input type="checkbox" id="auto-change-checkbox" checked="checked" class="checkbox checkbox-secondary" />
@@ -87,7 +87,7 @@
               </div>
 
               <!-- Custom Electrum server -->
-              <div class="form-control">
+              <div class="form-control hidden advanced:block">
                 <div class="label">
                   <label class="flex items-center gap-2">
                     <input
@@ -125,7 +125,8 @@
               </div>
 
               <!-- Network selection -->
-              <div class="form-control mb-5">
+              <div class="form-control mb-5 hidden dev:block dev:border-t dev:border-orange-500">
+                <div class="hidden dev:inline-block bg-orange-500 px-1">only in dev mode</div>
                 <div class="label">
                   <label class="flex items-center gap-2">
                     <input type="checkbox" id="network-checkbox" checked="checked" class="checkbox checkbox-secondary" />
@@ -312,7 +313,7 @@
     <div id="toast-container" class="hidden"></div>
 
     <!-- Footer -->
-    <footer id="footer" class="footer footer-center bg-neutral text-neutral-content p-3">
+    <footer id="footer" class="footer justify-between bg-neutral text-neutral-content p-3">
       <div class="flex gap-6">
         <!-- About -->
         <div class="flex gap-1">
@@ -378,6 +379,12 @@
           </svg>
           <button class="link link-hover" id="enumerate-button">Check Device</button>
         </div>
+      </div>
+      <div class="flex gap-2">
+        <button class="link link-hover" id="advanced-mode-button">
+          <span class="inline-block advanced:hidden">Need more control?</span>
+          <span class="hidden advanced:inline-block">Back to basics</span>
+        </button>
       </div>
     </footer>
 
