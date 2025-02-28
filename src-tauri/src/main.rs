@@ -225,7 +225,7 @@ fn get_blockchain(
     Some(electrum) => electrum,
     None => match network {
       Network::Testnet => "ssl://electrum.blockstream.info:60002".to_string(),
-      Network::Bitcoin => "ssl://blockstream.info:993".to_string(),
+      Network::Bitcoin => "ssl://electrum.blockstream.info:50002".to_string(),
       Network::Regtest => "localhost:50021".to_string(),
       _ => {
         return Err(TempuraError::new(
