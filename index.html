@@ -18,18 +18,14 @@
     <!-- Main content section -->
     <main id="main-content" class="flex flex-grow">
       <!-- Chat bubble on the left -->
-      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar border-r p-4">
+      <div class="flex-col w-5/12 overflow-y-auto no-scrollbar border-r p-4 pt-8">
         <div class="">
           <div class="">
-            <h2 class="">Chat</h2>
             <!-- Persistent conversation -->
             <div id="conversation"></div>
             <!-- Temporary feedback -->
             <div class="chat chat-start" id="temp-message-container">
-              <div class="chat-image avatar">
-                <span class="text-4xl">🍤</span>
-              </div>
-              <div class="chat-bubble chat-bubble-info animate-in border border-red-500" id="temporary-message">
+              <div class="chat-bubble chat-bubble-info animate-in" id="temporary-message">
                 Welcome! To load your wallet, enter the wallet configuration in the area provided.
               </div>
             </div>
@@ -49,7 +45,7 @@
           <!-- First Card: Wallet Set Up -->
           <div class="collapse collapse-arrow bg-base-100 border">
             <input id="wallet-configuration-collapse-radio" name="collapses" type="radio" checked="checked" />
-            <div class="collapse-title text-xl">1. Set Up Wallet</div>
+            <div class="collapse-title text-xl">1. Recover Wallet</div>
             <div class="collapse-content">
               <!-- Receive descriptor -->
               <div class="form-control mb-4">
@@ -125,8 +121,8 @@
               </div>
 
               <!-- Network selection -->
-              <div class="form-control mb-5 hidden dev:block dev:border-t dev:border-orange-500">
-                <div class="hidden dev:inline-block bg-orange-500 px-1">only in dev mode</div>
+              <div class="form-control mb-5 hidden dev:block dev:border dev:border-orange-500 dev:bg-orange-100">
+                <div class="hidden dev:block bg-orange-500 text-orange-950 px-1 text-sm">dev mode only</div>
                 <div class="label">
                   <label class="flex items-center gap-2">
                     <input type="checkbox" id="network-checkbox" checked="checked" class="checkbox checkbox-secondary" />
@@ -181,7 +177,7 @@
               </div>
 
               <!-- Fee rate -->
-              <div class="form-control mb-5">
+              <div class="form-control mb-5 hidden advanced:block">
                 <div class="label">
                   <label class="flex items-center gap-2">
                     <input

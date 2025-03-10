@@ -3773,10 +3773,6 @@ details.collapse summary::-webkit-details-marker {
 .border-r {
   border-right-width: 1px;
 }
-.border-red-500 {
-  --tw-border-opacity: 1;
-  border-color: rgb(239 68 68 / var(--tw-border-opacity));
-}
 .bg-base-100 {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity)));
@@ -3850,6 +3846,9 @@ details.collapse summary::-webkit-details-marker {
 .pt-2 {
   padding-top: 0.5rem;
 }
+.pt-8 {
+  padding-top: 2rem;
+}
 .text-center {
   text-align: center;
 }
@@ -3910,6 +3909,10 @@ details.collapse summary::-webkit-details-marker {
 .text-neutral-content {
   --tw-text-opacity: 1;
   color: var(--fallback-nc, oklch(var(--nc) / var(--tw-text-opacity)));
+}
+.text-orange-950 {
+  --tw-text-opacity: 1;
+  color: rgb(67 20 7 / var(--tw-text-opacity));
 }
 .text-success {
   --tw-text-opacity: 1;
@@ -4047,17 +4050,18 @@ details.collapse summary::-webkit-details-marker {
   display: block;
 }
 
-.dev\:inline-block:where(.dev-mode .dev\:inline-block) {
-  display: inline-block;
-}
-
-.dev\:border-t:where(.dev-mode .dev\:border-t) {
-  border-top-width: 1px;
+.dev\:border:where(.dev-mode .dev\:border) {
+  border-width: 1px;
 }
 
 .dev\:border-orange-500:where(.dev-mode .dev\:border-orange-500) {
   --tw-border-opacity: 1;
   border-color: rgb(249 115 22 / var(--tw-border-opacity));
+}
+
+.dev\:bg-orange-100:where(.dev-mode .dev\:bg-orange-100) {
+  --tw-bg-opacity: 1;
+  background-color: rgb(255 237 213 / var(--tw-bg-opacity));
 }
 
 .advanced\:block:where(.advanced-mode .advanced\:block) {
