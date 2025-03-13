@@ -192,20 +192,44 @@ pub struct Wallet {
  */
 
 /*
- * this function extracts a (presumably signed) psbt from an hwi response
+ * this function extracts a value from an hwi response json for a given key
  * we do this via 'dumb' string search so avoid bringing in a regex or json crate.
  */
-fn extract_psbt(response: &str) -> Option<String> {
-  let psbt_key = "\"psbt\": \"";
-  if let Some(start) = response.find(psbt_key) {
-    let value_start = start + psbt_key.len();
+fn extract_value(response: &str, key: &str) -> Option<String> {
+  let key_pattern = format!("\"{}\":", key);
 
-    if let Some(end) = response[value_start..].find('"') {
-      let psbt_value = &response[value_start..value_start + end];
-      return Some(psbt_value.to_string());
+  if let Some(start) = response.find(&key_pattern) {
+    let value_start = start + key_pattern.len();
+    let remaining = &response[value_start..].trim_start();
+
+    if remaining.starts_with('"') {
+      if let Some(end) = remaining[1..].find('"') {
+        let value = &remaining[1..end + 1];
+        return Some(value.to_string());
+      }
+    } else {
+      let end = remaining
+        .find(|c: char| c == ',' || c == '}' || c.is_whitespace())
+        .unwrap_or(remaining.len());
+      let value = &remaining[..end].trim();
+      if !value.is_empty()
+        && value
+          .chars()
+          .all(|c| c.is_digit(10) || c == '.' || c == '-')
+      {
+        return Some(value.to_string());
+      }
     }
   }
   None
+}
+
+fn extract_error_code(response: &str) -> Option<i32> {
+  extract_value(response, "code")?.parse::<i32>().ok()
+}
+
+fn extract_psbt(response: &str) -> Option<String> {
+  extract_value(response, "psbt")
 }
 
 fn extract_txid(psbt: &str) -> Result<String, TempuraError> {
@@ -726,10 +750,8 @@ async fn sign(psbt: String, network: String, device_type: String) -> Result<Stri
 
   // check for a malicious or unexpected edit to the transaction
   let psbt = extract_psbt(&response).ok_or_else(|| {
-    TempuraError::new(
-      TempuraErrorType::HwiError,
-      "Failed to extract PSBT from HWI response",
-    )
+    let code = extract_error_code(&response);
+    TempuraError::from_hwi_error_code(code)
   })?;
   let signed_txid = extract_txid(&psbt)?;
   if txid.ne(&signed_txid) {

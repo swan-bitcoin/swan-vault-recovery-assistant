@@ -19,17 +19,6 @@ impl std::fmt::Display for Network {
   }
 }
 
-impl Network {
-  pub fn to_string(&self) -> String {
-    match self {
-      Network::Bitcoin => "bitcoin".to_string(),
-      Network::Testnet => "testnet".to_string(),
-      Network::Signet => "signet".to_string(),
-      Network::Regtest => "regtest".to_string(),
-    }
-  }
-}
-
 impl std::str::FromStr for Network {
   type Err = TempuraError;
 
