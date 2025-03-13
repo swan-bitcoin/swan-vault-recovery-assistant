@@ -91,7 +91,7 @@ untrusted_pending: string;
  */
 confirmed: string }
 export type Descriptors = { receive: string; change: string | null; auto_change: boolean }
-export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null; outbound: string }
+export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null; outbound: string; sent_to_self: boolean }
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"
 export type TempuraError = { error_type: string; message: string }
 export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }

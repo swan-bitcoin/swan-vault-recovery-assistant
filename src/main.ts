@@ -378,7 +378,8 @@ async function sweep() {
       dangerouslySetInnerHTML: true,
     })
     DOM.outputs.conversation.appendChild(userBubble)
-    const { psbt, outbound, fee } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+    const psbtDetails = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+    const { psbt, outbound, fee } = psbtDetails
     clearStatusIndicators(DOM.outputs.psbtTextArea)
     // Show transaction overview and populate transaction overview table
     DOM.outputs.transactionOverview.classList.remove('hidden')
@@ -487,7 +488,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.buttons.sweep.addEventListener('click', (e) => {
     e.preventDefault()
-    console.log('kfdghjfskdf')
     sweep()
   })
 

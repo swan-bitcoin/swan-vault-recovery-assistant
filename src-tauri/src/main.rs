@@ -26,6 +26,7 @@ use tauri::Manager;
 use bdk_electrum::electrum_client::Client;
 use bdk_electrum::BdkElectrumClient;
 use bdk_wallet;
+use bdk_wallet::bitcoin::address::Address;
 use bdk_wallet::bitcoin::secp256k1::Secp256k1;
 use bdk_wallet::bitcoin::Amount;
 use bdk_wallet::bitcoin::Psbt;
@@ -39,7 +40,7 @@ const DEFAULT_BATCH_SIZE: usize = 100;
  * types
  */
 
-#[derive(Default, Serialize, Deserialize, Type)]
+#[derive(Default, Serialize, Deserialize, Type, Clone)]
 pub struct AddressInfo {
   pub index: u32,
   pub address: String,
@@ -80,7 +81,7 @@ impl From<bdk_wallet::Balance> for Balance {
   }
 }
 
-#[derive(Default, Serialize, Deserialize, Type)]
+#[derive(Default, Serialize, Deserialize, Type, Clone)]
 struct Descriptors {
   pub receive: String,
   pub change: Option<String>,
@@ -106,10 +107,11 @@ pub struct PsbtDetails {
   pub sent: String,
   pub fee: Option<String>,
   pub outbound: String,
+  pub sent_to_self: bool,
 }
 
 impl PsbtDetails {
-  pub fn new(psbt: Psbt, wallet: &bdk_wallet::Wallet) -> Self {
+  pub fn new(psbt: Psbt, wallet: &bdk_wallet::Wallet, sent_to_self: bool) -> Self {
     let tx = psbt.clone().extract_tx().unwrap();
     let fee = psbt.fee_amount().unwrap_or(Amount::ZERO);
     let (sent, received) = wallet.sent_and_received(&tx);
@@ -122,6 +124,7 @@ impl PsbtDetails {
       sent: sent.to_sat().to_string(),
       fee: Some(fee.to_sat().to_string()),
       outbound: outbound.to_sat().to_string(),
+      sent_to_self,
     }
   }
 }
@@ -350,6 +353,21 @@ fn get_wallet(
   .create_wallet_no_persist();
 
   Ok(resolve!(wallet_result, TempuraErrorType::WalletError))
+}
+
+fn is_address_mine_internal(address: &Address, wallet: &mut bdk_wallet::Wallet) -> bool {
+  let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::External,
+    receive_index + (DEFAULT_STOP_GAP as u32),
+  );
+  let change_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::Internal);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::Internal,
+    change_index + (DEFAULT_STOP_GAP as u32),
+  );
+
+  wallet.is_mine(address.script_pubkey())
 }
 
 fn is_multipath_descriptor(descriptor: &str) -> bool {
@@ -610,18 +628,7 @@ async fn is_address_mine(
     )
   })?;
 
-  let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
-  let _ = wallet.reveal_addresses_to(
-    bdk_wallet::KeychainKind::External,
-    receive_index + (DEFAULT_STOP_GAP as u32),
-  );
-  let change_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::Internal);
-  let _ = wallet.reveal_addresses_to(
-    bdk_wallet::KeychainKind::Internal,
-    change_index + (DEFAULT_STOP_GAP as u32),
-  );
-
-  Ok(wallet.is_mine(addr.script_pubkey()))
+  Ok(is_address_mine_internal(&addr, &mut wallet))
 }
 
 #[tauri::command]
@@ -765,7 +772,6 @@ async fn sweep(
   tokio::task::block_in_place(|| {
     sync_wallet(&mut wallet, &blockchain)?;
 
-    let mut builder = wallet.build_tx();
     let addr = resolve!(
       bdk_wallet::bitcoin::Address::from_str(&address),
       TempuraErrorType::AddressError
@@ -780,13 +786,15 @@ async fn sweep(
         ),
       )
     })?;
+    let is_address_mine = is_address_mine_internal(&addr, &mut wallet);
 
+    let mut builder = wallet.build_tx();
     builder.drain_wallet();
     builder.drain_to(addr.script_pubkey());
     builder.fee_rate(fee_rate);
 
     let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
-    Ok(PsbtDetails::new(psbt, &wallet))
+    Ok(PsbtDetails::new(psbt, &wallet, is_address_mine))
   })
 }
 
