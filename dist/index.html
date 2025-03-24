@@ -169,6 +169,7 @@
             <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
             <div class="collapse-title text-xl">2. Recover Wallet</div>
             <div class="collapse-content">
+              <div class="text-orange-500 dev:block hidden">todo: description here</div>
               <!-- Destination address -->
               <div class="form-control mb-3">
                 <label class="label">Destination Address</label>
@@ -223,7 +224,7 @@
                           Fetching Fee
                         </span>
 
-                        <span class="flex items-center gap-2 group-[.is-loading]:hidden"> Suggest Fee </span>
+                        <span class="flex items-center gap-2 group-[.is-loading]:hidden">Suggest Fee</span>
                       </button>
                     </div>
                   </div>
@@ -232,7 +233,10 @@
 
               <!-- Sweep button -->
               <div class="card-actions justify-end mb-2">
-                <button class="btn btn-primary" type="button" id="sweep-button">Create Recovery Transaction</button>
+                <button class="btn btn-primary group" type="button" id="sweep-button">
+                  <span class="group-[.is-mine]:hidden"> Create Recovery Transaction </span>
+                  <span class="group-[.is-mine]:inline hidden"> Create transaction to myself </span>
+                </button>
               </div>
             </div>
           </div>
@@ -242,43 +246,48 @@
             <input id="send-transaction-collapse-radio" name="collapses" type="radio" />
             <div class="collapse-title text-xl">3. Send Transaction</div>
             <div class="collapse-content">
+              <div class="text-orange-500 dev:block hidden">todo: the amount here is 0 if you send to yourself. discuss</div>
+
               <!-- Transaction -->
               <div class="form-control mb-3 hidden" id="transaction-overview-container">
                 <!-- Transaction overview -->
                 <div class="overflow-x-auto">
-                  <table class="table table-fixed table-md mb-2">
-                    <thead>
-                      <tr>
-                        <th>To</th>
-                        <th>Amount</th>
-                        <th>Fee</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody id="transaction-overview-body">
-                      <tr>
-                        <td class="truncate"></td>
-                        <td></td>
-                        <td></td>
-                        <td>
-                          <div id="psbt-status" class="truncate"></div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div class="flex flex-col">
+                    <div>
+                      You&rsquo;re sending <span id="transaction-overview-amount"></span> to <br />
+                      <span id="transaction-overview-address"></span>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div class="grid grid-cols-[max-content_1fr] auto-cols-max gap-2">
+                      <span>Network Fee</span>
+                      <span id="transaction-overview-fee"></span>
+                      <span>Status</span>
+                      <span id="psbt-status"></span>
+                    </div>
+                  </div>
                 </div>
-                <div class="flex items-center justify-center">
-                  <ul id="psbt-sign-history" class="steps steps-vertical"></ul>
-                </div>
+
+                <ul id="psbt-sign-history" class="grid auto-cols-fr grid-flow-col gap-2 mt-4">
+                  <li
+                    class="border border-100 rounded-md p-2 bg-base-200 flex items-center justify-center group"
+                    id="missing-signature"
+                  >
+                    <span class="group-first:hidden opacity-70">Pending signature</span>
+                    <span class="group-first:block hidden opacity-70">No signatures yet</span>
+                  </li>
+                </ul>
               </div>
+
               <!-- PSBT details -->
-              <div class="form-control mb-3" id="psbt-details-container">
+              <div class="form-control mb-3 hidden advanced:block" id="psbt-details-container">
                 <label class="label justify-normal gap-2 mt-2" for="psbt-details-toggle">
                   <input id="psbt-details-toggle" type="checkbox" class="toggle" />
                   <span class="">Show PSBT Details</span>
                 </label>
                 <!-- Toggle content-->
-                <div class="psbt-details-toggle-content">
+                <div class="psbt-details-toggle-content bg-base-200 p-4 pt-2 -mx-4 border-y">
                   <!-- PSBT textarea -->
                   <textarea
                     class="textarea textarea-bordered h-40 w-full leading-normal"
@@ -295,9 +304,15 @@
               </div>
 
               <!-- Device & Broadcast controls -->
-              <div class="card-actions mb-6 justify-center">
-                <button class="btn btn-warning" type="button" id="sign-button">Sign</button>
-                <button class="btn btn-secondary btn-disabled" type="button" id="broadcast-button">Broadcast</button>
+              <div class="card-actions mb-6 justify-end">
+                <button class="btn btn-primary" type="button" id="sign-button">Sign Transaction</button>
+                <button
+                  class="btn btn-secondary advanced:inline-block hidden btn-disabled"
+                  type="button"
+                  id="broadcast-button"
+                >
+                  Broadcast Now
+                </button>
               </div>
             </div>
           </div>
@@ -313,7 +328,6 @@
       <div class="flex gap-6">
         <!-- About -->
         <div class="flex gap-1">
-          🍤
           <a id="about-link" class="link link-hover" href="#">About</a>
         </div>
         <!-- GitHub -->

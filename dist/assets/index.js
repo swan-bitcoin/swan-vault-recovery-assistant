@@ -1,12 +1,13 @@
 import {
   S as Sats,
+  D as DOM,
+  s as scrollToLastMessage,
   g as getUserInputs,
   c as clearStatusIndicators,
-  D as DOM,
   h as handleError,
   i as initializeDOM,
-  s as showTempLoadingMessage,
-  a as hideTempMessage,
+  a as showTempLoadingMessage,
+  b as hideTempMessage,
 } from './layout.js'
 typeof SuppressedError === 'function'
   ? SuppressedError
@@ -198,9 +199,7 @@ const Transactions = (transactions) => {
   })
   return sortedTransactions.map(TxRow).join('\n')
 }
-const Success = (text) => `
-<div class="flex gap-1 items-center">
-  <svg
+const CircularTickIcon = `<svg
     xmlns="http://www.w3.org/2000/svg"
     class="h-6 w-6 shrink-0 stroke-current"
     fill="none"
@@ -210,24 +209,13 @@ const Success = (text) => `
       stroke-linejoin="round"
       stroke-width="2"
       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
+  </svg>`
+const Success = (text) => `
+<div class="flex gap-1 items-center">
+  ${CircularTickIcon}
   <span>${text}</span>
 </div>
 `
-const Balance = ({ confirmed, unconfirmed }) => {
-  return `
-    <div class="flex flex-col gap-4 py-4">
-      <div class="stat p-0">
-        <div class="stat-value font-normal">${Sats(confirmed)}</div>
-        <div class="stat-desc">Confirmed</div>
-      </div>
-      <div class="stat p-0">
-        <div class="stat-value font-normal">${Sats(unconfirmed)}</div>
-        <div class="stat-desc">Unconfirmed</div>
-      </div>
-    </div>
-  `
-}
 const Address = ({ address }) => {
   return `
     <div class="flex items-center space-x-2 relative">
@@ -236,20 +224,10 @@ const Address = ({ address }) => {
     </div>
   `
 }
-const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1)
-const countTransactions = (transactions) => {
-  let unconfirmedCount = 0
-  let confirmedCount = 0
-  for (const transaction of transactions) {
-    if (transaction.confirmation_height === null) {
-      unconfirmedCount++
-    } else {
-      confirmedCount++
-    }
-  }
-  return {
-    unconfirmedCount,
-    confirmedCount,
+function addToConversation(bubble, { shouldScrollToLastMessage = true } = {}) {
+  DOM.outputs.conversation.appendChild(bubble)
+  if (shouldScrollToLastMessage) {
+    scrollToLastMessage()
   }
 }
 const showConversation = () => {
@@ -267,9 +245,6 @@ const showClearMessagesButton = () => {
 const createConversationBubble = ({ content, footer, isUserSpeaking = false, dangerouslySetInnerHTML = false }) => {
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', 'animate-in', isUserSpeaking ? 'chat-end' : 'chat-start')
-  const avatar = document.createElement('div')
-  avatar.classList.add('chat-image', 'avatar')
-  avatar.innerHTML = `<span class="text-4xl">${isUserSpeaking ? '👨‍💻' : '🍤'}</span>`
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', 'animate-in', 'fade-in', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
   bubble.classList.add(isUserSpeaking ? 'slide-in-from-right-2' : 'slide-in-from-left-2')
@@ -282,11 +257,10 @@ const createConversationBubble = ({ content, footer, isUserSpeaking = false, dan
   } else if (typeof content === 'string') {
     bubble.innerText = content
   }
-  chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
   if (footer) {
     const footerContainer = document.createElement('div')
-    footerContainer.classList.add('chat-footer', 'opacity-50')
+    footerContainer.classList.add('chat-footer', 'pt-1', 'opacity-70')
     footerContainer.innerText = footer
     chatContainer.appendChild(footerContainer)
   }
@@ -294,107 +268,108 @@ const createConversationBubble = ({ content, footer, isUserSpeaking = false, dan
   showClearMessagesButton()
   return chatContainer
 }
-const getFirstTransaction = (transactions) => {
-  const confirmedTransactions = transactions.filter((tx) => tx.confirmation_height !== null)
-  if (confirmedTransactions.length === 0) {
-    return null
+const getTransactionsButtonBubble = () => ({
+  content: `<button id="show-transactions-btn" class="btn btn-outline btn-sm">View Transactions</button>`,
+  dangerouslySetInnerHTML: true,
+  footer: /* @__PURE__ */ new Date().toLocaleString(),
+  type: 'actions',
+})
+function getUnfundedWalletMessages({ receiveAddress }) {
+  return [
+    {
+      content: 'The wallet seems to be unused. Are you sure you have the right wallet configuration?',
+      type: 'bubble',
+    },
+    {
+      content: 'If you want to deposit funds, you can do so by sending Bitcoin to the following wallet address.',
+      type: 'bubble',
+    },
+    {
+      dangerouslySetInnerHTML: true,
+      content: Address({ address: receiveAddress }),
+      type: 'bubble',
+    },
+  ]
+}
+function getUsedButEmptyWalletMessages({ transactions }) {
+  return [
+    {
+      content: `The wallet is currently empty but has ${transactions.length} transactions.`,
+      type: 'bubble',
+    },
+    getTransactionsButtonBubble(),
+  ]
+}
+function getWalletInfoBubbles({ balance, transactions, addressInfo }) {
+  const confirmed = Number(balance.confirmed)
+  const unconfirmed = Number(balance.untrusted_pending) + Number(balance.trusted_pending)
+  const hasBalance = confirmed > 0 || unconfirmed > 0
+  const hasUnconfirmedBalance = unconfirmed > 0
+  const hasTransactions = transactions.length > 0
+  if (!hasBalance && !hasTransactions) {
+    return {
+      messages: getUnfundedWalletMessages({ receiveAddress: addressInfo.address }),
+      isRecoverable: false,
+    }
   }
-  return confirmedTransactions.reduce((firstTx, currentTx) => {
-    return currentTx.confirmation_height < firstTx.confirmation_height ? currentTx : firstTx
-  })
+  if (!hasBalance && hasTransactions) {
+    return {
+      messages: getUsedButEmptyWalletMessages({ transactions }),
+      isRecoverable: false,
+    }
+  }
+  const balanceMessage = hasUnconfirmedBalance
+    ? `Your wallet has a balance of ${Sats(confirmed)}. <br/>${Sats(unconfirmed)} is still unconfirmed.`
+    : `Your wallet has a confirmed balance of <br/>${Sats(confirmed)}.`
+  return {
+    messages: [
+      {
+        content: 'I was able to find the following information about your wallet.',
+        type: 'bubble',
+      },
+      {
+        content: balanceMessage,
+        dangerouslySetInnerHTML: true,
+        type: 'bubble',
+      },
+      {
+        content: `Your wallet was involved in ${transactions.length} transactions.`,
+        type: 'bubble',
+      },
+      {
+        content: 'You can start recovering your wallet now, or view the transactions the wallet was involved in.',
+        type: 'bubble',
+      },
+      {
+        content: [
+          `<button id="begin-recovery-btn" class="btn btn-primary btn-sm">Start Recovery</button>`,
+          getTransactionsButtonBubble().content,
+        ].join(''),
+        dangerouslySetInnerHTML: true,
+        footer: /* @__PURE__ */ new Date().toLocaleString(),
+        type: 'actions',
+      },
+    ],
+    isRecoverable: true,
+  }
 }
 const isChangeDescriptor = (descriptor) => {
   const changePattern = /\/1\/\*\)+(?:#\w+)?$/
   return changePattern.test(descriptor)
 }
 const populateTransactionOverview = ({ address, outbound, fee }) => {
-  const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
-  transactionRowTds[0].textContent = address
-  transactionRowTds[1].innerHTML = Sats(outbound)
-  transactionRowTds[2].innerHTML = Sats(fee || '')
-}
-const scrollToLastMessage = () => {
-  const conversationContainer = document.getElementById('conversation')
-  if (conversationContainer && conversationContainer.lastElementChild) {
-    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  const overviewAmount = document.getElementById('transaction-overview-amount')
+  if (overviewAmount) {
+    overviewAmount.innerHTML = Sats(outbound)
   }
-}
-const generateRandomString = (length = 8) => {
-  return Math.random()
-    .toString(36)
-    .substring(2, 2 + length)
-}
-const WalletInfo = ({ balance, transactions, addressInfo }) => {
-  const { unconfirmedCount, confirmedCount } = countTransactions(transactions)
-  const firstTransaction = getFirstTransaction(transactions)
-  const tabId = generateRandomString()
-  const confirmed = balance.confirmed
-  const unconfirmed = String(Number(balance.untrusted_pending) + Number(balance.trusted_pending))
-  return `
-      <div class="wallet-info">
-        <div role="tablist" class="tabs tabs-bordered">  
-          <!-- Balance Tab -->
-          <input
-            type="radio"
-            name="wallet_info_tabs_${tabId}"
-            role="tab"
-            class="tab"
-            aria-label="Balance"
-            checked="checked"
-          />
-          <div role="tabpanel" class="tab-content rounded-box">
-            ${Balance({ confirmed, unconfirmed })}
-          </div>
-
-          <!-- Transactions Tab -->
-          <input
-            type="radio"
-            name="wallet_info_tabs_${tabId}"
-            role="tab"
-            class="tab"
-            aria-label="Transactions"
-          />
-          <div role="tabpanel" class="tab-content rounded-box mt-4">
-            <div class="flex flex-col gap-4 items-center">
-              <div class="flex flex-wrap gap-2">
-                <span class="badge badge-neutral">Total ${transactions.length}</span>
-                <span class="badge badge-warning">Unconfirmed ${unconfirmedCount}</span>
-                <span class="badge badge-success">Confirmed ${confirmedCount}</span>
-              </div>
-              ${
-                (firstTransaction == null ? void 0 : firstTransaction.confirmation_height)
-                  ? `<div class="flex gap-1">
-                  <span>First Transaction in Block:</span>
-                  <span>${firstTransaction.confirmation_height}</span>
-                </div>`
-                  : '<span>No transactions yet</span>'
-              }
-              <button class="btn btn-outline btn-ghost btn-sm mt-4 mb-2" id="show-transactions-btn">
-                Show Full List
-              </button>
-            </div>
-          </div>
-
-          <!-- Receive Tab -->
-          <input
-            type="radio"
-            name="wallet_info_tabs_${tabId}"
-            role="tab"
-            class="tab"
-            aria-label="Receive"
-          />
-          <div role="tabpanel" class="tab-content rounded-box mt-6 mb-4">
-            <div class="indicator w-60">
-              <span class="indicator-item badge badge-primary">Next Unused</span>
-              <span class="indicator-item indicator-bottom badge badge-neutral">#${addressInfo.index}</span>
-              <div class="bg-base-100 flex justify-center rounded-box px-4 py-2">
-                ${Address({ address: addressInfo.address })}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `
+  const overviewFee = document.getElementById('transaction-overview-fee')
+  if (overviewFee) {
+    overviewFee.innerHTML = Sats(fee || '')
+  }
+  const overviewAddress = document.getElementById('transaction-overview-address')
+  if (overviewAddress) {
+    overviewAddress.innerHTML = address
+  }
 }
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
@@ -448,11 +423,11 @@ function getPsbtStatusMessage(status) {
   let message
   switch (status) {
     case 'Unsigned':
-      message = 'The PSBT is unsigned.'
+      message = 'The transaction still is unsigned.'
       break
     case 'PartiallySigned':
       message =
-        'The transaction is partially signed. You need to add the signature from another key before you can broadcast it.'
+        'The transaction is now partially signed. You need to add the signature from another key before you can broadcast it.'
       break
     case 'FullySigned':
       message = 'The transaction is fully signed 🎉. You can broadcast it now.'
@@ -466,7 +441,7 @@ function getPsbtStatusMessage(status) {
 function getSignResultAndPsbt(val) {
   const signResponse = parseSignResponse(val)
   const message = signResponse.signed
-    ? Success('Signature added')
+    ? Success('Great! Added a signature to the transaction.')
     : 'A signature was not added, have you already signed with this device?'
   return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }
@@ -570,6 +545,7 @@ const validateDescriptor = async () => {
   }
 }
 async function validatePsbt() {
+  var _a, _b, _c
   const { psbt, network, descriptors } = getUserInputs()
   clearStatusIndicators(DOM.outputs.psbtTextArea)
   try {
@@ -587,15 +563,19 @@ async function validatePsbt() {
       DOM.outputs.psbtStatus.innerHTML = `
         <span class="text-success">Fully Signed ${simpleCheckmark}</span>
       `
-      DOM.buttons.broadcast.classList.remove('btn-disabled')
+      DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
+      DOM.buttons.sign.classList.add('btn-disabled', 'hidden')
+      ;(_a = document.getElementById('missing-signature')) == null ? void 0 : _a.classList.add('hidden')
     } else if (psbtStatus === 'PartiallySigned') {
       DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-warning">Partially Signed</span>
+        <span class="opacity-70">Partially Signed</span>
       `
+      ;(_b = document.getElementById('missing-signature')) == null ? void 0 : _b.classList.remove('hidden')
     } else if (psbtStatus === 'Unsigned') {
       DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-neutral-500">Unsigned</span>
+        <span class="opacity-70">Unsigned</span>
       `
+      ;(_c = document.getElementById('missing-signature')) == null ? void 0 : _c.classList.remove('hidden')
     }
   } catch (e) {
     handleError(e)
@@ -604,6 +584,7 @@ async function validatePsbt() {
 async function validateAddress() {
   const { address, descriptors, network } = getUserInputs()
   clearStatusIndicators(DOM.inputs.address)
+  DOM.buttons.sweep.classList.remove('is-mine')
   if (!address) {
     DOM.inputs.address.classList.remove('input-error', 'input-warning', 'input-success')
     DOM.feedback.addressInputValidationMessage.textContent = ''
@@ -633,6 +614,7 @@ async function validateAddress() {
       DOM.feedback.addressInputValidationMessage.textContent =
         'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
       DOM.inputs.address.classList.add('input-warning')
+      DOM.buttons.sweep.classList.add('is-mine')
       return false
     }
     DOM.inputs.address.classList.add('input-success')
@@ -645,6 +627,176 @@ async function validateAddress() {
     handleError(e)
   }
   return false
+}
+function createActionContainer() {
+  const chatContainer = document.createElement('div')
+  chatContainer.classList.add('chat', 'animate-in', 'fade-in', 'slide-in-from-bottom-2', 'px-[0.75rem]', 'grid-cols-1')
+  const actions = document.createElement('div')
+  actions.classList.add('px-4', 'py-4', 'border', 'bg-base-200', 'border-gray-300', 'rounded-lg', 'flex', 'gap-4')
+  return { chatContainer, actions }
+}
+function createConversationActions({ content, footer, dangerouslySetInnerHTML = false, onAppended }) {
+  try {
+    const { chatContainer, actions } = createActionContainer()
+    if (dangerouslySetInnerHTML) {
+      if (content instanceof HTMLElement) {
+        actions.appendChild(content)
+      } else {
+        actions.innerHTML = content
+      }
+      onAppended == null ? void 0 : onAppended(actions)
+    } else if (typeof content === 'string') {
+      actions.innerText = content
+    }
+    chatContainer.appendChild(actions)
+    if (footer) {
+      const footerContainer = document.createElement('div')
+      footerContainer.classList.add('chat-footer', 'pt-1', 'opacity-70')
+      footerContainer.innerText = footer
+      chatContainer.appendChild(footerContainer)
+    }
+    return chatContainer
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+function getTransactionCreatedBubbles({ address, sent, outbound, hasUserFeeRate, feeRate }) {
+  if (!hasUserFeeRate) {
+    const amount = outbound || sent
+    return {
+      messages: [
+        ...(amount
+          ? [
+              {
+                content: `Created a transaction to send <span class="font-bold">${Sats(amount)}</span> to <br/><span class="break-all font-bold">${sanitize(address)}</span>.`,
+                type: 'bubble',
+                dangerouslySetInnerHTML: true,
+              },
+            ]
+          : []),
+        ...(feeRate
+          ? [
+              {
+                content: `Applied a network fee of <span class="font-bold">${Sats(feeRate)}</span> to get that transaction confirmed swiftly.`,
+                type: 'bubble',
+                dangerouslySetInnerHTML: true,
+              },
+            ]
+          : []),
+        {
+          type: 'bubble',
+          content: 'Verify the transaction details on the right carefully before proceeding with signing.',
+        },
+      ],
+    }
+  }
+  return {
+    messages: [
+      {
+        content: 'Transaction (PSBT) created!',
+        type: 'bubble',
+      },
+    ],
+  }
+}
+function getDeviceName(device) {
+  switch (device.type) {
+    case 'jade': {
+      return 'Jade'
+    }
+    default: {
+      return device.type
+    }
+  }
+}
+function getJadeDevice({ fingerprint }) {
+  return `<svg viewBox="0 0 309 138" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto">
+<g filter="url(#filter0_d_23_53)">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M78.6022 1.58451C78.6022 0.865902 79.1848 0.283356 79.9034 0.283356L90.5195 0.283356C91.2381 0.283356 91.8206 0.865902 91.8206 1.58451V4.2959C91.9736 5.67144 94.0036 5.92154 94.4211 4.49356C94.8833 2.91285 97.2393 3.41363 97.0186 5.04566C96.8092 6.59402 98.9771 7.17492 99.57 5.72931C100.195 4.20558 102.486 4.94988 102.095 6.5499C101.725 8.06788 103.821 8.87221 104.561 7.49649C105.342 6.04642 107.543 7.02609 106.987 8.57658C106.935 8.72282 106.908 8.8646 106.902 9.00008C140.078 9.00008 173.254 9.00006 206.431 9.00004L294 9.00001C300.075 9.00001 305 13.9227 305 19.9978V119.002C305 125.077 300.08 130 294.005 130L14.9954 130C8.9203 130 4 125.077 4 119.002L4 19.9978C4 13.9227 8.92488 9.00001 15 9.00002C31.17 9.00004 47.3399 9.00006 63.5099 9.00006C63.5039 8.86459 63.4765 8.72282 63.4241 8.57658C62.8689 7.0261 65.0693 6.04643 65.85 7.4965C66.5907 8.87221 68.6861 8.06789 68.316 6.5499C67.9259 4.94988 70.2166 4.20558 70.8415 5.72931C71.4343 7.17492 73.6023 6.59401 73.3929 5.04566C73.1722 3.41363 75.5282 2.91284 75.9904 4.49355C76.4289 5.9932 78.6457 5.6421 78.5993 4.08034C78.5976 4.02609 78.5987 3.97335 78.6022 3.92214V1.58451Z" fill="#1D1D1D"/>
+<g filter="url(#filter1_i_23_53)">
+<path d="M21.4911 30.852C21.4911 27.9775 23.8213 25.6474 26.6957 25.6474L143.719 25.6474C146.594 25.6474 148.924 27.9776 148.924 30.852V109.262C148.924 112.136 146.594 114.466 143.719 114.466L26.6957 114.466C23.8213 114.466 21.4911 112.136 21.4911 109.262L21.4911 30.852Z" fill="#444444"/>
+</g>
+<path d="M4 9H305V130H4V9Z" fill="url(#paint0_linear_23_53)"/>
+<g filter="url(#filter2_d_23_53)">
+<path d="M179.758 45.8508C179.758 42.9764 182.088 40.6462 184.962 40.6462L218.148 40.6462C221.022 40.6462 223.352 42.9764 223.352 45.8509V94.1831C223.352 97.0575 221.022 99.3877 218.148 99.3877H184.962C182.088 99.3877 179.758 97.0575 179.758 94.1831L179.758 45.8508Z" fill="#2D2D2D" fill-opacity="0.8" shape-rendering="crispEdges"/>
+</g>
+<g filter="url(#filter3_d_23_53)">
+<path fill-rule="evenodd" clip-rule="evenodd" d="M217.92 41.9876L184.734 41.9876C182.579 41.9876 180.831 43.7353 180.831 45.8911V94.2234C180.831 96.3792 182.579 98.1268 184.734 98.1268H217.92C220.076 98.1268 221.823 96.3792 221.823 94.2234V45.8911C221.823 43.7353 220.076 41.9876 217.92 41.9876ZM184.734 40.6865C181.86 40.6865 179.53 43.0167 179.53 45.8911L179.53 94.2234C179.53 97.0978 181.86 99.428 184.734 99.428H217.92C220.794 99.428 223.124 97.0978 223.124 94.2234V45.8911C223.124 43.0167 220.794 40.6865 217.92 40.6865L184.734 40.6865Z" fill="black"/>
+</g>
+<text x="144" y="108" fill="#ffffff" text-anchor="end" class="text-sm">${fingerprint.toUpperCase()}</text>
+<circle cx="32" cy="104" r="4" fill="#90E3B1"/>
+</g>
+<defs>
+<filter id="filter0_d_23_53" x="0" y="0.283356" width="309" height="137.717" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="2"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.05 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_23_53"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_23_53" result="shape"/>
+</filter>
+<filter id="filter1_i_23_53" x="21.4911" y="25.6474" width="127.433" height="88.8191" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset/>
+<feGaussianBlur stdDeviation="1"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_23_53"/>
+</filter>
+<filter id="filter2_d_23_53" x="175.758" y="40.6462" width="51.5947" height="66.7415" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="2"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_23_53"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_23_53" result="shape"/>
+</filter>
+<filter id="filter3_d_23_53" x="175.53" y="40.6865" width="51.5947" height="66.7415" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="4"/>
+<feGaussianBlur stdDeviation="2"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_23_53"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_23_53" result="shape"/>
+</filter>
+<linearGradient id="paint0_linear_23_53" x1="33.3475" y1="-0.758069" x2="209.829" y2="99.823" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0"/>
+<stop offset="0.82" stop-color="white" stop-opacity="0.07"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
+`
+}
+const createConversationImage = ({ content, footer }) => {
+  const chatContainer = document.createElement('div')
+  chatContainer.classList.add('chat', 'animate-in', 'fade-in', 'slide-in-from-bottom-2', 'px-[0.75rem]', 'grid-cols-1')
+  const bubble = document.createElement('div')
+  bubble.classList.add('chat-bubble-info', 'rounded-lg', 'w-3/4', 'max-w-[300px]', 'px-4', 'py-4')
+  if (content instanceof HTMLElement) {
+    bubble.appendChild(content)
+  } else {
+    bubble.innerHTML = content
+  }
+  chatContainer.appendChild(bubble)
+  if (footer) {
+    const footerContainer = document.createElement('div')
+    footerContainer.classList.add('chat-footer', 'pt-1', 'opacity-70')
+    footerContainer.innerText = footer
+    chatContainer.appendChild(footerContainer)
+  }
+  showConversation()
+  showClearMessagesButton()
+  return chatContainer
 }
 const FEE_RATE_WARNING_RATIO = 0.9
 async function getFeeRate() {
@@ -671,12 +823,22 @@ async function getFeeRate() {
   }
   return { value: feeRate }
 }
+const addSignatureToSignHistory = (device) => {
+  const newSignature = document.createElement('li')
+  newSignature.className = 'border rounded-md p-2 bg-success/10 border-success flex group gap-2 text-success'
+  const icon = CircularTickIcon
+  newSignature.innerHTML = `${icon}<div class="flex flex-col"><span class="text-success-content">${getDeviceName(device)}</span><span class="text-sm text-success-content/70">${device.fingerprint}</span></div>`
+  return newSignature
+}
 const updateSignHistory = (device) => {
-  const newStep = document.createElement('li')
-  newStep.classList.add('step', 'step-info')
-  newStep.innerText = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
+  const newSignature = addSignatureToSignHistory(device)
   const stepsList = DOM.outputs.psbtSignHistory
-  stepsList.appendChild(newStep)
+  const missingSignature = stepsList.querySelector('#missing-signature')
+  if (missingSignature) {
+    stepsList.insertBefore(newSignature, missingSignature)
+  } else {
+    stepsList.appendChild(newSignature)
+  }
 }
 function require2(value, message, errorElement) {
   if (value) {
@@ -695,16 +857,27 @@ async function broadcast() {
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble({
-      content: 'Broadcast the transaction from this PSBT',
+      content: 'Broadcast the transaction to the Bitcoin network',
       isUserSpeaking: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     await commands.broadcast(psbt, network, descriptors, electrum)
-    const tempuraBubble = createConversationBubble({
-      content: 'Broadcast successful!',
-    })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    DOM.outputs.tempMessage.textContent = 'Anything else?'
+    await sleep(500)
+    showTempLoadingMessage('Broadcasting transaction...')
+    await sleep(2e3)
+    hideTempMessage()
+    addToConversation(
+      createConversationBubble({
+        content: 'Transaction successfully broadcasted.',
+        footer: /* @__PURE__ */ new Date().toLocaleString(),
+      })
+    )
+    await sleep(500)
+    addToConversation(
+      createConversationBubble({
+        content: 'Your transaction should be visible in your wallet shortly and confirmed in the next few blocks.',
+      })
+    )
   } catch (e) {
     handleError(e)
   }
@@ -717,12 +890,12 @@ async function enumerate() {
       content: 'Find my device',
       isUserSpeaking: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     const response = await commands.enumerate(network)
     const tempuraBubble = createConversationBubble({
       content: getDeviceMessage(response),
     })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
+    addToConversation(tempuraBubble)
     DOM.outputs.tempMessage.textContent = getDevicePrompt(response)
   } catch (e) {
     handleError(e)
@@ -738,71 +911,70 @@ async function loadWallet() {
       content: 'Fetch my wallet.',
       isUserSpeaking: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     showTempLoadingMessage('Fetching wallet')
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
     hideTempMessage()
-    const balanceInfoBubble = createConversationBubble({
-      content: 'I found the following information about your wallet',
+    const { messages: walletInfoBubbles, isRecoverable } = getWalletInfoBubbles({
+      // balance: { immature: '0', confirmed: '0', trusted_pending: '0', untrusted_pending: '0' },
+      balance,
+      transactions,
+      addressInfo,
     })
-    const tempuraBubble = createConversationBubble({
-      content: WalletInfo({
-        balance,
-        transactions,
-        addressInfo,
-      }),
-      footer: /* @__PURE__ */ new Date().toLocaleString(),
-      dangerouslySetInnerHTML: true,
-    })
-    instrumentCopyButtons(tempuraBubble)
-    DOM.outputs.conversation.appendChild(balanceInfoBubble)
-    await sleep(200)
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
-    showListButton == null
-      ? void 0
-      : showListButton.addEventListener('click', () => {
-          DOM.modals.transactions.showModal()
-        })
-    const recoveryMessageContainer = document.createElement('div')
-    recoveryMessageContainer.classList.add('flex', 'flex-col', 'gap-2', 'pb-2')
-    const recoveryMessage = document.createElement('span')
-    recoveryMessage.textContent = 'You can recover your wallet now.'
-    const beginRecoveryButton = document.createElement('button')
-    beginRecoveryButton.id = 'begin-recovery-btn'
-    beginRecoveryButton.textContent = 'Start Recovery'
-    beginRecoveryButton.classList.add('btn', 'btn-outline')
-    recoveryMessageContainer.appendChild(recoveryMessage)
-    recoveryMessageContainer.appendChild(beginRecoveryButton)
-    beginRecoveryButton == null
-      ? void 0
-      : beginRecoveryButton.addEventListener('click', async () => {
-          const isChecked = DOM.radios.recoveryOptionsCollapse.checked
-          DOM.radios.recoveryOptionsCollapse.checked = true
-          if (isChecked) {
-            return
-          }
-          const addDestinationAddressMessage = createConversationBubble({
-            content:
-              'Recovering is simple. Add an address in the input on the right. We create a recovery transaction and send the funds to that address next.',
-            isUserSpeaking: false,
-          })
-          await sleep(400)
-          DOM.outputs.conversation.appendChild(addDestinationAddressMessage)
-        })
-    const beginRecoveryBubble = createConversationBubble({
-      content: recoveryMessageContainer,
-      isUserSpeaking: false,
-      dangerouslySetInnerHTML: true,
-    })
-    await sleep(400)
-    DOM.outputs.conversation.appendChild(beginRecoveryBubble)
+    if (!walletInfoBubbles || !walletInfoBubbles.length) {
+      const couldNotFindWalletInfoBubble = createConversationBubble({
+        content: 'I could not find any information about your wallet',
+      })
+      addToConversation(couldNotFindWalletInfoBubble)
+      return
+    }
+    for (const bubble of walletInfoBubbles) {
+      const tempuraItem = bubble.type === 'bubble' ? createConversationBubble(bubble) : createConversationActions(bubble)
+      if (!tempuraItem) {
+        continue
+      }
+      if (bubble.type === 'actions') {
+        instrumentCopyButtons(tempuraItem)
+        const showListButton = tempuraItem.querySelector('#show-transactions-btn')
+        showListButton == null
+          ? void 0
+          : showListButton.addEventListener('click', () => {
+              DOM.modals.transactions.showModal()
+            })
+        instrumentStartRecoveryButton(tempuraItem)
+      }
+      addToConversation(tempuraItem)
+      await sleep(400)
+    }
+    if (!isRecoverable) {
+      return
+    }
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e) {
     handleError(e)
   }
+}
+function instrumentStartRecoveryButton(parent) {
+  const beginRecoveryButton = parent.querySelector('#begin-recovery-btn')
+  if (!beginRecoveryButton) {
+    return
+  }
+  beginRecoveryButton.addEventListener('click', async () => {
+    const isChecked = DOM.radios.recoveryOptionsCollapse.checked
+    if (isChecked) {
+      return
+    }
+    const addDestinationAddressMessage = createConversationBubble({
+      content:
+        'Recovering is simple. Add an address in the input on the right. We create a recovery transaction and send the funds to that address next.',
+      isUserSpeaking: false,
+    })
+    addToConversation(addDestinationAddressMessage)
+    await sleep(1e3)
+    DOM.radios.recoveryOptionsCollapse.checked = true
+  })
 }
 function instrumentCopyButtons(parent) {
   parent.querySelectorAll('button[name=copy]').forEach((copyButton) => {
@@ -858,7 +1030,7 @@ function pastePsbtFromClipboard() {
     .then((psbt) => {
       const trimmed = psbt.trim()
       if (trimmed !== DOM.outputs.psbtTextArea.value) {
-        DOM.buttons.broadcast.classList.remove('btn-disabled')
+        DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
         DOM.outputs.psbtStatus.innerHTML = ''
         DOM.outputs.psbtSignHistory.innerHTML = ''
       }
@@ -875,35 +1047,139 @@ const toggleChangeInput = () => DOM.containers.change.classList.toggle('hidden',
 const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidden', DOM.checkboxes.electrum.checked)
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
-async function sign() {
+async function sign({ retryCount = 0 } = {}) {
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
-  DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
   try {
-    const userBubble = createConversationBubble({
-      content: 'Sign this transaction (PSBT)',
-      isUserSpeaking: true,
-    })
-    DOM.outputs.conversation.appendChild(userBubble)
+    showTempLoadingMessage('Looking for your device…')
+    await sleep(400)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
-    DOM.outputs.tempMessage.textContent =
-      'Follow the instructions on your device (might take a few seconds for them to appear).'
+    hideTempMessage()
+    const deviceInstructionBubbles = [
+      ...(device.type === 'jade'
+        ? [
+            {
+              content: getJadeDevice({ fingerprint: device.fingerprint ?? '' }),
+              type: 'image',
+            },
+            {
+              content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+              footer: /* @__PURE__ */ new Date().toLocaleString(),
+              type: 'bubble',
+            },
+          ]
+        : [
+            {
+              content: `Found a ${device.type} with fingerprint ${device.fingerprint}.`,
+              type: 'bubble',
+            },
+            {
+              content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
+              type: 'bubble',
+            },
+          ]),
+    ]
+    for (const { type, ...bubble } of deviceInstructionBubbles) {
+      const item = type === 'image' ? createConversationImage(bubble) : createConversationBubble(bubble)
+      addToConversation(item)
+      await sleep(400)
+    }
+    await sleep(9e3)
+    showTempLoadingMessage('Waiting for you to sign the transaction')
     const response = await commands.sign(psbt, network, device.type)
+    hideTempMessage()
     const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
       content: message,
+      //footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
+    addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
       updateSignHistory(device)
     }
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
-    DOM.outputs.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
+    await sleep(600)
+    addToConversation(
+      createConversationBubble({
+        content: getPsbtStatusMessage(psbtStatus),
+        footer: /* @__PURE__ */ new Date().toLocaleString(),
+      })
+    )
+    if (psbtStatus === 'PartiallySigned') {
+      await sleep(4e3)
+      addToConversation(
+        createConversationBubble({
+          content: 'Connect another device to continue signing the transaction.',
+        })
+      )
+      const actions = createConversationActions({
+        content: '<button class="btn btn-primary btn-sm">Continue signing with another device</button>',
+        dangerouslySetInnerHTML: true,
+        onAppended: (parent) => {
+          var _a
+          ;(_a = parent.querySelector('button')) == null
+            ? void 0
+            : _a.addEventListener('click', () => {
+                sign()
+              })
+        },
+      })
+      if (actions) {
+        addToConversation(actions)
+      }
+    }
   } catch (e) {
+    if (e instanceof Error) {
+      const tryAgainActions = createConversationActions({
+        content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
+        dangerouslySetInnerHTML: true,
+        onAppended: (parent) => {
+          var _a
+          ;(_a = parent.querySelector('#get-device-and-sign-again-btn')) == null
+            ? void 0
+            : _a.addEventListener('click', () => {
+                sign({ retryCount: retryCount + 1 })
+              })
+        },
+      })
+      if (e.message.toLowerCase() === 'no devices found') {
+        hideTempMessage()
+        addToConversation(
+          createConversationBubble({
+            content:
+              retryCount > 3
+                ? 'If you have trouble connecting to your device please try a different USB port or cable.'
+                : 'No devices found. Please make sure your device is plugged in and unlocked (PIN entered).',
+            footer: /* @__PURE__ */ new Date().toLocaleString(),
+          }),
+          {
+            shouldScrollToLastMessage: !tryAgainActions,
+          }
+        )
+      }
+      if (e.message.toLowerCase().includes('failed to extract psbt')) {
+        hideTempMessage()
+        addToConversation(
+          createConversationBubble({
+            content: `Looks like you refused to sign this transaction. If this was a mistake, you can try again.`,
+          }),
+          {
+            shouldScrollToLastMessage: !tryAgainActions,
+          }
+        )
+      }
+      await sleep(400)
+      if (tryAgainActions) {
+        addToConversation(tryAgainActions, {
+          shouldScrollToLastMessage: true,
+        })
+      }
+      return
+    }
     handleError(e)
   }
 }
@@ -918,6 +1194,7 @@ async function sweep() {
     DOM.inputs.address.classList.remove('input-error')
   }
   require2(address, 'A destination address is required', DOM.feedback.addressInputValidationMessage)
+  const { feeRate: userFeeRate } = getUserInputs()
   const feeRate = await getFeeRate()
   if (feeRate.failed || feeRate.value === null) {
     DOM.outputs.tempMessage.textContent =
@@ -926,32 +1203,43 @@ async function sweep() {
   }
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
+    const createTransactionMessage = !userFeeRate
+      ? `Create a transaction to send all wallet funds to <br/><span class="break-all font-bold">${sanitize(address)}</span>`
+      : `Create a transaction to send all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`
     const userBubble = createConversationBubble({
-      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
+      content: createTransactionMessage,
+      //content: `Create a transaction to send all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
+      //content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
       isUserSpeaking: true,
       dangerouslySetInnerHTML: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     const psbtDetails = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
-    const { psbt, outbound, fee } = psbtDetails
+    const { psbt, outbound, sent, fee } = psbtDetails
+    await sleep(1e3)
     clearStatusIndicators(DOM.outputs.psbtTextArea)
+    const { messages: replies } = getTransactionCreatedBubbles({
+      sent,
+      address,
+      hasUserFeeRate: !!userFeeRate,
+      feeRate: fee,
+    })
+    for (const reply of replies) {
+      const tempuraBubble = createConversationBubble(reply)
+      addToConversation(tempuraBubble)
+      await sleep(400)
+    }
     DOM.outputs.transactionOverview.classList.remove('hidden')
     populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
     DOM.outputs.psbtTextArea.value = psbt
     validatePsbt()
     DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
     DOM.outputs.tempMessage.textContent = 'Sign next?'
-    const tempuraBubble = createConversationBubble({
-      content: Success('Transaction (PSBT) created!'),
-      isUserSpeaking: false,
-      dangerouslySetInnerHTML: true,
-    })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
     if (feeRate.warning) {
       const warningBubble = createConversationBubble({
         content: feeRate.warning,
       })
-      DOM.outputs.conversation.appendChild(warningBubble)
+      addToConversation(warningBubble)
     }
     DOM.radios.sendTransactionCollapse.checked = true
   } catch (e) {
@@ -1012,8 +1300,22 @@ window.addEventListener('DOMContentLoaded', () => {
     e.preventDefault()
     pastePsbtFromClipboard()
   })
-  DOM.buttons.sign.addEventListener('click', (e) => {
+  DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
+    const userBubble = createConversationBubble({
+      content: 'Sign this transaction (PSBT)',
+      isUserSpeaking: true,
+    })
+    addToConversation(userBubble)
+    await sleep(400)
+    addToConversation(
+      createConversationBubble({
+        content:
+          'To sign the transaction, we need to find your device. Make sure it is plugged in and unlocked (PIN entered).',
+        isUserSpeaking: false,
+      })
+    )
+    await sleep(2e3)
     sign()
   })
   DOM.buttons.sweep.addEventListener('click', (e) => {
@@ -1046,7 +1348,7 @@ window.addEventListener('DOMContentLoaded', () => {
     })
   })
   DOM.outputs.psbtTextArea.addEventListener('input', () => {
-    DOM.buttons.broadcast.classList.remove('btn-disabled')
+    DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
     DOM.outputs.psbtSignHistory.innerHTML = ''
     validatePsbt()
   })

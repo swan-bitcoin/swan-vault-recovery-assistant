@@ -41,15 +41,7 @@ const Sats = (sats) => {
   const splitIndex = firstNonZeroIndex === -1 ? combinedStr.length : firstNonZeroIndex
   const leading = combinedStr.slice(0, splitIndex)
   const trailing = combinedStr.slice(splitIndex)
-  return `₿<span class="opacity-50">${leading}</span>${trailing}`
-}
-const setThemeBasedOnSystemPreference = () => {
-  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-  if (prefersDarkScheme) {
-    document.documentElement.setAttribute('data-theme', 'halloween')
-  } else {
-    document.documentElement.setAttribute('data-theme', 'cupcake')
-  }
+  return `₿<span class="opacity-70">${leading}</span>${trailing}`
 }
 let DOM
 function clearStatusIndicators(element) {
@@ -212,16 +204,32 @@ function requireDomElements(name) {
   }
   return elements
 }
+const scrollToLastMessage = () => {
+  const conversationContainer = document.getElementById('conversation')
+  if (conversationContainer && conversationContainer.lastElementChild) {
+    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+const setThemeBasedOnSystemPreference = () => {
+  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+  if (prefersDarkScheme) {
+    document.documentElement.setAttribute('data-theme', 'halloween')
+  } else {
+    document.documentElement.setAttribute('data-theme', 'cupcake')
+  }
+}
 const hideTempMessage = () => {
   DOM.outputs.tempMessageContainer.classList.add('hidden')
 }
 const showTempMessage = (content) => {
   DOM.outputs.tempMessage.textContent = content
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
+  scrollToLastMessage()
 }
 const showTempLoadingMessage = (content) => {
-  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${`<span>${content}</span>`}<span class="loading loading-spinner loading-sm"></span></div>`
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
+  scrollToLastMessage()
 }
 const adjustMainContentHeight = () => {
   const availableHeight = window.innerHeight - DOM.containers.footer.offsetHeight
@@ -242,10 +250,11 @@ document.addEventListener('DOMContentLoaded', () => {
 export {
   DOM as D,
   Sats as S,
-  hideTempMessage as a,
+  showTempLoadingMessage as a,
+  hideTempMessage as b,
   clearStatusIndicators as c,
   getUserInputs as g,
   handleError as h,
   initializeDOM as i,
-  showTempLoadingMessage as s,
+  scrollToLastMessage as s,
 }

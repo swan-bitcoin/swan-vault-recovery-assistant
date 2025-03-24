@@ -79,15 +79,20 @@ export async function validatePsbt() {
       DOM.outputs.psbtStatus.innerHTML = `
         <span class="text-success">Fully Signed ${simpleCheckmark}</span>
       `
-      DOM.buttons.broadcast.classList.remove('btn-disabled')
+      DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
+      DOM.buttons.sign.classList.add('btn-disabled', 'hidden')
+
+      document.getElementById('missing-signature')?.classList.add('hidden')
     } else if (psbtStatus === 'PartiallySigned') {
       DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-warning">Partially Signed</span>
+        <span class="opacity-70">Partially Signed</span>
       `
+      document.getElementById('missing-signature')?.classList.remove('hidden')
     } else if (psbtStatus === 'Unsigned') {
       DOM.outputs.psbtStatus.innerHTML = `
-        <span class="text-neutral-500">Unsigned</span>
+        <span class="opacity-70">Unsigned</span>
       `
+      document.getElementById('missing-signature')?.classList.remove('hidden')
     }
   } catch (e: unknown) {
     handleError(e)
@@ -97,6 +102,7 @@ export async function validatePsbt() {
 export async function validateAddress() {
   const { address, descriptors, network } = getUserInputs()
   clearStatusIndicators(DOM.inputs.address)
+  DOM.buttons.sweep.classList.remove('is-mine')
 
   if (!address) {
     // this message is really only needed to make sure a previous bad 'tempMessage' is cleared.
@@ -107,6 +113,7 @@ export async function validateAddress() {
 
   try {
     const isValid = await commands.isAddress(address)
+
     if (!isValid) {
       DOM.inputs.address.classList.add('input-error')
       DOM.feedback.addressInputValidationMessage.classList.remove('text-warning', 'text-success')
@@ -131,6 +138,7 @@ export async function validateAddress() {
       DOM.feedback.addressInputValidationMessage.textContent =
         'Warning: This address belongs to the same wallet. Please be sure you intend to send this transaction to yourself.'
       DOM.inputs.address.classList.add('input-warning')
+      DOM.buttons.sweep.classList.add('is-mine')
       return false
     }
 

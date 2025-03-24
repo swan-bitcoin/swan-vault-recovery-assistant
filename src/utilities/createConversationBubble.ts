@@ -10,19 +10,19 @@ type UnsafeContent = {
 
 type ConversationBubbleContent = SafeContent | UnsafeContent
 
-type ConversationBubbleProps = {
+export type ConversationBubbleProps = {
   footer?: string
   isUserSpeaking?: boolean
 } & ConversationBubbleContent
 
-const showConversation = () => {
+export const showConversation = () => {
   const conversationContainer = document.getElementById('conversation')
   if (conversationContainer) {
     conversationContainer.classList.remove('hidden')
   }
 }
 
-const showClearMessagesButton = () => {
+export const showClearMessagesButton = () => {
   const clearMessagesButton = document.getElementById('clear-messages-btn')
   if (clearMessagesButton) {
     clearMessagesButton.classList.remove('hidden')
@@ -39,10 +39,6 @@ export const createConversationBubble = ({
   const chatContainer = document.createElement('div')
   chatContainer.classList.add('chat', 'animate-in', isUserSpeaking ? 'chat-end' : 'chat-start')
 
-  const avatar = document.createElement('div')
-  avatar.classList.add('chat-image', 'avatar')
-  avatar.innerHTML = `<span class="text-4xl">${isUserSpeaking ? '👨‍💻' : '🍤'}</span>` // Use different avatars
-
   const bubble = document.createElement('div')
   bubble.classList.add('chat-bubble', 'animate-in', 'fade-in', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
   bubble.classList.add(isUserSpeaking ? 'slide-in-from-right-2' : 'slide-in-from-left-2')
@@ -58,12 +54,11 @@ export const createConversationBubble = ({
   }
 
   // Assemble the structure
-  chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
 
   if (footer) {
     const footerContainer = document.createElement('div')
-    footerContainer.classList.add('chat-footer', 'opacity-50')
+    footerContainer.classList.add('chat-footer', 'pt-1', 'opacity-70')
     footerContainer.innerText = footer
     chatContainer.appendChild(footerContainer)
   }
