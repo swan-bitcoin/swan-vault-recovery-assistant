@@ -327,11 +327,24 @@
     <footer id="footer" class="footer justify-between bg-neutral text-neutral-content p-3">
       <div class="flex gap-6">
         <!-- About -->
-        <div class="flex gap-1">
-          <a id="about-link" class="link link-hover" href="#">About</a>
-        </div>
+        <a id="about-link" class="link link-hover flex items-center gap-1" href="#">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0 fill-current" fill="none" viewBox="0 0 24 24">
+            <path
+              fill-rule="evenodd"
+              clip-rule="evenodd"
+              d="M14.0976 2H9.90245C5.94725 2 3.96965 2 2.74093 3.23324C1.51221 4.46647 1.51221 6.45132 1.51221 10.4211V10.9474C1.51221 14.9171 1.51221 16.9019 2.74093 18.1352C3.3077 18.704 4.10475 19.0836 5.13528 19.2739L5.13631 19.2741C5.45214 19.3325 5.61012 19.3618 5.67878 19.4609C5.74752 19.5602 5.71929 19.7182 5.66284 20.0342L5.66284 20.0342C5.52617 20.7994 5.54776 21.4912 6.03842 21.858C6.55256 22.2334 7.37177 21.8325 9.01004 21.0308L9.01085 21.0304C9.19329 20.9411 9.37637 20.8496 9.55982 20.7578C10.5328 20.2715 11.5243 19.7759 12.5817 19.5316C13.0416 19.4264 13.5098 19.3816 14.0976 19.3684C18.0528 19.3684 20.0303 19.3684 21.2591 18.1352C22.4878 16.9019 22.4878 14.9171 22.4878 10.9474V10.4211C22.4878 6.45132 22.4878 4.46647 21.2591 3.23324C20.0303 2 18.0528 2 14.0976 2ZM14.3651 14.6907C15.5832 14.3477 16.146 13.4525 16.0181 12.2358C15.9188 11.2907 15.3189 10.6969 14.6381 10.4699C15.1977 10.1125 15.602 9.41308 15.5151 8.58617C15.3909 7.40486 14.6909 6.65433 13.5084 6.53974L13.3644 5.16943L12.0059 5.31222L12.1425 6.61165L11.3156 6.69856L11.179 5.39913L9.8205 5.54191L9.95708 6.84135L8.83484 6.9593L9.70396 15.2284L10.8262 15.1105L10.9628 16.4099L12.3213 16.2671L12.1847 14.9677L13.0116 14.8808L13.1482 16.1802L14.5067 16.0374L14.3651 14.6907ZM10.7682 8.30875L12.6583 8.1101C13.308 8.04181 13.6996 8.35895 13.7617 8.9496C13.8238 9.54025 13.5067 9.93189 12.8569 10.0002L10.9669 10.1988L10.7682 8.30875ZM13.3227 13.2954L11.3145 13.5065L11.1159 11.6164L13.1241 11.4053C13.7738 11.337 14.1654 11.6542 14.2275 12.2448C14.2896 12.8355 13.9724 13.2271 13.3227 13.2954Z"
+            />
+          </svg>
+          About
+        </a>
+
         <!-- GitHub -->
-        <div class="flex items-center gap-1">
+        <a
+          class="link link-hover text-md flex items-center gap-1"
+          href="https://github.com/swan-bitcoin/tempura"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <svg width="18" height="18" class="h-6 w-6" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M29.3444 30.4765C31.7481 29.977 33.9292 29.1108 35.6247 27.8391C38.5202 25.6676 40 22.3136 40 18.9999C40 16.6752 39.1187 14.505 37.5929 12.6668C36.7427 11.6425 39.2295 3.99989 37.02 5.02919C34.8105 6.05848 31.5708 8.33679 29.8726 7.83398C28.0545 7.29565 26.0733 6.99989 24 6.99989C22.1992 6.99989 20.4679 7.22301 18.8526 7.6344C16.5046 8.23237 14.2591 5.99989 12 5.02919C9.74086 4.05848 10.9736 11.9632 10.3026 12.7944C8.84119 14.6051 8 16.7288 8 18.9999C8 22.3136 9.79086 25.6676 12.6863 27.8391C14.6151 29.2857 17.034 30.2076 19.7401 30.6619"
@@ -358,16 +371,11 @@
               stroke-linecap="butt"
             ></path>
           </svg>
-          <a
-            class="link link-hover text-md"
-            href="https://github.com/swan-bitcoin/tempura"
-            target="_blank"
-            rel="noopener noreferrer"
-            >GitHub
-          </a>
-        </div>
+          GitHub
+        </a>
 
-        <div class="flex gap-2">
+        <!-- Check Device -->
+        <button class="link link-hover flex items-center gap-1" id="enumerate-button">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             x-bind:width="size"
@@ -387,9 +395,10 @@
             <path d="M15 11l0 .01"></path>
             <path d="M18 13l0 .01"></path>
           </svg>
-          <button class="link link-hover" id="enumerate-button">Check Device</button>
-        </div>
+          Check Device
+        </button>
       </div>
+
       <div class="flex gap-2">
         <button class="link link-hover" id="advanced-mode-button">
           <span class="inline-block advanced:hidden">Need more control?</span>
