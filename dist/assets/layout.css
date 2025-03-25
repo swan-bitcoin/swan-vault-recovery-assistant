@@ -1309,6 +1309,14 @@ html {
 .link-hover {
   text-decoration-line: none;
 }
+.mask {
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
 :where(.menu li) .badge {
   justify-self: end;
 }
@@ -3394,6 +3402,9 @@ details.collapse summary::-webkit-details-marker {
   margin-left: -1rem;
   margin-right: -1rem;
 }
+.-mb-12 {
+  margin-bottom: -3rem;
+}
 .mb-2 {
   margin-bottom: 0.5rem;
 }
@@ -3444,6 +3455,10 @@ details.collapse summary::-webkit-details-marker {
 }
 .hidden {
   display: none;
+}
+.size-64 {
+  width: 16rem;
+  height: 16rem;
 }
 .size-8 {
   width: 2rem;
