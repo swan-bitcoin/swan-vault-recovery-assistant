@@ -518,7 +518,7 @@ const validateDescriptor = async () => {
       DOM.feedback.receiveInputValidationMessage.classList.remove('text-warning', 'text-success')
       DOM.feedback.receiveInputValidationMessage.classList.add('text-error')
       DOM.feedback.receiveInputValidationMessage.textContent =
-        'Descriptor is fine but it is for the wrong network. Open the network settings below to change the network!'
+        'Your wallet configuration is for a different network. Open the network settings below to change the network!'
       return false
     }
     if (isChangeDescriptor(descriptor)) {
