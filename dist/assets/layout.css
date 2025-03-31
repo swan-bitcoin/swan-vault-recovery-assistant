@@ -3670,10 +3670,6 @@ details.collapse summary::-webkit-details-marker {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-n, oklch(var(--n) / var(--tw-bg-opacity)));
 }
-.bg-orange-500 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(249 115 22 / var(--tw-bg-opacity));
-}
 .bg-success\/10 {
   background-color: var(--fallback-su, oklch(var(--su) / 0.1));
 }
@@ -3796,10 +3792,6 @@ details.collapse summary::-webkit-details-marker {
 .text-orange-500 {
   --tw-text-opacity: 1;
   color: rgb(249 115 22 / var(--tw-text-opacity));
-}
-.text-orange-950 {
-  --tw-text-opacity: 1;
-  color: rgb(67 20 7 / var(--tw-text-opacity));
 }
 .text-success {
   --tw-text-opacity: 1;
@@ -3961,20 +3953,6 @@ details.collapse summary::-webkit-details-marker {
 
 .dev\:block:where(.dev-mode .dev\:block) {
   display: block;
-}
-
-.dev\:border:where(.dev-mode .dev\:border) {
-  border-width: 1px;
-}
-
-.dev\:border-orange-500:where(.dev-mode .dev\:border-orange-500) {
-  --tw-border-opacity: 1;
-  border-color: rgb(249 115 22 / var(--tw-border-opacity));
-}
-
-.dev\:bg-orange-100:where(.dev-mode .dev\:bg-orange-100) {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 237 213 / var(--tw-bg-opacity));
 }
 
 .advanced\:block:where(.advanced-mode .advanced\:block) {

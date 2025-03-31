@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 #[macro_use]
 mod errors;
-use bdk_wallet::bitcoin::psbt;
 use bdk_wallet::psbt::PsbtUtils;
 use errors::{DescriptorType, TempuraError, TempuraErrorType};
 mod network;
