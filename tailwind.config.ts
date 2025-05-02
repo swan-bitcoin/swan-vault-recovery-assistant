@@ -1,9 +1,13 @@
+import animatePlugin from 'tailwindcss-animate'
+import daisyUI from 'daisyui'
+import type { Config } from 'tailwindcss'
+
 /** @type {import('tailwindcss').Config} */
-module.exports = {
+export default {
   darkMode: ['class'], // unclear whether there will be light/dark-mode
   content: ['./src/**/*.ts', '*.html'],
-  plugins: [require('tailwindcss-animate'), require('daisyui')],
+  plugins: [animatePlugin, daisyUI],
   daisyui: {
     themes: ['halloween', 'cupcake'],
   },
-}
+} satisfies Config
