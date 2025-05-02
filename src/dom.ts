@@ -7,6 +7,7 @@ type Buttons = {
   enumerate: HTMLButtonElement
   estimate: HTMLButtonElement
   load: HTMLButtonElement
+  modals: ModalButtons
   pastePsbt: HTMLButtonElement
   sign: HTMLButtonElement
   sweep: HTMLButtonElement
@@ -49,6 +50,25 @@ type Links = {
   about: HTMLAnchorElement
 }
 
+type Modals = {
+  autoChange: HTMLDialogElement
+  autoElectrum: HTMLDialogElement
+  electrumServer: HTMLDialogElement
+  feeRate: HTMLDialogElement
+  network: HTMLDialogElement
+  transactions: HTMLDialogElement
+  walletConfig: HTMLDialogElement
+}
+
+type ModalButtons = {
+  autoChange: HTMLButtonElement
+  autoElectrum: HTMLButtonElement
+  electrumServer: HTMLButtonElement
+  feeRate: HTMLButtonElement
+  network: HTMLButtonElement
+  walletConfig: HTMLButtonElement
+}
+
 type Outputs = {
   conversation: HTMLDivElement
   psbtSignHistory: HTMLUListElement
@@ -57,17 +77,17 @@ type Outputs = {
   tempMessage: HTMLDivElement
   transactionOverview: HTMLDivElement
   txBody: HTMLTableSectionElement
-  txModal: HTMLDialogElement
 }
 
 type DOM = {
   buttons: Buttons
   checkboxes: Checkboxes
-  radios: Radios
   containers: Containers
   inputs: Inputs
   links: Links
+  modals: Modals
   outputs: Outputs
+  radios: Radios
 }
 export let DOM: DOM
 
@@ -141,6 +161,14 @@ export function initializeDOM() {
       enumerate: requireDomElement<HTMLButtonElement>('#enumerate-button'),
       estimate: requireDomElement<HTMLButtonElement>('#estimate-button'),
       load: requireDomElement<HTMLButtonElement>('#fetch-wallet-button'),
+      modals: {
+        autoChange: requireDomElement<HTMLButtonElement>('#auto-change-modal-button'),
+        autoElectrum: requireDomElement<HTMLButtonElement>('#auto-electrum-modal-button'),
+        electrumServer: requireDomElement<HTMLButtonElement>('#electrum-server-modal-button'),
+        feeRate: requireDomElement<HTMLButtonElement>('#fee-rate-modal-button'),
+        network: requireDomElement<HTMLButtonElement>('#network-modal-button'),
+        walletConfig: requireDomElement<HTMLButtonElement>('#wallet-config-modal-button'),
+      },
       pastePsbt: requireDomElement<HTMLButtonElement>('#paste-psbt-button'),
       sign: requireDomElement<HTMLButtonElement>('#sign-button'),
       sweep: requireDomElement<HTMLButtonElement>('#sweep-button'),
@@ -183,6 +211,16 @@ export function initializeDOM() {
       about: requireDomElement<HTMLAnchorElement>('#about-link'),
     }
 
+    const modals = {
+      autoChange: requireDomElement<HTMLDialogElement>('#auto-change-modal'),
+      autoElectrum: requireDomElement<HTMLDialogElement>('#auto-electrum-modal'),
+      electrumServer: requireDomElement<HTMLDialogElement>('#electrum-server-modal'),
+      feeRate: requireDomElement<HTMLDialogElement>('#fee-rate-modal'),
+      network: requireDomElement<HTMLDialogElement>('#network-modal'),
+      transactions: requireDomElement<HTMLDialogElement>('#transactions-modal'),
+      walletConfig: requireDomElement<HTMLDialogElement>('#wallet-config-modal'),
+    }
+
     const outputs = {
       conversation: requireDomElement<HTMLDivElement>('#conversation'),
       psbtSignHistory: requireDomElement<HTMLUListElement>('#psbt-sign-history'),
@@ -191,20 +229,21 @@ export function initializeDOM() {
       tempMessage,
       transactionOverview: requireDomElement<HTMLDivElement>('#transaction-overview-container'),
       txBody: requireDomElement<HTMLTableSectionElement>('#transactions-body'),
-      txModal: requireDomElement<HTMLDialogElement>('#transactions-modal'),
     }
 
     DOM = {
       buttons,
       checkboxes,
-      radios,
       containers,
       inputs,
       links,
+      modals,
+      radios,
       outputs,
     }
   } catch (e: unknown) {
     const error = (e as Error) || new Error('Failed to initialize: missing required DOM elements')
+    console.error(error)
     if (tempMessage) {
       tempMessage.textContent = error.message
     }

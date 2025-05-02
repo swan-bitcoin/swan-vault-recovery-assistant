@@ -2,6 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- note that the CSP should be generated from tauri.conf.json, but it doesn't appear to work. this is added manually for now -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; connect-src ipc: http://ipc.localhost ws: ws://localhost; img-src 'self' data: ; font-src 'self' data:"
@@ -52,7 +53,7 @@
             <div class="form-control">
               <div class="label">
                 <label class="label-text">Wallet Configuration (Descriptor)</label>
-                <button class="btn btn-link no-underline btn-sm" onclick="wallet_config_modal.showModal()">
+                <button id="wallet-config-modal-button" class="btn btn-link no-underline btn-sm">
                   Where can I find this?
                 </button>
               </div>
@@ -74,7 +75,7 @@
                     class="checkbox checkbox-info checkbox-sm"
                   />
                 </div>
-                <button class="btn btn-link no-underline btn-sm" onclick="auto_change_modal.showModal()">
+                <button id="auto-change-modal-button" class="btn btn-link no-underline btn-sm">
                   What is a change configuration?
                 </button>
               </div>
@@ -98,7 +99,7 @@
                     class="checkbox checkbox-info checkbox-sm"
                   />
                 </div>
-                <button class="btn btn-link no-underline btn-sm" onclick="auto_electrum_modal.showModal()">
+                <button id="auto-electrum-modal-button" class="btn btn-link no-underline btn-sm">
                   What is an Electrum Server?
                 </button>
               </div>
@@ -112,12 +113,9 @@
                     class="input input-ghost input-bordered w-full max-w-xs"
                     id="electrum-input"
                     type="text"
-                    placeholder="ssl://blockstream.info:993"
+                    placeholder="ssl://electrum.blockstream.info:50002"
                   />
-                  <button
-                    class="btn btn-link no-underline btn-xs px-1 py-0 font-normal"
-                    onclick="electrum_server_modal.showModal()"
-                  >
+                  <button id="electrum-server-modal-button" class="btn btn-link no-underline btn-xs px-1 py-0 font-normal">
                     How to use a custom server?
                   </button>
                 </div>
@@ -136,7 +134,7 @@
                     class="checkbox checkbox-info checkbox-sm"
                   />
                 </div>
-                <button class="btn btn-link no-underline btn-sm" onclick="network_modal.showModal()">
+                <button id="network-modal-button" class="btn btn-link no-underline btn-sm">
                   Why would I change my network?
                 </button>
               </div>
@@ -195,7 +193,7 @@
                     class="checkbox checkbox-info checkbox-sm"
                   />
                 </div>
-                <button class="btn btn-link no-underline btn-sm" onclick="fee_rate_modal.showModal()">
+                <button id="fee-rate-modal-button" class="btn btn-link no-underline btn-sm">
                   How is the fee rate used?
                 </button>
               </div>
@@ -393,7 +391,7 @@
     </dialog>
 
     <!-- Wallet Configuration Modal -->
-    <dialog id="wallet_config_modal" class="modal">
+    <dialog id="wallet-config-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
@@ -416,7 +414,7 @@
     </dialog>
 
     <!-- Auto-change Modal -->
-    <dialog id="auto_change_modal" class="modal">
+    <dialog id="auto-change-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
@@ -436,7 +434,7 @@
     </dialog>
 
     <!-- Auto-electrum Modal -->
-    <dialog id="auto_electrum_modal" class="modal">
+    <dialog id="auto-electrum-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
@@ -456,7 +454,7 @@
     </dialog>
 
     <!-- Electrum Server Modal -->
-    <dialog id="electrum_server_modal" class="modal">
+    <dialog id="electrum-server-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
@@ -474,7 +472,7 @@
     </dialog>
 
     <!-- Network Modal -->
-    <dialog id="network_modal" class="modal">
+    <dialog id="network-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
@@ -491,7 +489,7 @@
     </dialog>
 
     <!-- Fee Rate Modal -->
-    <dialog id="fee_rate_modal" class="modal">
+    <dialog id="fee-rate-modal" class="modal">
       <div class="modal-box">
         <form method="dialog">
           <button class="btn btn-xs btn-circle btn-ghost absolute right-3 top-3">✕</button>
