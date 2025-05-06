@@ -34,7 +34,7 @@ export const WalletInfo = ({ balance, transactions, addressInfo }: WalletInfoPro
             aria-label="Balance"
             checked="checked"
           />
-          <div role="tabpanel" class="tab-content rounded-box mt-4">
+          <div role="tabpanel" class="tab-content rounded-box">
             ${Balance({ confirmed, unconfirmed })}
           </div>
 

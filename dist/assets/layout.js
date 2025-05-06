@@ -41,15 +41,7 @@ const Sats = (sats) => {
   const splitIndex = firstNonZeroIndex === -1 ? combinedStr.length : firstNonZeroIndex
   const leading = combinedStr.slice(0, splitIndex)
   const trailing = combinedStr.slice(splitIndex)
-  return `₿<span class="opacity-50">${leading}</span>${trailing}`
-}
-const setThemeBasedOnSystemPreference = () => {
-  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-  if (prefersDarkScheme) {
-    document.documentElement.setAttribute('data-theme', 'halloween')
-  } else {
-    document.documentElement.setAttribute('data-theme', 'cupcake')
-  }
+  return `₿<span class="opacity-70">${leading}</span>${trailing}`
 }
 let DOM
 function clearStatusIndicators(element) {
@@ -86,21 +78,27 @@ function getUserInputs() {
 function handleError(e) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
   }
   if (e instanceof Error) {
     console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
+    showTempMessage(e.message)
     return
   }
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+  showTempMessage('An unknown error occurred')
 }
 function initializeDOM() {
   let tempMessage = void 0
   try {
     tempMessage = requireDomElement('#temporary-message')
+    const feedback = {
+      receiveInputValidationMessage: requireDomElement('#receive-input-validation-message'),
+      addressInputValidationMessage: requireDomElement('#address-input-validation-message'),
+      psbtInputValidationMessage: requireDomElement('#psbt-input-validation-message'),
+    }
     const buttons = {
+      advancedMode: requireDomElement('#advanced-mode-button'),
       broadcast: requireDomElement('#broadcast-button'),
       clearMessages: requireDomElement('#clear-messages-button'),
       copyPsbt: requireDomElement('#copy-psbt-button'),
@@ -137,7 +135,6 @@ function initializeDOM() {
       footer: requireDomElement('#footer'),
       mainContent: requireDomElement('#main-content'),
       network: requireDomElement('#network-input-container'),
-      toast: requireDomElement('#toast-container'),
       walletActions: requireDomElement('#wallet-actions'),
     }
     const inputs = {
@@ -166,6 +163,7 @@ function initializeDOM() {
       psbtStatus: requireDomElement('#psbt-status'),
       psbtTextArea: requireDomElement('#psbt-textarea'),
       tempMessage,
+      tempMessageContainer: requireDomElement('#temp-message-container'),
       transactionOverview: requireDomElement('#transaction-overview-container'),
       txBody: requireDomElement('#transactions-body'),
     }
@@ -173,6 +171,7 @@ function initializeDOM() {
       buttons,
       checkboxes,
       containers,
+      feedback,
       inputs,
       links,
       modals,
@@ -205,6 +204,33 @@ function requireDomElements(name) {
   }
   return elements
 }
+const scrollToLastMessage = () => {
+  const conversationContainer = document.getElementById('conversation')
+  if (conversationContainer && conversationContainer.lastElementChild) {
+    conversationContainer.lastElementChild.scrollIntoView({ behavior: 'smooth' })
+  }
+}
+const setThemeBasedOnSystemPreference = () => {
+  const prefersDarkScheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+  if (prefersDarkScheme) {
+    document.documentElement.setAttribute('data-theme', 'halloween')
+  } else {
+    document.documentElement.setAttribute('data-theme', 'cupcake')
+  }
+}
+const hideTempMessage = () => {
+  DOM.outputs.tempMessageContainer.classList.add('hidden')
+}
+const showTempMessage = (content) => {
+  DOM.outputs.tempMessage.textContent = content
+  DOM.outputs.tempMessageContainer.classList.remove('hidden')
+  scrollToLastMessage()
+}
+const showTempLoadingMessage = (content) => {
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
+  DOM.outputs.tempMessageContainer.classList.remove('hidden')
+  scrollToLastMessage()
+}
 const adjustMainContentHeight = () => {
   const availableHeight = window.innerHeight - DOM.containers.footer.offsetHeight
   DOM.containers.mainContent.style.height = `${availableHeight}px`
@@ -221,4 +247,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   })
 })
-export { DOM as D, Sats as S, clearStatusIndicators as c, getUserInputs as g, handleError as h, initializeDOM as i }
+export {
+  DOM as D,
+  Sats as S,
+  showTempLoadingMessage as a,
+  hideTempMessage as b,
+  clearStatusIndicators as c,
+  getUserInputs as g,
+  handleError as h,
+  initializeDOM as i,
+  scrollToLastMessage as s,
+}
