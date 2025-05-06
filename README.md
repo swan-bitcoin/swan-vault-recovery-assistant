@@ -123,7 +123,7 @@ If you would like to reset the network (destroying all blocks/transactions in th
 
 ## Troubleshooting
 
-review the [prerequisites page of Tauri](https://tauri.app/v1/guides/getting-started/prerequisites/) and verify you have the proper system dependencies installed.
+Review the [prerequisites page of Tauri](https://tauri.app/v1/guides/getting-started/prerequisites/) and verify you have the proper system dependencies installed.
 
 ### Error: failed to run custom build command for `javascriptcore-rs-sys v1.1.1`
 
