@@ -9,16 +9,16 @@ export type TransactionOverviewProps = {
 export const populateTransactionOverview = ({ address, outbound, fee }: TransactionOverviewProps) => {
   const overviewAmount = document.getElementById('transaction-overview-amount')
   if (overviewAmount) {
-    overviewAmount.innerHTML = Sats(outbound)
+    overviewAmount.textContent = Sats(outbound)
   }
 
   const overviewFee = document.getElementById('transaction-overview-fee')
   if (overviewFee) {
-    overviewFee.innerHTML = Sats(fee || '')
+    overviewFee.textContent = Sats(fee || '')
   }
 
   const overviewAddress = document.getElementById('transaction-overview-address')
   if (overviewAddress) {
-    overviewAddress.innerHTML = address
+    overviewAddress.textContent = address
   }
 }
