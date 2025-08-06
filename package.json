@@ -24,12 +24,12 @@
     "simulate-network": "pnpm simnet"
   },
   "dependencies": {
-    "@tauri-apps/api": ">=2.0.0",
-    "@tauri-apps/plugin-clipboard-manager": "^2.0.0"
+    "@tauri-apps/api": "^2.7.0",
+    "@tauri-apps/plugin-clipboard-manager": "^2.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.13.0",
-    "@tauri-apps/cli": ">=2.0.0",
+    "@tauri-apps/cli": "^2.7.1",
     "@types/node": "^22.7.4",
     "@types/selenium-webdriver": "^4.1.27",
     "autoprefixer": "^10.4.20",
