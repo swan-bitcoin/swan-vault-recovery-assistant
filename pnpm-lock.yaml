@@ -84,8 +84,8 @@ importers:
         specifier: ^7.4.3
         version: 7.4.3
       tiny-secp256k1:
-        specifier: ^2.2.3
-        version: 2.2.3
+        specifier: ^2.2.4
+        version: 2.2.4
       tsx:
         specifier: ^4.20.3
         version: 4.20.3
@@ -2380,9 +2380,9 @@ packages:
     resolution:
       { integrity: sha512-/mrRod8xqpA+IHSLyGCQ2s8SPHiCDEeQJSep1jqLYeEUClOFG2Qsh+4FU6G9VeqpZnGW/Su8LQGc4YKni5rYSQ== }
 
-  tiny-secp256k1@2.2.3:
+  tiny-secp256k1@2.2.4:
     resolution:
-      { integrity: sha512-SGcL07SxcPN2nGKHTCvRMkQLYPSoeFcvArUSCYtjVARiFAWU44cCIqYS0mYAU6nY7XfvwURuTIGo2Omt3ZQr0Q== }
+      { integrity: sha512-FoDTcToPqZE454Q04hH9o2EhxWsm7pOSpicyHkgTwKhdKWdsTUuqfP5MLq3g+VjAtl2vSx6JpXGdwA2qpYkI0Q== }
     engines: { node: '>=14.0.0' }
 
   tinybench@2.9.0:
@@ -4409,7 +4409,7 @@ snapshots:
       readable-stream: 2.3.8
       xtend: 4.0.2
 
-  tiny-secp256k1@2.2.3:
+  tiny-secp256k1@2.2.4:
     dependencies:
       uint8array-tools: 0.0.7
 
