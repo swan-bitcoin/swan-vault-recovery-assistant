@@ -1,21 +1,21 @@
 networks:
-  tempura-net:
-    name: tempura-net
+  swan-vault-recovery-assistant-net:
+    name: swan-vault-recovery-assistant-net
     driver: bridge
     ipam:
       config:
         - subnet: 172.50.1.0/24
 
 services:
-  tempura-bitcoind:
-    container_name: tempura-bitcoind
+  swan-vault-recovery-assistant-bitcoind:
+    container_name: swan-vault-recovery-assistant-bitcoind
     image: ruimarinho/bitcoin-core:23
     restart: always
     ports:
       - 18453:18443
       - 18454:18444
     networks:
-      - tempura-net
+      - swan-vault-recovery-assistant-net
     command: [
         '-printtoconsole',
         '-regtest',
@@ -23,20 +23,31 @@ services:
         '-txindex',
         '-fallbackfee=0.0002', # 20 sats per byte
         '-rpcallowip=172.50.1.0/24',
-        '-rpcbind=tempura-bitcoind',
+        '-rpcbind=swan-vault-recovery-assistant-bitcoind',
         '-rpcbind=127.0.0.1',
-        '-rpcuser=tempura',
+        '-rpcuser=swan-vault-recovery-assistant',
         '-rpcpassword=hunter2',
       ]
 
-  tempura-fulcrum:
-    container_name: tempura-fulcrum
+  swan-vault-recovery-assistant-fulcrum:
+    container_name: swan-vault-recovery-assistant-fulcrum
     image: cculianu/fulcrum
     restart: always
     depends_on:
-      - tempura-bitcoind
+      - swan-vault-recovery-assistant-bitcoind
     ports:
       - 50021:50001
     networks:
-      - tempura-net
-    command: ['Fulcrum', '-t', '0.0.0.0:50001', '-b', 'tempura-bitcoind:18443', '-u', 'tempura', '-p', 'hunter2']
+      - swan-vault-recovery-assistant-net
+    command:
+      [
+        'Fulcrum',
+        '-t',
+        '0.0.0.0:50001',
+        '-b',
+        'swan-vault-recovery-assistant-bitcoind:18443',
+        '-u',
+        'swan-vault-recovery-assistant',
+        '-p',
+        'hunter2',
+      ]
