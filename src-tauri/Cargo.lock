@@ -3800,6 +3800,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
+name = "swan_vault_recovery_assistant"
+version = "0.1.0"
+dependencies = [
+ "bdk_electrum",
+ "bdk_wallet",
+ "bitcoin-units",
+ "serde",
+ "serde_json",
+ "specta",
+ "specta-typescript",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-clipboard-manager",
+ "tauri-specta",
+ "tokio",
+]
+
+[[package]]
 name = "swift-rs"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4174,24 +4192,6 @@ checksum = "5993dc129e544393574288923d1ec447c857f3f644187f4fbf7d9a875fbfc4fb"
 dependencies = [
  "embed-resource",
  "toml 0.7.8",
-]
-
-[[package]]
-name = "tempura"
-version = "0.1.0"
-dependencies = [
- "bdk_electrum",
- "bdk_wallet",
- "bitcoin-units",
- "serde",
- "serde_json",
- "specta",
- "specta-typescript",
- "tauri",
- "tauri-build",
- "tauri-plugin-clipboard-manager",
- "tauri-specta",
- "tokio",
 ]
 
 [[package]]
