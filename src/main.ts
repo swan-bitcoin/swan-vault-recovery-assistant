@@ -595,15 +595,6 @@ async function sweep() {
 
     DOM.outputs.tempMessage.textContent = 'Sign next?'
 
-    /*
-    const tempuraBubble = createConversationBubble({
-      content: reply,
-      isUserSpeaking: false,
-      dangerouslySetInnerHTML: true,
-    })
-    addToConversation(tempuraBubble)
-    */
-
     if (feeRate.warning) {
       const warningBubble = createConversationBubble({
         content: feeRate.warning,
@@ -753,7 +744,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.links.about.addEventListener('click', async (e) => {
     e.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
+    await commands.createWindow('about', 'about.html', 'About Swan Vault Recovery Assistant', 800, 950)
   })
 
   // Set up observer to scroll to the last chat message whenever a message is added

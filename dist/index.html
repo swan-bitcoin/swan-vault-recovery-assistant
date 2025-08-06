@@ -8,7 +8,7 @@
       content="default-src 'self'; connect-src ipc: http://ipc.localhost ws: ws://localhost; img-src 'self' data: ; font-src 'self' data:"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>tempura</title>
+    <title>Swan Vault Recovery Assistant</title>
     <script type="module" crossorigin src="/assets/index.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/layout.js" />
     <link rel="stylesheet" crossorigin href="/assets/layout.css" />
@@ -166,9 +166,8 @@
           <!-- Second Card: Recovery Options -->
           <div class="collapse collapse-arrow bg-base-100 border" id="recovery-container">
             <input id="recovery-options-collapse-radio" name="collapses" type="radio" />
-            <div class="collapse-title text-xl">2. Recover Wallet</div>
+            <div class="collapse-title text-xl">2. Prepare Transaction</div>
             <div class="collapse-content">
-              <div class="text-orange-500 dev:block hidden">todo: description here</div>
               <!-- Destination address -->
               <div class="form-control mb-3">
                 <label class="label">Destination Address</label>
@@ -481,13 +480,13 @@
         <div class="py-4 gap-4 flex flex-col text-pretty">
           <p>
             Bitcoin wallets typically separate addresses for receiving transactions from those used to receive change from
-            outgoing transactions. In most cases Tempura can calculate the correct change configuration from the wallet
-            configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter your change
-            configuration.
+            outgoing transactions. In most cases Swan Vault Recovery Assistant can calculate the correct change configuration
+            from the wallet configuration. If you have an uncommon wallet or change configuration, uncheck the box and enter
+            your change configuration.
           </p>
           <p>
-            Tempura calculates the change configuration from the receive configuration if the receive descriptor paths end
-            with
+            Swan Vault Recovery Assistant calculates the change configuration from the receive configuration if the receive
+            descriptor paths end with
             <code class="bg-base-300 py-1 px-2 rounded-md">/0/*</code>. The calculated change configuration paths will end in
             <code class="bg-base-300 py-1 px-2 rounded-md">/1/*</code>.
           </p>
@@ -548,11 +547,12 @@
         <h3 class="text-lg font-bold text-balance">Why would I change my network?</h3>
         <div class="py-4 gap-4 flex flex-col text-pretty">
           <p>
-            For testing purposes, developers may want to use Tempura on networks where the coins involved do not have value.
+            For testing purposes, developers may want to use Swan Vault Recovery Assistant on networks where the coins
+            involved do not have value.
           </p>
           <p>
-            Each Bitcoin wallet should only be used with the network on which it was created. Tempura will typically detect
-            mismatched wallet configuration and network selections.
+            Each Bitcoin wallet should only be used with the network on which it was created. Swan Vault Recovery Assistant
+            will typically detect mismatched wallet configuration and network selections.
           </p>
         </div>
       </div>
@@ -572,8 +572,8 @@
             periods of high network activity.
           </p>
           <p>
-            Tempura automatically estimates the optimal fee rate to prioritize your transaction for inclusion in the next
-            block. To set the fee rate manually, uncheck the box.
+            Swan Vault Recovery Assistant automatically estimates the optimal fee rate to prioritize your transaction for
+            inclusion in the next block. To set the fee rate manually, uncheck the box.
           </p>
         </div>
       </div>

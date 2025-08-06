@@ -1354,7 +1354,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.links.about.addEventListener('click', async (e) => {
     e.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
+    await commands.createWindow('about', 'about.html', 'About Swan Vault Recovery Assistant', 800, 950)
   })
   const config = { childList: true }
   const callback = (mutationList) => {
