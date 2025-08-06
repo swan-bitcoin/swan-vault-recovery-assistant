@@ -79,7 +79,7 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
-            !src-tauri/target/release/tempura
+            !src-tauri/target/release/swan_vault_recovery_assistant
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/test.yml') }}
 
       - name: install the tauri driver if necessary
@@ -88,7 +88,7 @@ jobs:
             cargo install tauri-driver
           fi
 
-      - name: build tempura
+      - name: build Swan Vault Recovery Assistant
         run: pnpm tauri build --no-bundle
 
       - name: save cargo cache
@@ -101,7 +101,7 @@ jobs:
             ~/.cargo/git/db/
             src-tauri/target/
             !src-tauri/target/release/hwi
-            !src-tauri/target/release/tempura
+            !src-tauri/target/release/swan_vault_recovery_assistant
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
       - name: run the tests
