@@ -3799,10 +3799,6 @@ details.collapse summary::-webkit-details-marker {
   --tw-text-opacity: 1;
   color: var(--fallback-nc, oklch(var(--nc) / var(--tw-text-opacity)));
 }
-.text-orange-500 {
-  --tw-text-opacity: 1;
-  color: rgb(249 115 22 / var(--tw-text-opacity));
-}
 .text-success {
   --tw-text-opacity: 1;
   color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));
@@ -3959,10 +3955,6 @@ details.collapse summary::-webkit-details-marker {
 
 .group.is-mine .group-\[\.is-mine\]\:hidden {
   display: none;
-}
-
-.dev\:block:where(.dev-mode .dev\:block) {
-  display: block;
 }
 
 .advanced\:block:where(.advanced-mode .advanced\:block) {
