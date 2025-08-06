@@ -13,7 +13,7 @@ typeof SuppressedError === 'function'
   ? SuppressedError
   : function (error, suppressed, message) {
       var e = new Error(message)
-      return (e.name = 'SuppressedError'), (e.error = error), (e.suppressed = suppressed), e
+      return ((e.name = 'SuppressedError'), (e.error = error), (e.suppressed = suppressed), e)
     }
 async function invoke(cmd, args = {}, options) {
   return window.__TAURI_INTERNALS__.invoke(cmd, args, options)

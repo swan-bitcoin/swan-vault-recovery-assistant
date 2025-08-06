@@ -107,7 +107,7 @@
   --tw-contain-paint:  ;
   --tw-contain-style:  ;
 } /*
-! tailwindcss v3.4.13 | MIT License | https://tailwindcss.com
+! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com
 */ /*
 1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
 2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
@@ -144,8 +144,8 @@ html,
   -moz-tab-size: 4; /* 3 */
   -o-tab-size: 4;
   tab-size: 4; /* 3 */
-  font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
-    'Noto Color Emoji'; /* 4 */
+  font-family:
+    ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'; /* 4 */
   font-feature-settings: normal; /* 5 */
   font-variation-settings: normal; /* 6 */
   -webkit-tap-highlight-color: transparent; /* 7 */
@@ -500,7 +500,7 @@ video {
 }
 
 /* Make elements with the HTML hidden attribute stay hidden by default */
-[hidden] {
+[hidden]:where(:not([hidden='until-found'])) {
   display: none;
 }
 
@@ -630,8 +630,9 @@ html {
     transform,
     filter,
     -webkit-backdrop-filter;
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
-    transform, filter, backdrop-filter;
+  transition-property:
+    color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter,
+    backdrop-filter;
   transition-property:
     color,
     background-color,
@@ -922,7 +923,7 @@ html {
   position: relative;
   display: grid;
   overflow: hidden;
-  grid-template-rows: auto 0fr;
+  grid-template-rows: max-content 0fr;
   transition: grid-template-rows 0.2s;
   width: 100%;
   border-radius: var(--rounded-box, 1rem);
@@ -941,6 +942,12 @@ html {
   appearance: none;
   opacity: 0;
 }
+:where(.collapse > input[type='checkbox']),
+:where(.collapse > input[type='radio']) {
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
 .collapse-content {
   visibility: hidden;
   grid-column-start: 1;
@@ -957,11 +964,11 @@ html {
 .collapse[open],
 .collapse-open,
 .collapse:focus:not(.collapse-close) {
-  grid-template-rows: auto 1fr;
+  grid-template-rows: max-content 1fr;
 }
 .collapse:not(.collapse-close):has(> input[type='checkbox']:checked),
 .collapse:not(.collapse-close):has(> input[type='radio']:checked) {
-  grid-template-rows: auto 1fr;
+  grid-template-rows: max-content 1fr;
 }
 .collapse[open] > .collapse-content,
 .collapse-open > .collapse-content,
@@ -1395,8 +1402,9 @@ html {
     transform,
     filter,
     -webkit-backdrop-filter;
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
-    transform, filter, backdrop-filter;
+  transition-property:
+    color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter,
+    backdrop-filter;
   transition-property:
     color,
     background-color,
@@ -1469,8 +1477,8 @@ html {
   border-color: transparent;
   --tw-bg-opacity: 1;
   background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity)));
-  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
-    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position:
     calc(100% - 20px) calc(1px + 50%),
     calc(100% - 16.1px) calc(1px + 50%);
@@ -2040,7 +2048,8 @@ input.tab:checked + .tab-content,
   background-repeat: no-repeat;
   animation: checkmark var(--animation-input, 0.2s) ease-out;
   background-color: var(--chkbg);
-  background-image: linear-gradient(-45deg, transparent 65%, var(--chkbg) 65.99%),
+  background-image:
+    linear-gradient(-45deg, transparent 65%, var(--chkbg) 65.99%),
     linear-gradient(45deg, transparent 75%, var(--chkbg) 75.99%),
     linear-gradient(-45deg, var(--chkbg) 40%, transparent 40.99%),
     linear-gradient(45deg, var(--chkbg) 30%, var(--chkfg) 30.99%, var(--chkfg) 40%, transparent 40.99%),
@@ -2051,8 +2060,8 @@ input.tab:checked + .tab-content,
   background-color: var(--fallback-bc, oklch(var(--bc) / var(--tw-bg-opacity)));
   background-repeat: no-repeat;
   animation: checkmark var(--animation-input, 0.2s) ease-out;
-  background-image: linear-gradient(90deg, transparent 80%, var(--chkbg) 80%),
-    linear-gradient(-90deg, transparent 80%, var(--chkbg) 80%),
+  background-image:
+    linear-gradient(90deg, transparent 80%, var(--chkbg) 80%), linear-gradient(-90deg, transparent 80%, var(--chkbg) 80%),
     linear-gradient(0deg, var(--chkbg) 43%, var(--chkfg) 43%, var(--chkfg) 57%, var(--chkbg) 57%);
 }
 .checkbox-secondary {
@@ -2158,14 +2167,9 @@ details.collapse summary::-webkit-details-marker {
 .collapse-title {
   position: relative;
 }
-:where(.collapse > input[type='checkbox']),
-:where(.collapse > input[type='radio']) {
-  z-index: 1;
-}
 .collapse-title,
 :where(.collapse > input[type='checkbox']),
 :where(.collapse > input[type='radio']) {
-  width: 100%;
   padding: 1rem;
   padding-inline-end: 3rem;
   min-height: 3.75rem;
@@ -2340,12 +2344,12 @@ details.collapse summary::-webkit-details-marker {
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='%23000' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cstyle%3E.spinner_V8m1%7Btransform-origin:center;animation:spinner_zKoa 2s linear infinite%7D.spinner_V8m1 circle%7Bstroke-linecap:round;animation:spinner_YpZS 1.5s ease-out infinite%7D%40keyframes spinner_zKoa%7B100%25%7Btransform:rotate(360deg)%7D%7D%40keyframes spinner_YpZS%7B0%25%7Bstroke-dasharray:0 150;stroke-dashoffset:0%7D47.5%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-16%7D95%25%2C100%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-59%7D%7D%3C%2Fstyle%3E%3Cg class='spinner_V8m1'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3'%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='%23000' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cstyle%3E.spinner_V8m1%7Btransform-origin:center;animation:spinner_zKoa 2s linear infinite%7D.spinner_V8m1 circle%7Bstroke-linecap:round;animation:spinner_YpZS 1.5s ease-out infinite%7D%40keyframes spinner_zKoa%7B100%25%7Btransform:rotate(360deg)%7D%7D%40keyframes spinner_YpZS%7B0%25%7Bstroke-dasharray:0 150;stroke-dashoffset:0%7D47.5%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-16%7D95%25%2C100%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-59%7D%7D%3C%2Fstyle%3E%3Cg class='spinner_V8m1'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3'%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='black' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform-origin='center'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='2s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dasharray' values='0,150;42,150;42,150' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dashoffset' values='0;-16;-59' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='black' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform-origin='center'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='2s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dasharray' values='0,150;42,150;42,150' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dashoffset' values='0;-16;-59' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E");
 }
 .loading-spinner {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='%23000' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cstyle%3E.spinner_V8m1%7Btransform-origin:center;animation:spinner_zKoa 2s linear infinite%7D.spinner_V8m1 circle%7Bstroke-linecap:round;animation:spinner_YpZS 1.5s ease-out infinite%7D%40keyframes spinner_zKoa%7B100%25%7Btransform:rotate(360deg)%7D%7D%40keyframes spinner_YpZS%7B0%25%7Bstroke-dasharray:0 150;stroke-dashoffset:0%7D47.5%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-16%7D95%25%2C100%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-59%7D%7D%3C%2Fstyle%3E%3Cg class='spinner_V8m1'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3'%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='%23000' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cstyle%3E.spinner_V8m1%7Btransform-origin:center;animation:spinner_zKoa 2s linear infinite%7D.spinner_V8m1 circle%7Bstroke-linecap:round;animation:spinner_YpZS 1.5s ease-out infinite%7D%40keyframes spinner_zKoa%7B100%25%7Btransform:rotate(360deg)%7D%7D%40keyframes spinner_YpZS%7B0%25%7Bstroke-dasharray:0 150;stroke-dashoffset:0%7D47.5%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-16%7D95%25%2C100%25%7Bstroke-dasharray:42 150;stroke-dashoffset:-59%7D%7D%3C%2Fstyle%3E%3Cg class='spinner_V8m1'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3'%3E%3C%2Fcircle%3E%3C%2Fg%3E%3C%2Fsvg%3E");
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='black' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform-origin='center'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='2s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dasharray' values='0,150;42,150;42,150' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dashoffset' values='0;-16;-59' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg width='24' height='24' stroke='black' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform-origin='center'%3E%3Ccircle cx='12' cy='12' r='9.5' fill='none' stroke-width='3' stroke-linecap='round'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='2s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dasharray' values='0,150;42,150;42,150' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3Canimate attributeName='stroke-dashoffset' values='0;-16;-59' keyTimes='0;0.475;1' dur='1.5s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3C/svg%3E");
 }
 .loading-sm {
   width: 1.25rem;
@@ -2434,6 +2438,9 @@ details.collapse summary::-webkit-details-marker {
   --tw-space-x-reverse: 0;
   margin-right: calc(0.5rem * var(--tw-space-x-reverse));
   margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
+}
+.modal-action:where([dir='rtl'], [dir='rtl'] *) > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
 }
 @keyframes modal-pop {
   0% {
@@ -2861,7 +2868,8 @@ details.collapse summary::-webkit-details-marker {
   border-color: var(--fallback-bc, oklch(var(--bc) / var(--tw-border-opacity)));
   background-color: transparent;
   opacity: 0.3;
-  --togglehandleborder: 0 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset,
+  --togglehandleborder:
+    0 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset,
     var(--handleoffsetcalculator) 0 0 3px var(--fallback-bc, oklch(var(--bc) / 1)) inset;
 }
 .btn-xs {
@@ -3259,8 +3267,9 @@ details.collapse summary::-webkit-details-marker {
     transform,
     filter,
     -webkit-backdrop-filter;
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow,
-    transform, filter, backdrop-filter;
+  transition-property:
+    color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter,
+    backdrop-filter;
   transition-property:
     color,
     background-color,
@@ -3651,27 +3660,27 @@ details.collapse summary::-webkit-details-marker {
 }
 .border-gray-300 {
   --tw-border-opacity: 1;
-  border-color: rgb(209 213 219 / var(--tw-border-opacity));
+  border-color: rgb(209 213 219 / var(--tw-border-opacity, 1));
 }
 .border-success {
   --tw-border-opacity: 1;
-  border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity)));
+  border-color: var(--fallback-su, oklch(var(--su) / var(--tw-border-opacity, 1)));
 }
 .bg-base-100 {
   --tw-bg-opacity: 1;
-  background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity)));
+  background-color: var(--fallback-b1, oklch(var(--b1) / var(--tw-bg-opacity, 1)));
 }
 .bg-base-200 {
   --tw-bg-opacity: 1;
-  background-color: var(--fallback-b2, oklch(var(--b2) / var(--tw-bg-opacity)));
+  background-color: var(--fallback-b2, oklch(var(--b2) / var(--tw-bg-opacity, 1)));
 }
 .bg-base-300 {
   --tw-bg-opacity: 1;
-  background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity)));
+  background-color: var(--fallback-b3, oklch(var(--b3) / var(--tw-bg-opacity, 1)));
 }
 .bg-neutral {
   --tw-bg-opacity: 1;
-  background-color: var(--fallback-n, oklch(var(--n) / var(--tw-bg-opacity)));
+  background-color: var(--fallback-n, oklch(var(--n) / var(--tw-bg-opacity, 1)));
 }
 .bg-success\/10 {
   background-color: var(--fallback-su, oklch(var(--su) / 0.1));
@@ -3785,34 +3794,34 @@ details.collapse summary::-webkit-details-marker {
 }
 .text-error {
   --tw-text-opacity: 1;
-  color: var(--fallback-er, oklch(var(--er) / var(--tw-text-opacity)));
+  color: var(--fallback-er, oklch(var(--er) / var(--tw-text-opacity, 1)));
 }
 .text-gray-500 {
   --tw-text-opacity: 1;
-  color: rgb(107 114 128 / var(--tw-text-opacity));
+  color: rgb(107 114 128 / var(--tw-text-opacity, 1));
 }
 .text-info {
   --tw-text-opacity: 1;
-  color: var(--fallback-in, oklch(var(--in) / var(--tw-text-opacity)));
+  color: var(--fallback-in, oklch(var(--in) / var(--tw-text-opacity, 1)));
 }
 .text-neutral-content {
   --tw-text-opacity: 1;
-  color: var(--fallback-nc, oklch(var(--nc) / var(--tw-text-opacity)));
+  color: var(--fallback-nc, oklch(var(--nc) / var(--tw-text-opacity, 1)));
 }
 .text-success {
   --tw-text-opacity: 1;
-  color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity)));
+  color: var(--fallback-su, oklch(var(--su) / var(--tw-text-opacity, 1)));
 }
 .text-success-content {
   --tw-text-opacity: 1;
-  color: var(--fallback-suc, oklch(var(--suc) / var(--tw-text-opacity)));
+  color: var(--fallback-suc, oklch(var(--suc) / var(--tw-text-opacity, 1)));
 }
 .text-success-content\/70 {
   color: var(--fallback-suc, oklch(var(--suc) / 0.7));
 }
 .text-warning {
   --tw-text-opacity: 1;
-  color: var(--fallback-wa, oklch(var(--wa) / var(--tw-text-opacity)));
+  color: var(--fallback-wa, oklch(var(--wa) / var(--tw-text-opacity, 1)));
 }
 .no-underline {
   text-decoration-line: none;
@@ -3920,17 +3929,17 @@ details.collapse summary::-webkit-details-marker {
 
 .checked\:bg-blue-500:checked {
   --tw-bg-opacity: 1;
-  background-color: rgb(59 130 246 / var(--tw-bg-opacity));
+  background-color: rgb(59 130 246 / var(--tw-bg-opacity, 1));
 }
 
 .checked\:bg-green-500:checked {
   --tw-bg-opacity: 1;
-  background-color: rgb(34 197 94 / var(--tw-bg-opacity));
+  background-color: rgb(34 197 94 / var(--tw-bg-opacity, 1));
 }
 
 .checked\:bg-orange-500:checked {
   --tw-bg-opacity: 1;
-  background-color: rgb(249 115 22 / var(--tw-bg-opacity));
+  background-color: rgb(249 115 22 / var(--tw-bg-opacity, 1));
 }
 
 .group:first-child .group-first\:block {
