@@ -1,7 +1,7 @@
 import { exec } from 'child_process'
 import { ONE_SECOND } from './constants'
 
-const CONTAINER_NAME = 'tempura-fulcrum'
+const CONTAINER_NAME = 'swan-vault-recovery-assistant-fulcrum'
 
 function log(message: string, ...args: any): void {
   console.log('[TEST][CONTAINER]', message, ...args)
