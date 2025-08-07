@@ -1,4 +1,5 @@
 import { Descriptors, TempuraError } from './bindings'
+import { showTempMessage } from './utilities'
 
 type Buttons = {
   broadcast: HTMLButtonElement
@@ -11,6 +12,7 @@ type Buttons = {
   pastePsbt: HTMLButtonElement
   sign: HTMLButtonElement
   sweep: HTMLButtonElement
+  advancedMode: HTMLButtonElement
 }
 
 type Checkboxes = {
@@ -33,8 +35,13 @@ type Containers = {
   footer: HTMLDivElement
   mainContent: HTMLDivElement
   network: HTMLDivElement
-  toast: HTMLDivElement
   walletActions: HTMLDivElement
+}
+
+type FeedbackElements = {
+  receiveInputValidationMessage: HTMLDivElement
+  addressInputValidationMessage: HTMLDivElement
+  psbtInputValidationMessage: HTMLDivElement
 }
 
 type Inputs = {
@@ -75,6 +82,7 @@ type Outputs = {
   psbtStatus: HTMLDivElement
   psbtTextArea: HTMLTextAreaElement
   tempMessage: HTMLDivElement
+  tempMessageContainer: HTMLDivElement
   transactionOverview: HTMLDivElement
   txBody: HTMLTableSectionElement
 }
@@ -83,6 +91,7 @@ type DOM = {
   buttons: Buttons
   checkboxes: Checkboxes
   containers: Containers
+  feedback: FeedbackElements
   inputs: Inputs
   links: Links
   modals: Modals
@@ -136,17 +145,25 @@ export function getUserInputs(): UserInputs {
 export function handleError(e: unknown) {
   if (isTempuraError(e)) {
     console.log(e.error_type, e.message)
-    DOM.outputs.tempMessage.textContent = e.error_type.concat(': ').concat(e.message)
+    showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
   }
 
   if (e instanceof Error) {
     console.error(e)
-    DOM.outputs.tempMessage.textContent = e.message
+    showTempMessage(e.message)
     return
   }
 
-  DOM.outputs.tempMessage.textContent = 'An unknown error occurred'
+  showTempMessage('An unknown error occurred')
+}
+
+export function initializeMode() {
+  const isDev = import.meta.env.MODE === 'development'
+
+  if (isDev) {
+    document.documentElement.classList.add('dev-mode')
+  }
 }
 
 export function initializeDOM() {
@@ -154,7 +171,14 @@ export function initializeDOM() {
   try {
     tempMessage = requireDomElement<HTMLDivElement>('#temporary-message')
 
+    const feedback = {
+      receiveInputValidationMessage: requireDomElement<HTMLDivElement>('#receive-input-validation-message'),
+      addressInputValidationMessage: requireDomElement<HTMLDivElement>('#address-input-validation-message'),
+      psbtInputValidationMessage: requireDomElement<HTMLDivElement>('#psbt-input-validation-message'),
+    }
+
     const buttons = {
+      advancedMode: requireDomElement<HTMLButtonElement>('#advanced-mode-button'),
       broadcast: requireDomElement<HTMLButtonElement>('#broadcast-button'),
       clearMessages: requireDomElement<HTMLButtonElement>('#clear-messages-button'),
       copyPsbt: requireDomElement<HTMLButtonElement>('#copy-psbt-button'),
@@ -194,7 +218,6 @@ export function initializeDOM() {
       footer: requireDomElement<HTMLDivElement>('#footer'),
       mainContent: requireDomElement<HTMLDivElement>('#main-content'),
       network: requireDomElement<HTMLDivElement>('#network-input-container'),
-      toast: requireDomElement<HTMLDivElement>('#toast-container'),
       walletActions: requireDomElement<HTMLDivElement>('#wallet-actions'),
     }
 
@@ -227,6 +250,7 @@ export function initializeDOM() {
       psbtStatus: requireDomElement<HTMLDivElement>('#psbt-status'),
       psbtTextArea: requireDomElement<HTMLTextAreaElement>('#psbt-textarea'),
       tempMessage,
+      tempMessageContainer: requireDomElement<HTMLDivElement>('#temp-message-container'),
       transactionOverview: requireDomElement<HTMLDivElement>('#transaction-overview-container'),
       txBody: requireDomElement<HTMLTableSectionElement>('#transactions-body'),
     }
@@ -235,6 +259,7 @@ export function initializeDOM() {
       buttons,
       checkboxes,
       containers,
+      feedback,
       inputs,
       links,
       modals,

@@ -1,4 +1,4 @@
-name: Build tempura release
+name: Build Swan Vault Recovery Assistant release
 
 on:
   push:
@@ -62,8 +62,8 @@ jobs:
             src-tauri/target/
             !src-tauri/target/release/hwi
             !src-tauri/target/release/hwi.exe
-            !src-tauri/target/release/tempura
-            !src-tauri/target/release/tempura.exe
+            !src-tauri/target/release/swan-vault-recovery-assistant
+            !src-tauri/target/release/swan-vault-recovery-assistant.exe
             !src-tauri/target/release/bundle
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
@@ -124,8 +124,8 @@ jobs:
             src-tauri/target/
             !src-tauri/target/release/hwi
             !src-tauri/target/release/hwi.exe
-            !src-tauri/target/release/tempura
-            !src-tauri/target/release/tempura.exe
+            !src-tauri/target/release/swan_vault_recovery_assistant
+            !src-tauri/target/release/swan_vault_recovery_assistant.exe
             !src-tauri/target/release/bundle
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
@@ -134,26 +134,26 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
-          name: tempura-linux
+          name: swan-vault-recovery-assistant-linux
           path: |
-            src-tauri/target/release/bundle/deb/tempura*.deb
-            src-tauri/target/release/bundle/appimage/tempura*.AppImage
-            src-tauri/target/release/bundle/rpm/tempura*.rpm
+            src-tauri/target/release/bundle/deb/Swan*.deb
+            src-tauri/target/release/bundle/appimage/Swan*.AppImage
+            src-tauri/target/release/bundle/rpm/Swan*.rpm
 
       - name: Publish artifacts (macos)
         if: ${{ matrix.os == 'macos-latest' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
-          name: tempura-macos
+          name: swan-vault-recovery-assistant-macos
           path: |
-            src-tauri/target/release/bundle/macos/tempura.app
-            src-tauri/target/release/bundle/dmg/tempura*.dmg
+            src-tauri/target/release/bundle/macos/Swan*.app
+            src-tauri/target/release/bundle/dmg/Swan*.dmg
 
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
-          name: tempura-windows
+          name: swan-vault-recovery-assistant-windows
           path: |
-            src-tauri/target/release/bundle/msi/tempura*.msi
-            src-tauri/target/release/bundle/nsis/tempura*.exe
+            src-tauri/target/release/bundle/msi/Swan*.msi
+            src-tauri/target/release/bundle/nsis/Swan*.exe

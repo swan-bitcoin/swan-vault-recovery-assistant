@@ -13,8 +13,8 @@ function log(message: string, ...args: any): void {
 export let driver: WebDriver
 let tauriDriver
 
-const application = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release', 'tempura')
-const hashFile = path.resolve(__dirname, '..', 'src-tauri', 'target', 'tempura-hashfile')
+const application = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release', 'swan_vault_recovery_assistant')
+const hashFile = path.resolve(__dirname, '..', 'src-tauri', 'target', 'swan_vault_recovery_assistant-hashfile')
 
 // a list of files and directories to hash to determine when we should build
 const tauriDir = path.resolve(__dirname, '..', 'src-tauri')

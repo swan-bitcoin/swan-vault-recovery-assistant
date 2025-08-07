@@ -128,7 +128,7 @@ describe('getSignResultAndPsbt()', () => {
         signed: true,
       })
     )
-    expect(result.message).toContain('Signature added')
+    expect(result.message).toContain('Added a signature')
   })
 })
 

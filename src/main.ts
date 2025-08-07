@@ -1,7 +1,7 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
 import { commands } from './bindings'
-import { RecoveryToast, Success, Transactions, WalletInfo } from './components'
-import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM } from './dom'
+import { Transactions } from './components'
+import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM, initializeMode } from './dom'
 import {
   Device,
   getDevice,
@@ -11,9 +11,22 @@ import {
   getSignResultAndPsbt,
   sanitize,
 } from './parsing'
-import { capitalize, createConversationBubble, populateTransactionOverview, scrollToLastMessage } from './utilities'
+import {
+  createConversationBubble,
+  getWalletInfoBubbles,
+  hideTempMessage,
+  populateTransactionOverview,
+  scrollToLastMessage,
+  showTempLoadingMessage,
+  addToConversation,
+  ConversationBubbleProps,
+} from './utilities'
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
-import { closeToast, showToast } from './toast'
+import { createConversationActions } from './utilities/createConversationActions'
+import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
+import { getJadeDevice, getDeviceName } from './utilities/devices'
+import { createConversationImage } from './utilities/createConversationImage'
+import { CircularTickIcon } from './icons/circularTick'
 
 const FEE_RATE_WARNING_RATIO = 0.9
 
@@ -58,42 +71,84 @@ async function getFeeRate(): Promise<FeeRate> {
   return { value: feeRate }
 }
 
-const updateSignHistory = (device: Device) => {
-  const newStep = document.createElement('li')
-  newStep.classList.add('step', 'step-info')
-  newStep.innerText = `Signed by ${capitalize(device.type)} device (${device.fingerprint})`
-  const stepsList = DOM.outputs.psbtSignHistory
-  stepsList.appendChild(newStep)
+const addSignatureToSignHistory = (device: Device) => {
+  const newSignature = document.createElement('li')
+  newSignature.className = 'border rounded-md p-2 bg-success/10 border-success flex group gap-2 text-success'
+
+  const icon = CircularTickIcon
+  newSignature.innerHTML = `${icon}<div class="flex flex-col"><span class="text-success-content">${getDeviceName(device)}</span><span class="text-sm text-success-content/70">${device.fingerprint}</span></div>`
+
+  return newSignature
 }
 
-function require(value: unknown, itemName: string) {
-  if (!value) {
-    const message = itemName.concat(' is required')
-    DOM.outputs.tempMessage.textContent = message
-    throw new Error(message)
+const updateSignHistory = (device: Device) => {
+  const newSignature = addSignatureToSignHistory(device)
+  const stepsList = DOM.outputs.psbtSignHistory
+
+  const missingSignature = stepsList.querySelector('#missing-signature')
+  if (missingSignature) {
+    stepsList.insertBefore(newSignature, missingSignature)
+  } else {
+    stepsList.appendChild(newSignature)
   }
 }
+
+function require(value: unknown, message: string, errorElement: HTMLElement) {
+  if (value) {
+    errorElement.textContent = ''
+    return
+  }
+
+  errorElement.textContent = message
+  throw new Error(message)
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 async function broadcast() {
   const { descriptors, electrum, network, psbt } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  require(psbt, 'PSBT')
+  require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
   DOM.outputs.tempMessage.textContent = 'Please wait...'
   try {
     const userBubble = createConversationBubble({
-      content: 'Broadcast the transaction from this PSBT',
+      content: 'Broadcast the transaction to the Bitcoin network',
       isUserSpeaking: true,
     })
 
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     await commands.broadcast(psbt, network, descriptors, electrum)
-    const tempuraBubble = createConversationBubble({
-      content: 'Broadcast successful!',
+
+    await sleep(500)
+
+    showTempLoadingMessage('Broadcasting transaction...')
+    await sleep(2000)
+
+    hideTempMessage()
+    addToConversation(
+      createConversationBubble({
+        content: 'Transaction successfully broadcasted.',
+        footer: new Date().toLocaleString(),
+      })
+    )
+
+    await sleep(500)
+
+    addToConversation(
+      createConversationBubble({
+        content: 'Your transaction should be visible in your wallet shortly and confirmed in the next few blocks.',
+      })
+    )
+
+    /*
+    addToConversation(createConversationActions({
+      content: '<button class="btn btn-outline btn-sm" id="broadcast-again-btn">View in mempool</button>',
     })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
-    DOM.outputs.tempMessage.textContent = 'Anything else?'
+    */
+
+    //DOM.outputs.tempMessage.textContent = 'Anything else?'
   } catch (e: unknown) {
     handleError(e)
   }
@@ -108,13 +163,13 @@ async function enumerate() {
       content: 'Find my device',
       isUserSpeaking: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
     const response = await commands.enumerate(network)
     const tempuraBubble = createConversationBubble({
       content: getDeviceMessage(response),
     })
 
-    DOM.outputs.conversation.appendChild(tempuraBubble)
+    addToConversation(tempuraBubble)
     DOM.outputs.tempMessage.textContent = getDevicePrompt(response)
   } catch (e: unknown) {
     handleError(e)
@@ -125,46 +180,102 @@ async function loadWallet() {
   const { descriptors, electrum, network } = getUserInputs()
   const isValid = await validateDescriptor()
   if (!isValid) return
-  DOM.outputs.tempMessage.textContent = 'Fetching wallet ...'
+
+  showTempLoadingMessage('Fetching wallet')
 
   try {
     const userBubble = createConversationBubble({
       content: 'Fetch my wallet.',
       isUserSpeaking: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
+    addToConversation(userBubble)
+    showTempLoadingMessage('Fetching wallet')
     const { balance, transactions } = await commands.wallet(network, descriptors, electrum)
     const addressInfo = await commands.address(network, descriptors, electrum)
     DOM.outputs.txBody.innerHTML = Transactions(transactions)
-    DOM.outputs.tempMessage.textContent = 'Wallet fetched successfully!'
-    const tempuraBubble = createConversationBubble({
-      content: WalletInfo({
-        balance,
-        transactions,
-        addressInfo,
-      }),
-      dangerouslySetInnerHTML: true,
-    })
-    instrumentCopyButtons(tempuraBubble)
-    DOM.outputs.conversation.appendChild(tempuraBubble)
 
-    const showListButton = tempuraBubble.querySelector('#show-transactions-btn')
-    showListButton?.addEventListener('click', () => {
-      DOM.modals.transactions.showModal()
+    hideTempMessage()
+
+    /*
+    const balanceInfoBubble = createConversationBubble({
+      content: 'I found the following information about your wallet',
+    })
+      */
+
+    const { messages: walletInfoBubbles, isRecoverable } = getWalletInfoBubbles({
+      // balance: { immature: '0', confirmed: '0', trusted_pending: '0', untrusted_pending: '0' },
+      balance,
+      transactions,
+      addressInfo,
     })
 
-    // Show toast message from which to start recovery flow
-    showToast(RecoveryToast())
-    const beginRecoveryButton = document.getElementById('begin-recovery-btn')
-    beginRecoveryButton?.addEventListener('click', () => {
-      DOM.radios.recoveryOptionsCollapse.checked = true
-      closeToast()
-    })
+    if (!walletInfoBubbles || !walletInfoBubbles.length) {
+      const couldNotFindWalletInfoBubble = createConversationBubble({
+        content: 'I could not find any information about your wallet',
+      })
+      addToConversation(couldNotFindWalletInfoBubble)
+      return
+    }
+
+    for (const bubble of walletInfoBubbles) {
+      const tempuraItem = bubble.type === 'bubble' ? createConversationBubble(bubble) : createConversationActions(bubble)
+      if (!tempuraItem) {
+        continue
+      }
+
+      if (bubble.type === 'actions') {
+        instrumentCopyButtons(tempuraItem)
+
+        const showListButton = tempuraItem.querySelector('#show-transactions-btn')
+        showListButton?.addEventListener('click', () => {
+          DOM.modals.transactions.showModal()
+        })
+
+        instrumentStartRecoveryButton(tempuraItem)
+      }
+
+      addToConversation(tempuraItem)
+
+      await sleep(400)
+    }
+
+    if (!isRecoverable) {
+      return
+    }
 
     instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e: unknown) {
     handleError(e)
   }
+}
+
+function instrumentStartRecoveryButton(parent: HTMLElement) {
+  const beginRecoveryButton = parent.querySelector('#begin-recovery-btn')
+
+  if (!beginRecoveryButton) {
+    return
+  }
+
+  beginRecoveryButton.addEventListener('click', async () => {
+    const isChecked = DOM.radios.recoveryOptionsCollapse.checked
+
+    if (isChecked) {
+      return
+    }
+
+    // only show this message once
+    const addDestinationAddressMessage = createConversationBubble({
+      content:
+        'Recovering is simple. Add an address in the input on the right. We create a recovery transaction and send the funds to that address next.',
+      isUserSpeaking: false,
+    })
+
+    addToConversation(addDestinationAddressMessage)
+
+    await sleep(1000)
+
+    DOM.radios.recoveryOptionsCollapse.checked = true
+  })
 }
 
 function instrumentCopyButtons(parent: HTMLElement) {
@@ -214,12 +325,15 @@ function copyPsbtToClipboard() {
 }
 
 async function estimateFee() {
-  DOM.outputs.tempMessage.textContent = 'Please wait...'
+  //showTempLoadingMessage('Estimating fee')
+
   try {
     const { electrum, network } = getUserInputs()
+    DOM.buttons.estimate.classList.add('is-loading')
     const feeRate = await commands.estimateFee(network, electrum, 1)
+    DOM.buttons.estimate.classList.remove('is-loading')
     DOM.inputs.feeRate.value = feeRate.toString()
-    DOM.outputs.tempMessage.innerHTML = Success('Fee retrieved')
+    // showTempMessage('Fee retrieved')
   } catch (e: unknown) {
     handleError(e)
   }
@@ -230,7 +344,7 @@ function pastePsbtFromClipboard() {
     .then((psbt) => {
       const trimmed = psbt.trim()
       if (trimmed !== DOM.outputs.psbtTextArea.value) {
-        DOM.buttons.broadcast.classList.remove('btn-disabled')
+        DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
         DOM.outputs.psbtStatus.innerHTML = ''
         DOM.outputs.psbtSignHistory.innerHTML = ''
       }
@@ -250,52 +364,184 @@ const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidd
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
 
-async function sign() {
+async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
   const { psbt, descriptors, network } = getUserInputs()
-  require(psbt, 'PSBT')
+  require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
-  DOM.outputs.tempMessage.textContent = 'Please wait... Make sure your device is unlocked (PIN entered).'
+  //showTempMessage('Please wait... Make sure your device is unlocked (PIN entered).')
   try {
-    const userBubble = createConversationBubble({
-      content: 'Sign this transaction (PSBT)',
-      isUserSpeaking: true,
-    })
-    DOM.outputs.conversation.appendChild(userBubble)
+    showTempLoadingMessage('Looking for your device…')
+
+    await sleep(400)
+
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
-    DOM.outputs.tempMessage.textContent =
-      'Follow the instructions on your device (might take a few seconds for them to appear).'
+
+    hideTempMessage()
+
+    const deviceInstructionBubbles: Array<ConversationBubbleProps & { type: 'bubble' | 'image' }> = [
+      ...(device.type === 'jade'
+        ? [
+            {
+              content: getJadeDevice({ fingerprint: device.fingerprint ?? '' }),
+              type: 'image' as const,
+            },
+            {
+              content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+              footer: new Date().toLocaleString(),
+              type: 'bubble' as const,
+            },
+          ]
+        : [
+            {
+              content: `Found a ${device.type} with fingerprint ${device.fingerprint}.`,
+              type: 'bubble' as const,
+            },
+            {
+              content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
+              type: 'bubble' as const,
+            },
+          ]),
+    ]
+
+    for (const { type, ...bubble } of deviceInstructionBubbles) {
+      const item = type === 'image' ? createConversationImage(bubble) : createConversationBubble(bubble)
+      addToConversation(item)
+      await sleep(400)
+    }
+
+    // let them read past messages first.
+    // give the device some time to receive the psbt.
+    // then notify that we're waiting
+    await sleep(9000)
+
+    showTempLoadingMessage('Waiting for you to sign the transaction')
+
     const response = await commands.sign(psbt, network, device.type)
+
+    hideTempMessage()
+
     const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
       content: message,
+      //footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
+    addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
       updateSignHistory(device)
     }
+
     // Give feedback via shrimpy
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
-    DOM.outputs.tempMessage.textContent = getPsbtStatusMessage(psbtStatus)
+
+    await sleep(600)
+
+    addToConversation(
+      createConversationBubble({
+        content: getPsbtStatusMessage(psbtStatus),
+        footer: new Date().toLocaleString(),
+      })
+    )
+
+    if (psbtStatus === 'PartiallySigned') {
+      await sleep(4000)
+      addToConversation(
+        createConversationBubble({
+          content: 'Connect another device to continue signing the transaction.',
+        })
+      )
+      const actions = createConversationActions({
+        content: '<button class="btn btn-primary btn-sm">Continue signing with another device</button>',
+        dangerouslySetInnerHTML: true,
+        onAppended: (parent) => {
+          parent.querySelector('button')?.addEventListener('click', () => {
+            sign()
+          })
+        },
+      })
+
+      if (actions) {
+        addToConversation(actions)
+      }
+    }
   } catch (e: unknown) {
+    if (e instanceof Error) {
+      const tryAgainActions = createConversationActions({
+        content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
+        dangerouslySetInnerHTML: true,
+        onAppended: (parent) => {
+          parent.querySelector('#get-device-and-sign-again-btn')?.addEventListener('click', () => {
+            sign({ retryCount: retryCount + 1 })
+          })
+        },
+      })
+
+      if (e.message.toLowerCase() === 'no devices found') {
+        hideTempMessage()
+
+        addToConversation(
+          createConversationBubble({
+            content:
+              retryCount > 3
+                ? 'If you have trouble connecting to your device please try a different USB port or cable.'
+                : 'No devices found. Please make sure your device is plugged in and unlocked (PIN entered).',
+            footer: new Date().toLocaleString(),
+          }),
+          {
+            shouldScrollToLastMessage: !tryAgainActions,
+          }
+        )
+      }
+
+      // user likely canceled signing
+      if (e.message.toLowerCase().includes('failed to extract psbt')) {
+        hideTempMessage()
+
+        addToConversation(
+          createConversationBubble({
+            content: `Looks like you refused to sign this transaction. If this was a mistake, you can try again.`,
+          }),
+          {
+            shouldScrollToLastMessage: !tryAgainActions,
+          }
+        )
+      }
+
+      await sleep(400)
+
+      if (tryAgainActions) {
+        addToConversation(tryAgainActions, {
+          shouldScrollToLastMessage: true,
+        })
+      }
+      return
+    }
+
     handleError(e)
   }
 }
 
 async function sweep() {
   const inputs = getUserInputs()
+
   const { address, descriptors, electrum, network } = inputs
   const isValid = await validateDescriptor()
   if (!isValid) return
+
   if (!address) {
     DOM.inputs.address.classList.add('input-error')
+  } else {
+    DOM.inputs.address.classList.remove('input-error')
   }
-  require(address, 'Address')
 
+  require(address, 'A destination address is required', DOM.feedback.addressInputValidationMessage)
+
+  const { feeRate: userFeeRate } = getUserInputs()
   const feeRate = await getFeeRate()
+
   if (feeRate.failed || feeRate.value === null) {
     DOM.outputs.tempMessage.textContent =
       'Unable to automatically estimate a fee for this network. Please enter a fee rate manually.'
@@ -303,15 +549,40 @@ async function sweep() {
   }
 
   DOM.outputs.tempMessage.textContent = 'Please wait...'
+
   try {
+    const createTransactionMessage = !userFeeRate
+      ? `Create a transaction to send all wallet funds to <br/><span class="break-all font-bold">${sanitize(address)}</span>`
+      : `Create a transaction to send all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`
+
     const userBubble = createConversationBubble({
-      content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> (fee rate: ${feeRate.value} sats/vB)`,
+      content: createTransactionMessage,
+      //content: `Create a transaction to send all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
+      //content: `Create a transaction (PSBT) sending all wallet funds to <span class="break-all font-bold">${sanitize(address)}</span> with a network fee rate of ${feeRate.value} sats/vB.`,
       isUserSpeaking: true,
       dangerouslySetInnerHTML: true,
     })
-    DOM.outputs.conversation.appendChild(userBubble)
-    const { psbt, outbound, fee } = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+
+    addToConversation(userBubble)
+    const psbtDetails = await commands.sweep(address, feeRate.value, network, descriptors, electrum)
+    const { psbt, outbound, sent, fee } = psbtDetails
+
+    await sleep(1000)
     clearStatusIndicators(DOM.outputs.psbtTextArea)
+
+    const { messages: replies } = getTransactionCreatedBubbles({
+      sent,
+      address,
+      hasUserFeeRate: !!userFeeRate,
+      feeRate: fee,
+    })
+
+    for (const reply of replies) {
+      const tempuraBubble = createConversationBubble(reply)
+      addToConversation(tempuraBubble)
+      await sleep(400)
+    }
+
     // Show transaction overview and populate transaction overview table
     DOM.outputs.transactionOverview.classList.remove('hidden')
     populateTransactionOverview({ address: DOM.inputs.address.value, outbound, fee })
@@ -323,18 +594,12 @@ async function sweep() {
     DOM.outputs.transactionOverview.scrollIntoView({ behavior: 'smooth' })
 
     DOM.outputs.tempMessage.textContent = 'Sign next?'
-    const tempuraBubble = createConversationBubble({
-      content: Success('Transaction (PSBT) created!'),
-      isUserSpeaking: false,
-      dangerouslySetInnerHTML: true,
-    })
-    DOM.outputs.conversation.appendChild(tempuraBubble)
 
     if (feeRate.warning) {
       const warningBubble = createConversationBubble({
         content: feeRate.warning,
       })
-      DOM.outputs.conversation.appendChild(warningBubble)
+      addToConversation(warningBubble)
     }
 
     DOM.radios.sendTransactionCollapse.checked = true
@@ -344,6 +609,7 @@ async function sweep() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  initializeMode()
   initializeDOM()
 
   DOM.buttons.broadcast.addEventListener('click', (e) => {
@@ -359,6 +625,11 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.buttons.enumerate.addEventListener('click', (e) => {
     e.preventDefault()
     enumerate()
+  })
+
+  DOM.buttons.advancedMode.addEventListener('click', (e) => {
+    e.preventDefault()
+    document.documentElement.classList.toggle('advanced-mode')
   })
 
   DOM.buttons.estimate.addEventListener('click', (e) => {
@@ -406,8 +677,26 @@ window.addEventListener('DOMContentLoaded', () => {
     pastePsbtFromClipboard()
   })
 
-  DOM.buttons.sign.addEventListener('click', (e) => {
+  DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
+    const userBubble = createConversationBubble({
+      content: 'Sign this transaction (PSBT)',
+      isUserSpeaking: true,
+    })
+    addToConversation(userBubble)
+
+    await sleep(400)
+
+    addToConversation(
+      createConversationBubble({
+        content:
+          'To sign the transaction, we need to find your device. Make sure it is plugged in and unlocked (PIN entered).',
+        isUserSpeaking: false,
+      })
+    )
+
+    await sleep(2000)
+
     sign()
   })
 
@@ -448,14 +737,14 @@ window.addEventListener('DOMContentLoaded', () => {
   })
 
   DOM.outputs.psbtTextArea.addEventListener('input', () => {
-    DOM.buttons.broadcast.classList.remove('btn-disabled')
+    DOM.buttons.broadcast.classList.remove('btn-disabled', 'hidden')
     DOM.outputs.psbtSignHistory.innerHTML = ''
     validatePsbt()
   })
 
   DOM.links.about.addEventListener('click', async (e) => {
     e.preventDefault()
-    await commands.createWindow('about', 'about.html', 'About Tempura', 800, 600)
+    await commands.createWindow('about', 'about.html', 'About Swan Vault Recovery Assistant', 800, 950)
   })
 
   // Set up observer to scroll to the last chat message whenever a message is added

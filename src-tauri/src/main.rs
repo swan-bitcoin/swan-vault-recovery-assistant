@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 #[macro_use]
 mod errors;
-use bdk_wallet::bitcoin::psbt;
 use bdk_wallet::psbt::PsbtUtils;
 use errors::{DescriptorType, TempuraError, TempuraErrorType};
 mod network;
@@ -26,6 +25,7 @@ use tauri::Manager;
 use bdk_electrum::electrum_client::Client;
 use bdk_electrum::BdkElectrumClient;
 use bdk_wallet;
+use bdk_wallet::bitcoin::address::Address;
 use bdk_wallet::bitcoin::secp256k1::Secp256k1;
 use bdk_wallet::bitcoin::Amount;
 use bdk_wallet::bitcoin::Psbt;
@@ -39,7 +39,7 @@ const DEFAULT_BATCH_SIZE: usize = 100;
  * types
  */
 
-#[derive(Default, Serialize, Deserialize, Type)]
+#[derive(Default, Serialize, Deserialize, Type, Clone)]
 pub struct AddressInfo {
   pub index: u32,
   pub address: String,
@@ -80,7 +80,7 @@ impl From<bdk_wallet::Balance> for Balance {
   }
 }
 
-#[derive(Default, Serialize, Deserialize, Type)]
+#[derive(Default, Serialize, Deserialize, Type, Clone)]
 struct Descriptors {
   pub receive: String,
   pub change: Option<String>,
@@ -106,10 +106,11 @@ pub struct PsbtDetails {
   pub sent: String,
   pub fee: Option<String>,
   pub outbound: String,
+  pub sent_to_self: bool,
 }
 
 impl PsbtDetails {
-  pub fn new(psbt: Psbt, wallet: &bdk_wallet::Wallet) -> Self {
+  pub fn new(psbt: Psbt, wallet: &bdk_wallet::Wallet, sent_to_self: bool) -> Self {
     let tx = psbt.clone().extract_tx().unwrap();
     let fee = psbt.fee_amount().unwrap_or(Amount::ZERO);
     let (sent, received) = wallet.sent_and_received(&tx);
@@ -122,6 +123,7 @@ impl PsbtDetails {
       sent: sent.to_sat().to_string(),
       fee: Some(fee.to_sat().to_string()),
       outbound: outbound.to_sat().to_string(),
+      sent_to_self,
     }
   }
 }
@@ -189,20 +191,44 @@ pub struct Wallet {
  */
 
 /*
- * this function extracts a (presumably signed) psbt from an hwi response
+ * this function extracts a value from an hwi response json for a given key
  * we do this via 'dumb' string search so avoid bringing in a regex or json crate.
  */
-fn extract_psbt(response: &str) -> Option<String> {
-  let psbt_key = "\"psbt\": \"";
-  if let Some(start) = response.find(psbt_key) {
-    let value_start = start + psbt_key.len();
+fn extract_value(response: &str, key: &str) -> Option<String> {
+  let key_pattern = format!("\"{}\":", key);
 
-    if let Some(end) = response[value_start..].find('"') {
-      let psbt_value = &response[value_start..value_start + end];
-      return Some(psbt_value.to_string());
+  if let Some(start) = response.find(&key_pattern) {
+    let value_start = start + key_pattern.len();
+    let remaining = &response[value_start..].trim_start();
+
+    if remaining.starts_with('"') {
+      if let Some(end) = remaining[1..].find('"') {
+        let value = &remaining[1..end + 1];
+        return Some(value.to_string());
+      }
+    } else {
+      let end = remaining
+        .find(|c: char| c == ',' || c == '}' || c.is_whitespace())
+        .unwrap_or(remaining.len());
+      let value = &remaining[..end].trim();
+      if !value.is_empty()
+        && value
+          .chars()
+          .all(|c| c.is_digit(10) || c == '.' || c == '-')
+      {
+        return Some(value.to_string());
+      }
     }
   }
   None
+}
+
+fn extract_error_code(response: &str) -> Option<i32> {
+  extract_value(response, "code")?.parse::<i32>().ok()
+}
+
+fn extract_psbt(response: &str) -> Option<String> {
+  extract_value(response, "psbt")
 }
 
 fn extract_txid(psbt: &str) -> Result<String, TempuraError> {
@@ -350,6 +376,21 @@ fn get_wallet(
   .create_wallet_no_persist();
 
   Ok(resolve!(wallet_result, TempuraErrorType::WalletError))
+}
+
+fn is_address_mine_internal(address: &Address, wallet: &mut bdk_wallet::Wallet) -> bool {
+  let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::External,
+    receive_index + (DEFAULT_STOP_GAP as u32),
+  );
+  let change_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::Internal);
+  let _ = wallet.reveal_addresses_to(
+    bdk_wallet::KeychainKind::Internal,
+    change_index + (DEFAULT_STOP_GAP as u32),
+  );
+
+  wallet.is_mine(address.script_pubkey())
 }
 
 fn is_multipath_descriptor(descriptor: &str) -> bool {
@@ -610,18 +651,7 @@ async fn is_address_mine(
     )
   })?;
 
-  let receive_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::External);
-  let _ = wallet.reveal_addresses_to(
-    bdk_wallet::KeychainKind::External,
-    receive_index + (DEFAULT_STOP_GAP as u32),
-  );
-  let change_index = wallet.next_derivation_index(bdk_wallet::KeychainKind::Internal);
-  let _ = wallet.reveal_addresses_to(
-    bdk_wallet::KeychainKind::Internal,
-    change_index + (DEFAULT_STOP_GAP as u32),
-  );
-
-  Ok(wallet.is_mine(addr.script_pubkey()))
+  Ok(is_address_mine_internal(&addr, &mut wallet))
 }
 
 #[tauri::command]
@@ -719,10 +749,8 @@ async fn sign(psbt: String, network: String, device_type: String) -> Result<Stri
 
   // check for a malicious or unexpected edit to the transaction
   let psbt = extract_psbt(&response).ok_or_else(|| {
-    TempuraError::new(
-      TempuraErrorType::HwiError,
-      "Failed to extract PSBT from HWI response",
-    )
+    let code = extract_error_code(&response);
+    TempuraError::from_hwi_error_code(code)
   })?;
   let signed_txid = extract_txid(&psbt)?;
   if txid.ne(&signed_txid) {
@@ -765,7 +793,6 @@ async fn sweep(
   tokio::task::block_in_place(|| {
     sync_wallet(&mut wallet, &blockchain)?;
 
-    let mut builder = wallet.build_tx();
     let addr = resolve!(
       bdk_wallet::bitcoin::Address::from_str(&address),
       TempuraErrorType::AddressError
@@ -780,13 +807,15 @@ async fn sweep(
         ),
       )
     })?;
+    let is_address_mine = is_address_mine_internal(&addr, &mut wallet);
 
+    let mut builder = wallet.build_tx();
     builder.drain_wallet();
     builder.drain_to(addr.script_pubkey());
     builder.fee_rate(fee_rate);
 
     let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
-    Ok(PsbtDetails::new(psbt, &wallet))
+    Ok(PsbtDetails::new(psbt, &wallet, is_address_mine))
   })
 }
 
@@ -909,7 +938,6 @@ fn main() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_clipboard_manager::init())
-    .plugin(tauri_plugin_shell::init())
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
       specta_builder.mount_events(app);

@@ -8,5 +8,5 @@ export const Sats = (sats: number | string) => {
   const splitIndex = firstNonZeroIndex === -1 ? combinedStr.length : firstNonZeroIndex
   const leading = combinedStr.slice(0, splitIndex)
   const trailing = combinedStr.slice(splitIndex)
-  return `₿<span class="opacity-50">${leading}</span>${trailing}`
+  return `₿<span class="opacity-70">${leading}</span>${trailing}`
 }

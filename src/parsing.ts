@@ -77,11 +77,11 @@ export function getPsbtStatusMessage(status: PsbtSigningStatus) {
   let message
   switch (status) {
     case 'Unsigned':
-      message = 'The PSBT is unsigned.'
+      message = 'The transaction still is unsigned.'
       break
     case 'PartiallySigned':
       message =
-        'The transaction is partially signed. You need to add the signature from another key before you can broadcast it.'
+        'The transaction is now partially signed. You need to add the signature from another key before you can broadcast it.'
       break
     case 'FullySigned':
       message = 'The transaction is fully signed 🎉. You can broadcast it now.'
@@ -101,7 +101,7 @@ export function getSignResultAndPsbt(val: unknown): {
   const signResponse = parseSignResponse(val)
 
   const message = signResponse.signed
-    ? Success('Signature added')
+    ? Success('Great! Added a signature to the transaction.')
     : 'A signature was not added, have you already signed with this device?'
   return { message, psbt: signResponse.psbt, signed: signResponse.signed }
 }

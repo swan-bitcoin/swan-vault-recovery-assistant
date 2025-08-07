@@ -7,8 +7,18 @@ export type TransactionOverviewProps = {
 }
 
 export const populateTransactionOverview = ({ address, outbound, fee }: TransactionOverviewProps) => {
-  const transactionRowTds = document.querySelectorAll('#transaction-overview-body tr td')
-  transactionRowTds[0].textContent = address
-  transactionRowTds[1].innerHTML = Sats(outbound)
-  transactionRowTds[2].innerHTML = Sats(fee || '')
+  const overviewAmount = document.getElementById('transaction-overview-amount')
+  if (overviewAmount) {
+    overviewAmount.textContent = Sats(outbound)
+  }
+
+  const overviewFee = document.getElementById('transaction-overview-fee')
+  if (overviewFee) {
+    overviewFee.textContent = Sats(fee || '')
+  }
+
+  const overviewAddress = document.getElementById('transaction-overview-address')
+  if (overviewAddress) {
+    overviewAddress.textContent = address
+  }
 }

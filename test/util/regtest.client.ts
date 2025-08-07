@@ -5,13 +5,13 @@ const defaultClientParameters = {
   agentOptions: undefined,
   network: 'regtest',
   port: 18453,
-  username: 'tempura',
+  username: 'swan-vault-recovery-assistant',
   password: 'hunter2',
   version: '0.23.0',
   wallet: undefined,
 }
 
-const defaultWallet = 'tempurawallet'
+const defaultWallet = 'swan-vault-recovery-assistant-wallet'
 
 const log = (message: string, ...args: any[]): void => {
   console.log('[TEST][REGTEST_CLIENT]', message, ...args)

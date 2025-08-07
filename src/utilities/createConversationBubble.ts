@@ -1,17 +1,28 @@
-type ConversationBubbleProps = {
+type SafeContent = {
   content: string
-  isUserSpeaking?: boolean
-  dangerouslySetInnerHTML?: boolean
+  dangerouslySetInnerHTML?: false
 }
 
-const showConversation = () => {
+type UnsafeContent = {
+  content: string | HTMLElement
+  dangerouslySetInnerHTML: true
+}
+
+type ConversationBubbleContent = SafeContent | UnsafeContent
+
+export type ConversationBubbleProps = {
+  footer?: string
+  isUserSpeaking?: boolean
+} & ConversationBubbleContent
+
+export const showConversation = () => {
   const conversationContainer = document.getElementById('conversation')
   if (conversationContainer) {
     conversationContainer.classList.remove('hidden')
   }
 }
 
-const showClearMessagesButton = () => {
+export const showClearMessagesButton = () => {
   const clearMessagesButton = document.getElementById('clear-messages-btn')
   if (clearMessagesButton) {
     clearMessagesButton.classList.remove('hidden')
@@ -21,28 +32,36 @@ const showClearMessagesButton = () => {
 // if using dangerouslySetInnerHTML option, make sure the content input has been sanitized or encoded to prevent XSS
 export const createConversationBubble = ({
   content,
+  footer,
   isUserSpeaking = false,
   dangerouslySetInnerHTML = false,
 }: ConversationBubbleProps) => {
   const chatContainer = document.createElement('div')
-  chatContainer.classList.add('chat', isUserSpeaking ? 'chat-end' : 'chat-start')
-
-  const avatar = document.createElement('div')
-  avatar.classList.add('chat-image', 'avatar')
-  avatar.innerHTML = `<span class="text-4xl">${isUserSpeaking ? '👨‍💻' : '🍤'}</span>` // Use different avatars
+  chatContainer.classList.add('chat', 'animate-in', isUserSpeaking ? 'chat-end' : 'chat-start')
 
   const bubble = document.createElement('div')
-  bubble.classList.add('chat-bubble', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
+  bubble.classList.add('chat-bubble', 'animate-in', 'fade-in', isUserSpeaking ? 'chat-bubble-secondary' : 'chat-bubble-info')
+  bubble.classList.add(isUserSpeaking ? 'slide-in-from-right-2' : 'slide-in-from-left-2')
 
   if (dangerouslySetInnerHTML) {
-    bubble.innerHTML = content
-  } else {
+    if (content instanceof HTMLElement) {
+      bubble.appendChild(content)
+    } else {
+      bubble.innerHTML = content
+    }
+  } else if (typeof content === 'string') {
     bubble.innerText = content
   }
 
   // Assemble the structure
-  chatContainer.appendChild(avatar)
   chatContainer.appendChild(bubble)
+
+  if (footer) {
+    const footerContainer = document.createElement('div')
+    footerContainer.classList.add('chat-footer', 'pt-1', 'opacity-70')
+    footerContainer.innerText = footer
+    chatContainer.appendChild(footerContainer)
+  }
 
   showConversation()
   showClearMessagesButton()
