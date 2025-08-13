@@ -1,9 +1,12 @@
 // prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::BTreeMap;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
+
+use std::collections::BTreeMap;
 
 use std::process::Command;
 use std::str::FromStr;
@@ -274,7 +277,6 @@ fn get_hwi() -> Result<Command, TempuraError> {
   let mut command = Command::new(&hwi_path);
   #[cfg(target_os = "windows")]
   {
-    const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
     command.creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW);
   }
   Ok(command)
@@ -907,7 +909,10 @@ async fn create_window(
 async fn open_github_url() -> Result<(), TempuraError> {
   #[cfg(target_os = "windows")]
   {
-    Command::new("cmd")
+    #[allow(unused_mut)]
+    let mut command = Command::new("cmd");
+    command
+      .creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW)
       .args(["/c", "start", GITHUB_URL])
       .spawn()
       .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
