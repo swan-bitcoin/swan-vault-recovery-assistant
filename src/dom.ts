@@ -55,6 +55,7 @@ type Inputs = {
 
 type Links = {
   about: HTMLAnchorElement
+  github: HTMLAnchorElement
 }
 
 type Modals = {
@@ -232,6 +233,7 @@ export function initializeDOM() {
 
     const links = {
       about: requireDomElement<HTMLAnchorElement>('#about-link'),
+      github: requireDomElement<HTMLAnchorElement>('#github-link'),
     }
 
     const modals = {

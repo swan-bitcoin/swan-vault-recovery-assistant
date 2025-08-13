@@ -34,6 +34,7 @@ use bitcoin_units::fee_rate::FeeRate;
 
 const DEFAULT_STOP_GAP: usize = 10;
 const DEFAULT_BATCH_SIZE: usize = 100;
+const GITHUB_URL: &str = "https://github.com/swan-bitcoin/swan-vault-recovery-assistant";
 
 /**
  * types
@@ -901,6 +902,36 @@ async fn create_window(
   }
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn open_github_url() -> Result<(), TempuraError> {
+  #[cfg(target_os = "windows")]
+  {
+    Command::new("cmd")
+      .args(["/c", "start", GITHUB_URL])
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  #[cfg(target_os = "macos")]
+  {
+    Command::new("open")
+      .arg(GITHUB_URL)
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  #[cfg(target_os = "linux")]
+  {
+    Command::new("xdg-open")
+      .arg(GITHUB_URL)
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  Ok(())
+}
+
 /**
  * entrypoint
  */
@@ -910,6 +941,7 @@ fn main() {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
       broadcast,
+      create_window,
       enumerate,
       estimate_fee,
       is_address,
@@ -918,11 +950,11 @@ fn main() {
       is_descriptor,
       is_descriptor_for_network,
       is_psbt,
+      open_github_url,
       psbt_status,
       sign,
       sweep,
       wallet,
-      create_window
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
