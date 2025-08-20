@@ -147,6 +147,7 @@ function initializeDOM() {
     }
     const links = {
       about: requireDomElement('#about-link'),
+      github: requireDomElement('#github-link'),
     }
     const modals = {
       autoChange: requireDomElement('#auto-change-modal'),

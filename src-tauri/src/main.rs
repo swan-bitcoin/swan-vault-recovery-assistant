@@ -1,9 +1,12 @@
 // prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::BTreeMap;
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
+
+use std::collections::BTreeMap;
 
 use std::process::Command;
 use std::str::FromStr;
@@ -34,6 +37,7 @@ use bitcoin_units::fee_rate::FeeRate;
 
 const DEFAULT_STOP_GAP: usize = 10;
 const DEFAULT_BATCH_SIZE: usize = 100;
+const GITHUB_URL: &str = "https://github.com/swan-bitcoin/swan-vault-recovery-assistant";
 
 /**
  * types
@@ -273,7 +277,6 @@ fn get_hwi() -> Result<Command, TempuraError> {
   let mut command = Command::new(&hwi_path);
   #[cfg(target_os = "windows")]
   {
-    const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
     command.creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW);
   }
   Ok(command)
@@ -901,6 +904,39 @@ async fn create_window(
   }
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn open_github_url() -> Result<(), TempuraError> {
+  #[cfg(target_os = "windows")]
+  {
+    #[allow(unused_mut)]
+    let mut command = Command::new("cmd");
+    command
+      .creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW)
+      .args(["/c", "start", GITHUB_URL])
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  #[cfg(target_os = "macos")]
+  {
+    Command::new("open")
+      .arg(GITHUB_URL)
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  #[cfg(target_os = "linux")]
+  {
+    Command::new("xdg-open")
+      .arg(GITHUB_URL)
+      .spawn()
+      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+  }
+
+  Ok(())
+}
+
 /**
  * entrypoint
  */
@@ -910,6 +946,7 @@ fn main() {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
       broadcast,
+      create_window,
       enumerate,
       estimate_fee,
       is_address,
@@ -918,11 +955,11 @@ fn main() {
       is_descriptor,
       is_descriptor_for_network,
       is_psbt,
+      open_github_url,
       psbt_status,
       sign,
       sweep,
       wallet,
-      create_window
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}

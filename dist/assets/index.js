@@ -56,6 +56,9 @@ const commands = {
   async broadcast(psbt, network, descriptors, electrum) {
     return await invoke('broadcast', { psbt, network, descriptors, electrum })
   },
+  async createWindow(label, html, title, width, height) {
+    await invoke('create_window', { label, html, title, width, height })
+  },
   async enumerate(network) {
     return await invoke('enumerate', { network })
   },
@@ -80,6 +83,9 @@ const commands = {
   async isPsbt(psbt) {
     return await invoke('is_psbt', { psbt })
   },
+  async openGithubUrl() {
+    return await invoke('open_github_url')
+  },
   async psbtStatus(psbt, network, descriptors) {
     return await invoke('psbt_status', { psbt, network, descriptors })
   },
@@ -91,9 +97,6 @@ const commands = {
   },
   async wallet(network, descriptors, electrum) {
     return await invoke('wallet', { network, descriptors, electrum })
-  },
-  async createWindow(label, html, title, width, height) {
-    await invoke('create_window', { label, html, title, width, height })
   },
 }
 const innerPaths = `
@@ -1355,6 +1358,10 @@ window.addEventListener('DOMContentLoaded', () => {
   DOM.links.about.addEventListener('click', async (e) => {
     e.preventDefault()
     await commands.createWindow('about', 'about.html', 'About Swan Vault Recovery Assistant', 800, 950)
+  })
+  DOM.links.github.addEventListener('click', async (e) => {
+    e.preventDefault()
+    await commands.openGithubUrl()
   })
   const config = { childList: true }
   const callback = (mutationList) => {

@@ -747,6 +747,11 @@ window.addEventListener('DOMContentLoaded', () => {
     await commands.createWindow('about', 'about.html', 'About Swan Vault Recovery Assistant', 800, 950)
   })
 
+  DOM.links.github.addEventListener('click', async (e) => {
+    e.preventDefault()
+    await commands.openGithubUrl()
+  })
+
   // Set up observer to scroll to the last chat message whenever a message is added
   const config = { childList: true } // only observe the addition/removal of child nodes
   const callback = (mutationList: MutationRecord[]) => {

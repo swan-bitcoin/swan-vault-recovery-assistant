@@ -16,6 +16,9 @@ async address(network: string, descriptors: Descriptors, electrum: string | null
 async broadcast(psbt: string, network: string, descriptors: Descriptors, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, descriptors, electrum });
 },
+async createWindow(label: string, html: string, title: string, width: number, height: number) : Promise<void> {
+    await TAURI_INVOKE("create_window", { label, html, title, width, height });
+},
 async enumerate(network: string) : Promise<string> {
     return await TAURI_INVOKE("enumerate", { network });
 },
@@ -40,6 +43,9 @@ async isDescriptorForNetwork(descriptor: string, network: string) : Promise<bool
 async isPsbt(psbt: string) : Promise<boolean> {
     return await TAURI_INVOKE("is_psbt", { psbt });
 },
+async openGithubUrl() : Promise<null> {
+    return await TAURI_INVOKE("open_github_url");
+},
 async psbtStatus(psbt: string, network: string, descriptors: Descriptors) : Promise<PsbtSigningStatus> {
     return await TAURI_INVOKE("psbt_status", { psbt, network, descriptors });
 },
@@ -51,9 +57,6 @@ async sweep(address: string, feeRate: number, network: string, descriptors: Desc
 },
 async wallet(network: string, descriptors: Descriptors, electrum: string | null) : Promise<Wallet> {
     return await TAURI_INVOKE("wallet", { network, descriptors, electrum });
-},
-async createWindow(label: string, html: string, title: string, width: number, height: number) : Promise<void> {
-    await TAURI_INVOKE("create_window", { label, html, title, width, height });
 }
 }
 
