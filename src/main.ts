@@ -224,11 +224,10 @@ async function loadWallet() {
       }
 
       if (bubble.type === 'actions') {
-        instrumentCopyButtons(tempuraItem)
-
         const showListButton = tempuraItem.querySelector('#show-transactions-btn')
         showListButton?.addEventListener('click', () => {
           DOM.modals.transactions.showModal()
+          instrumentCopyButtons(DOM.outputs.txBody)
         })
 
         instrumentStartRecoveryButton(tempuraItem)
@@ -242,8 +241,6 @@ async function loadWallet() {
     if (!isRecoverable) {
       return
     }
-
-    instrumentCopyButtons(DOM.outputs.txBody)
   } catch (e: unknown) {
     handleError(e)
   }
