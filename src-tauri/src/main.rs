@@ -91,16 +91,6 @@ struct Descriptors {
   pub auto_change: bool,
 }
 
-impl Descriptors {
-  pub fn new(receive: String, change: Option<String>, auto_change: bool) -> Self {
-    Descriptors {
-      receive: receive,
-      change: change,
-      auto_change: auto_change,
-    }
-  }
-}
-
 // again, unfortunately u64 is not supported, so we must convert to string for number values.
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct PsbtDetails {
