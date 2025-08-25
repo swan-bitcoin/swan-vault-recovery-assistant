@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src ipc: http://ipc.localhost ws: ws://localhost; img-src 'self' data: ; font-src 'self' data:"
+      content="default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; font-src 'self' data:; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
     <link rel="stylesheet" href="/src/styles.css" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
