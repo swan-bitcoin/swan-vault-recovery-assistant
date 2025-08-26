@@ -1,5 +1,5 @@
 {
-  "$schema": "https://schema.tauri.app/config/2.0.0",
+  "$schema": "https://schema.tauri.app/config/2.8.2",
   "productName": "Swan Vault Recovery Assistant",
   "version": "0.1.0",
   "identifier": "com.swan-bitcoin.swan-vault-recovery-assistant",
@@ -19,7 +19,9 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src ipc: http://ipc.localhost ws: ws://localhost; img-src 'self' data: ; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; font-src 'self' data:; script-src 'self'; style-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; ",
+      "dangerousDisableAssetCspModification": false,
+      "freezePrototype": true
     }
   },
   "bundle": {
@@ -34,5 +36,6 @@
       "icons/icon.ico"
     ],
     "externalBin": ["./hwi"]
-  }
+  },
+  "plugins": {}
 }

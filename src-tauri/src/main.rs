@@ -91,16 +91,6 @@ struct Descriptors {
   pub auto_change: bool,
 }
 
-impl Descriptors {
-  pub fn new(receive: String, change: Option<String>, auto_change: bool) -> Self {
-    Descriptors {
-      receive: receive,
-      change: change,
-      auto_change: auto_change,
-    }
-  }
-}
-
 // again, unfortunately u64 is not supported, so we must convert to string for number values.
 #[derive(Default, Serialize, Deserialize, Type)]
 pub struct PsbtDetails {
@@ -247,12 +237,53 @@ fn extract_txid(psbt: &str) -> Result<String, TempuraError> {
   )
 }
 
+fn validate_electrum_url(url: &str) -> Result<(), TempuraError> {
+  if !url.starts_with("ssl://") && !url.starts_with("tcp://") && !url.starts_with("localhost:") {
+    return Err(TempuraError::new(
+      TempuraErrorType::NetworkError,
+      "Invalid Electrum protocol. Use ssl://, tcp://, or localhost:",
+    ));
+  }
+
+  // parse and validate host:port
+  let address_part = url.split("://").nth(1).unwrap_or(url);
+  if let Some((host, port_str)) = address_part.rsplit_once(':') {
+    let port: u32 = port_str
+      .parse()
+      .map_err(|_| TempuraError::new(TempuraErrorType::NetworkError, "Invalid port number"))?;
+
+    if port == 0 || port > 65535 {
+      return Err(TempuraError::new(
+        TempuraErrorType::NetworkError,
+        "Port must be between 1 and 65535",
+      ));
+    }
+
+    if host.is_empty() {
+      return Err(TempuraError::new(
+        TempuraErrorType::NetworkError,
+        "Hostname cannot be empty",
+      ));
+    }
+  } else {
+    return Err(TempuraError::new(
+      TempuraErrorType::NetworkError,
+      "URL must include port number",
+    ));
+  }
+
+  Ok(())
+}
+
 fn get_blockchain(
   network: Network,
   electrum: Option<String>,
 ) -> Result<BdkElectrumClient<Client>, TempuraError> {
   let connection = match electrum {
-    Some(electrum) => electrum,
+    Some(electrum) => {
+      validate_electrum_url(&electrum)?;
+      electrum
+    }
     None => match network {
       Network::Testnet => "ssl://electrum.blockstream.info:60002".to_string(),
       Network::Bitcoin => "ssl://electrum.blockstream.info:50002".to_string(),
