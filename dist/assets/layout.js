@@ -76,7 +76,7 @@ function getUserInputs() {
   }
 }
 function handleError(e) {
-  if (isTempuraError(e)) {
+  if (isSvraError(e)) {
     console.log(e.error_type, e.message)
     showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
@@ -187,9 +187,9 @@ function initializeDOM() {
     }
   }
 }
-function isTempuraError(e) {
-  const tempuraError = e
-  return !!(tempuraError.error_type && tempuraError.message)
+function isSvraError(e) {
+  const SvraError2 = e
+  return !!(SvraError2.error_type && SvraError2.message)
 }
 function requireDomElement(name) {
   const element = document.querySelector(name)

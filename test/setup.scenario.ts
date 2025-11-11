@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import * as crypto from 'crypto'
 import { afterAll, beforeAll, should } from 'vitest'
-import { spawn, spawnSync } from 'child_process'
+import { ChildProcess, spawn, spawnSync } from 'child_process'
 import { Builder, Capabilities, WebDriver } from 'selenium-webdriver'
 
 function log(message: string, ...args: any): void {
@@ -11,7 +11,7 @@ function log(message: string, ...args: any): void {
 }
 
 export let driver: WebDriver
-let tauriDriver
+let tauriDriver: ChildProcess
 
 const application = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release', 'swan_vault_recovery_assistant')
 const hashFile = path.resolve(__dirname, '..', 'src-tauri', 'target', 'swan_vault_recovery_assistant-hashfile')
@@ -68,8 +68,8 @@ beforeAll(async () => {
     throw new Error('Platform tests are not supported on MacOS. Refer to the README for instructions.')
   }
 
-  if (process.env.TEMPURA_SCENARIO_SKIP_BUILD) {
-    log('TEMPURA_SCENARIO_SKIP_BUILD is set- skipping build.')
+  if (process.env.SVRA_SCENARIO_SKIP_BUILD) {
+    log('SVRA_SCENARIO_SKIP_BUILD is set- skipping build.')
   } else {
     // perform a build if the hash file doesn't exist (first run) or if the source files have changed
     let currentHash

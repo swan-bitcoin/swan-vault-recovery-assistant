@@ -1,4 +1,4 @@
-use crate::errors::{TempuraError, TempuraErrorType};
+use crate::errors::{SvraError, SvraErrorType};
 
 #[derive(Clone, Copy, Debug)]
 pub enum Network {
@@ -20,7 +20,7 @@ impl std::fmt::Display for Network {
 }
 
 impl std::str::FromStr for Network {
-  type Err = TempuraError;
+  type Err = SvraError;
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
@@ -28,8 +28,8 @@ impl std::str::FromStr for Network {
       "testnet" => Ok(Network::Testnet),
       "signet" => Ok(Network::Signet),
       "regtest" => Ok(Network::Regtest),
-      other => Err(TempuraError::new(
-        TempuraErrorType::NetworkError,
+      other => Err(SvraError::new(
+        SvraErrorType::NetworkError,
         format!("Unsupported network: {}", other).as_str(),
       )),
     }

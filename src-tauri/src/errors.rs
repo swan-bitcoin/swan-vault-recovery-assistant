@@ -109,14 +109,14 @@ impl std::fmt::Display for HwiErrorType {
       }
       HwiErrorType::UnknownHwiError => write!(
         f,
-        "UnknownHwiError: The error code from HWI is not recognized by tempura."
+        "UnknownHwiError: The error code from HWI is not recognized by SVRA."
       ),
     }
   }
 }
 
 #[derive(Debug, Default)]
-pub enum TempuraErrorType {
+pub enum SvraErrorType {
   AddressError,
   BalanceError,
   BlockchainError,
@@ -138,43 +138,43 @@ pub enum TempuraErrorType {
   UnknownError,
 }
 
-impl std::fmt::Display for TempuraErrorType {
+impl std::fmt::Display for SvraErrorType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      TempuraErrorType::AddressError => write!(f, "AddressError"),
-      TempuraErrorType::BalanceError => write!(f, "BalanceError"),
-      TempuraErrorType::BlockchainError => write!(f, "BlockchainError"),
-      TempuraErrorType::ClientError => write!(f, "ClientError"),
-      TempuraErrorType::CommandError => write!(f, "CommandError"),
-      TempuraErrorType::DescriptorError(t) => match t {
+      SvraErrorType::AddressError => write!(f, "AddressError"),
+      SvraErrorType::BalanceError => write!(f, "BalanceError"),
+      SvraErrorType::BlockchainError => write!(f, "BlockchainError"),
+      SvraErrorType::ClientError => write!(f, "ClientError"),
+      SvraErrorType::CommandError => write!(f, "CommandError"),
+      SvraErrorType::DescriptorError(t) => match t {
         Some(t) => write!(f, "DescriptorError({})", t),
         None => write!(f, "DescriptorError"),
       },
-      TempuraErrorType::DeviceError => write!(f, "DeviceError"),
-      TempuraErrorType::FeeRateError => write!(f, "FeeRateError"),
-      TempuraErrorType::HwiError => write!(f, "HwiError"),
-      TempuraErrorType::NetworkError => write!(f, "NetworkError"),
-      TempuraErrorType::ParseError => write!(f, "ParseError"),
-      TempuraErrorType::PsbtError => write!(f, "PsbtError"),
-      TempuraErrorType::PsbtSignError => write!(f, "PsbtSignError"),
-      TempuraErrorType::TransactionError => write!(f, "TransactionError"),
-      TempuraErrorType::TransactionsError => write!(f, "TransactionsError"),
-      TempuraErrorType::WalletError => write!(f, "WalletError"),
-      TempuraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
-      TempuraErrorType::UnknownError => write!(f, "UnknownError"),
+      SvraErrorType::DeviceError => write!(f, "DeviceError"),
+      SvraErrorType::FeeRateError => write!(f, "FeeRateError"),
+      SvraErrorType::HwiError => write!(f, "HwiError"),
+      SvraErrorType::NetworkError => write!(f, "NetworkError"),
+      SvraErrorType::ParseError => write!(f, "ParseError"),
+      SvraErrorType::PsbtError => write!(f, "PsbtError"),
+      SvraErrorType::PsbtSignError => write!(f, "PsbtSignError"),
+      SvraErrorType::TransactionError => write!(f, "TransactionError"),
+      SvraErrorType::TransactionsError => write!(f, "TransactionsError"),
+      SvraErrorType::WalletError => write!(f, "WalletError"),
+      SvraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
+      SvraErrorType::UnknownError => write!(f, "UnknownError"),
     }
   }
 }
 
 #[derive(Debug, Serialize, Deserialize, Type)]
-pub struct TempuraError {
+pub struct SvraError {
   pub error_type: String,
   pub message: String,
 }
 
-impl TempuraError {
-  pub fn new(error_type: TempuraErrorType, message: &str) -> Self {
-    TempuraError {
+impl SvraError {
+  pub fn new(error_type: SvraErrorType, message: &str) -> Self {
+    SvraError {
       error_type: error_type.to_string(),
       message: message.to_string(),
     }
@@ -186,14 +186,14 @@ impl TempuraError {
       None => HwiErrorType::UnknownHwiError,
     };
 
-    TempuraError::new(TempuraErrorType::HwiError, hwi_error.to_string().as_str())
+    SvraError::new(SvraErrorType::HwiError, hwi_error.to_string().as_str())
   }
 }
 
 #[macro_export]
 macro_rules! resolve {
   ($expr:expr, $error_type:expr) => {
-    $expr.map_err(|e| TempuraError::new($error_type, &e.to_string()))?
+    $expr.map_err(|e| SvraError::new($error_type, &e.to_string()))?
   };
 }
 
@@ -202,16 +202,16 @@ macro_rules! resolve_io {
   ($expr:expr) => {{
     let o = $expr.output().map_err(|e| {
       if e.kind() == std::io::ErrorKind::NotFound {
-        return TempuraError::new(
-          TempuraErrorType::CommandError,
+        return SvraError::new(
+          SvraErrorType::CommandError,
           "HWI executable not found in PATH or working directory.",
         );
       }
-      TempuraError::new(TempuraErrorType::CommandError, &e.to_string())
+      SvraError::new(SvraErrorType::CommandError, &e.to_string())
     })?;
     let response = String::from_utf8(o.stdout);
     #[cfg(debug_assertions)]
     println!("{:?}", response);
-    resolve!(response, TempuraErrorType::ParseError)
+    resolve!(response, SvraErrorType::ParseError)
   }};
 }
