@@ -1,17 +1,19 @@
 #
-# this dockerfile is not required to use tempura, but can be useful for building 
-# in a controlled environment and for prototyping changes to the github actions.
+# this dockerfile is not required to use swan-vault-recovery-assistant (SVRA),
+# but can be useful  for building in a controlled environment and for
+# prototyping changes to the github actions.
 #
-# this is a base image similar to github action, rather than a base node or rust image.
-# slim images or multi-stage is not necessary since this is not being deployed.
+# this is a base image similar to github action, rather than a base node or
+# rust image. slim images or multi-stage is not necessary since this is not
+# being deployed. 
 # this image takes a long time to build without cached layers.
 #
 # build:
-# docker build --tag tempura .
+# docker build --tag svra:latest .
 #
 # copy build artifacts out of the container:
-# docker run --it --rm --name tempura tempura
-# docker container cp tempura:/tempura/src-tauri/target/release/bundle/deb/tempura_<symver>_amd64.deb .
+# docker run -it --rm --name svra svra
+# docker container cp svra:/svra/src-tauri/target/release/bundle/deb/swan-vault-recovery-assistant_<symver>_amd64.deb .
 #
 FROM ubuntu:latest
 
@@ -33,6 +35,6 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN npm install -g pnpm
 
 # copy, install dependencies build
-WORKDIR /tempura
+WORKDIR /svra
 COPY . .
 RUN pnpm install -f && pnpm tauri build

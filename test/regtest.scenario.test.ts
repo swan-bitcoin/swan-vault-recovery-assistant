@@ -19,7 +19,7 @@ const sleepForBitcoinNetwork = () => sleep(BITCOIN_NETWORK_TIMEOUT_MS)
 const REGEX_BALANCE_NONZERO = /(?!0\.00 000 000)(\d+\.\d{2} \d{3} \d{3})/
 const REGEX_BALANCE_ZERO = /0\.00 000 000/
 
-const seed = Number(process.env.TEMPURA_SCENARIO_RANDOM_SEED) || Date.now() ^ (Math.random() * 0x100000000)
+const seed = Number(process.env.SVRA_SCENARIO_RANDOM_SEED) || Date.now() ^ (Math.random() * 0x100000000)
 const prng = prand.xoroshiro128plus(seed)
 const getRandom = (low: number, high: number): number => {
   const r = prand.unsafeUniformIntDistribution(low, high, prng)

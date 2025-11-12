@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2.8.2",
-  "productName": "Swan Vault Recovery Assistant",
+  "productName": "swan-vault-recovery-assistant",
   "version": "0.1.0",
   "identifier": "com.swan-bitcoin.swan-vault-recovery-assistant",
   "build": {

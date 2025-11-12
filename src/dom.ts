@@ -1,4 +1,4 @@
-import { Descriptors, TempuraError } from './bindings'
+import { Descriptors, SvraError } from './bindings'
 import { showTempMessage } from './utilities'
 
 type Buttons = {
@@ -144,7 +144,7 @@ export function getUserInputs(): UserInputs {
 }
 
 export function handleError(e: unknown) {
-  if (isTempuraError(e)) {
+  if (isSvraError(e)) {
     console.log(e.error_type, e.message)
     showTempMessage(e.error_type.concat(': ').concat(e.message))
     return
@@ -277,9 +277,9 @@ export function initializeDOM() {
   }
 }
 
-function isTempuraError(e: unknown): e is TempuraError {
-  const tempuraError = e as TempuraError
-  return !!(tempuraError.error_type && tempuraError.message)
+function isSvraError(e: unknown): e is SvraError {
+  const SvraError = e as SvraError
+  return !!(SvraError.error_type && SvraError.message)
 }
 
 function requireDomElement<T extends HTMLElement>(name: string): T {

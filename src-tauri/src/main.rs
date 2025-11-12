@@ -15,7 +15,7 @@ use std::sync::Arc;
 #[macro_use]
 mod errors;
 use bdk_wallet::psbt::PsbtUtils;
-use errors::{DescriptorType, TempuraError, TempuraErrorType};
+use errors::{DescriptorType, SvraError, SvraErrorType};
 mod network;
 use network::{HwiNetwork, Network};
 
@@ -225,22 +225,22 @@ fn extract_psbt(response: &str) -> Option<String> {
   extract_value(response, "psbt")
 }
 
-fn extract_txid(psbt: &str) -> Result<String, TempuraError> {
+fn extract_txid(psbt: &str) -> Result<String, SvraError> {
   let psbt = resolve!(
     bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
-    TempuraErrorType::PsbtError
+    SvraErrorType::PsbtError
   );
   Ok(
-    resolve!(psbt.extract_tx(), TempuraErrorType::PsbtError)
+    resolve!(psbt.extract_tx(), SvraErrorType::PsbtError)
       .compute_txid()
       .to_string(),
   )
 }
 
-fn validate_electrum_url(url: &str) -> Result<(), TempuraError> {
+fn validate_electrum_url(url: &str) -> Result<(), SvraError> {
   if !url.starts_with("ssl://") && !url.starts_with("tcp://") && !url.starts_with("localhost:") {
-    return Err(TempuraError::new(
-      TempuraErrorType::NetworkError,
+    return Err(SvraError::new(
+      SvraErrorType::NetworkError,
       "Invalid Electrum protocol. Use ssl://, tcp://, or localhost:",
     ));
   }
@@ -250,24 +250,24 @@ fn validate_electrum_url(url: &str) -> Result<(), TempuraError> {
   if let Some((host, port_str)) = address_part.rsplit_once(':') {
     let port: u32 = port_str
       .parse()
-      .map_err(|_| TempuraError::new(TempuraErrorType::NetworkError, "Invalid port number"))?;
+      .map_err(|_| SvraError::new(SvraErrorType::NetworkError, "Invalid port number"))?;
 
     if port == 0 || port > 65535 {
-      return Err(TempuraError::new(
-        TempuraErrorType::NetworkError,
+      return Err(SvraError::new(
+        SvraErrorType::NetworkError,
         "Port must be between 1 and 65535",
       ));
     }
 
     if host.is_empty() {
-      return Err(TempuraError::new(
-        TempuraErrorType::NetworkError,
+      return Err(SvraError::new(
+        SvraErrorType::NetworkError,
         "Hostname cannot be empty",
       ));
     }
   } else {
-    return Err(TempuraError::new(
-      TempuraErrorType::NetworkError,
+    return Err(SvraError::new(
+      SvraErrorType::NetworkError,
       "URL must include port number",
     ));
   }
@@ -278,7 +278,7 @@ fn validate_electrum_url(url: &str) -> Result<(), TempuraError> {
 fn get_blockchain(
   network: Network,
   electrum: Option<String>,
-) -> Result<BdkElectrumClient<Client>, TempuraError> {
+) -> Result<BdkElectrumClient<Client>, SvraError> {
   let connection = match electrum {
     Some(electrum) => {
       validate_electrum_url(&electrum)?;
@@ -289,19 +289,19 @@ fn get_blockchain(
       Network::Bitcoin => "ssl://electrum.blockstream.info:50002".to_string(),
       Network::Regtest => "localhost:50021".to_string(),
       _ => {
-        return Err(TempuraError::new(
-          TempuraErrorType::NetworkError,
+        return Err(SvraError::new(
+          SvraErrorType::NetworkError,
           "You must specify an electrum server for this network",
         ))
       }
     },
   };
 
-  let client = resolve!(Client::new(&connection), TempuraErrorType::ClientError);
+  let client = resolve!(Client::new(&connection), SvraErrorType::ClientError);
   Ok(BdkElectrumClient::new(client))
 }
 
-fn get_hwi() -> Result<Command, TempuraError> {
+fn get_hwi() -> Result<Command, SvraError> {
   let hwi_path = hwi_path();
 
   #[allow(unused_mut)]
@@ -313,10 +313,7 @@ fn get_hwi() -> Result<Command, TempuraError> {
   Ok(command)
 }
 
-fn get_wallet(
-  network: Network,
-  descriptors: Descriptors,
-) -> Result<bdk_wallet::Wallet, TempuraError> {
+fn get_wallet(network: Network, descriptors: Descriptors) -> Result<bdk_wallet::Wallet, SvraError> {
   let secp = Secp256k1::new();
   let network: bdk_wallet::bitcoin::Network = network.into();
 
@@ -329,15 +326,15 @@ fn get_wallet(
 
   if let Some(change_descriptor) = &descriptors.change {
     if is_multipath_descriptor(&descriptors.receive) {
-      return Err(TempuraError::new(
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Receive)),
+      return Err(SvraError::new(
+        SvraErrorType::DescriptorError(Some(DescriptorType::Receive)),
         "A change descriptor must not be provided when using multipath descriptors",
       ));
     }
 
     if is_multipath_descriptor(change_descriptor) {
-      return Err(TempuraError::new(
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Change)),
+      return Err(SvraError::new(
+      SvraErrorType::DescriptorError(Some(DescriptorType::Change)),
       "A change descriptor must not be a multipath descriptor. Use this as a receive descriptor instead.",
     ));
     }
@@ -349,17 +346,17 @@ fn get_wallet(
   {
     receive = resolve!(
       receive_descriptor.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
+      SvraErrorType::DescriptorError(Some(DescriptorType::Multipath))
     );
 
     change = Some(resolve!(
       change_descriptor.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
+      SvraErrorType::DescriptorError(Some(DescriptorType::Multipath))
     ));
   } else {
     receive = resolve!(
       descriptors.receive.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Receive))
+      SvraErrorType::DescriptorError(Some(DescriptorType::Receive))
     );
   }
 
@@ -367,7 +364,7 @@ fn get_wallet(
   if let Some(change_descriptor) = &descriptors.change {
     change = Some(resolve!(
       change_descriptor.into_wallet_descriptor(&secp, network),
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+      SvraErrorType::DescriptorError(Some(DescriptorType::Change))
     ));
   }
 
@@ -396,7 +393,7 @@ fn get_wallet(
       true => None,
       false => Some(resolve!(
         change_str.into_wallet_descriptor(&secp, network),
-        TempuraErrorType::DescriptorError(Some(DescriptorType::Change))
+        SvraErrorType::DescriptorError(Some(DescriptorType::Change))
       )),
     }
   };
@@ -409,7 +406,7 @@ fn get_wallet(
   .network(network)
   .create_wallet_no_persist();
 
-  Ok(resolve!(wallet_result, TempuraErrorType::WalletError))
+  Ok(resolve!(wallet_result, SvraErrorType::WalletError))
 }
 
 fn is_address_mine_internal(address: &Address, wallet: &mut bdk_wallet::Wallet) -> bool {
@@ -437,9 +434,7 @@ fn is_multipath_descriptor(descriptor: &str) -> bool {
  * we only pseudo-support multipath descriptors, as BDK does not currently support them.
  * this function will split a multipath descriptor into two single path descriptors.
  */
-fn split_descriptor_if_multipath(
-  descriptor: &str,
-) -> Result<Option<(String, String)>, TempuraError> {
+fn split_descriptor_if_multipath(descriptor: &str) -> Result<Option<(String, String)>, SvraError> {
   // we use `from_str` instead of `into_wallet_descriptor` intentionally, the former
   // does not consider the network when converting. BDK throws exceptions if you try to use
   // use the latter with a multipath descriptor on mainnet. yet, we should rely on BDK to
@@ -455,12 +450,12 @@ fn split_descriptor_if_multipath(
 
   let paths = resolve!(
     receive.clone().into_single_descriptors(),
-    TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath))
+    SvraErrorType::DescriptorError(Some(DescriptorType::Multipath))
   );
 
   if paths.len() != 2 {
-    return Err(TempuraError::new(
-      TempuraErrorType::DescriptorError(Some(DescriptorType::Multipath)),
+    return Err(SvraError::new(
+      SvraErrorType::DescriptorError(Some(DescriptorType::Multipath)),
       "A multipath descriptor must have exactly two paths",
     ));
   }
@@ -515,7 +510,7 @@ fn hwi_path() -> String {
 fn sync_wallet(
   wallet: &mut bdk_wallet::Wallet,
   blockchain: &BdkElectrumClient<Client>,
-) -> Result<(), TempuraError> {
+) -> Result<(), SvraError> {
   let request = wallet.start_full_scan();
 
   // we must fetch_prev_txouts in order to calculate fees.
@@ -527,12 +522,9 @@ fn sync_wallet(
       DEFAULT_BATCH_SIZE,
       fetch_prev_txouts
     ),
-    TempuraErrorType::WalletSyncError
+    SvraErrorType::WalletSyncError
   );
-  resolve!(
-    wallet.apply_update(update),
-    TempuraErrorType::WalletSyncError
-  );
+  resolve!(wallet.apply_update(update), SvraErrorType::WalletSyncError);
   Ok(())
 }
 
@@ -546,7 +538,7 @@ async fn address(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<AddressInfo, TempuraError> {
+) -> Result<AddressInfo, SvraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let mut wallet = get_wallet(network, descriptors)?;
@@ -567,30 +559,30 @@ async fn broadcast(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<(), TempuraError> {
+) -> Result<(), SvraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let wallet = get_wallet(network, descriptors)?;
 
   let mut psbt = resolve!(
     bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
-    TempuraErrorType::PsbtError
+    SvraErrorType::PsbtError
   );
 
   if !resolve!(
     wallet.finalize_psbt(&mut psbt, bdk_wallet::SignOptions::default()),
-    TempuraErrorType::PsbtError
+    SvraErrorType::PsbtError
   ) {
-    return Err(TempuraError::new(
-      TempuraErrorType::PsbtError,
+    return Err(SvraError::new(
+      SvraErrorType::PsbtError,
       "Failed to finalize the PSBT for broadcast, it may be missing required signatures.",
     ));
   }
 
-  let tx = resolve!(psbt.extract_tx(), TempuraErrorType::PsbtError);
+  let tx = resolve!(psbt.extract_tx(), SvraErrorType::PsbtError);
   let _txid = resolve!(
     blockchain.transaction_broadcast(&tx),
-    TempuraErrorType::TransactionError
+    SvraErrorType::TransactionError
   );
   Ok(())
 }
@@ -601,7 +593,7 @@ async fn estimate_fee(
   network: String,
   electrum: Option<String>,
   blocks: Option<u32>,
-) -> Result<f64, TempuraError> {
+) -> Result<f64, SvraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let blocks = blocks.unwrap_or(1) as usize;
@@ -614,13 +606,13 @@ async fn estimate_fee(
   match result {
     Ok(inner_result) => match inner_result {
       Ok(fee) => Ok(fee),
-      Err(e) => Err(TempuraError::new(
-        TempuraErrorType::BlockchainError,
+      Err(e) => Err(SvraError::new(
+        SvraErrorType::BlockchainError,
         &e.to_string(),
       )),
     },
-    Err(_) => Err(TempuraError::new(
-      TempuraErrorType::BlockchainError,
+    Err(_) => Err(SvraError::new(
+      SvraErrorType::BlockchainError,
       "An unexpected error occurred while estimating the fee",
     )),
   }
@@ -628,7 +620,7 @@ async fn estimate_fee(
 
 #[tauri::command]
 #[specta::specta]
-async fn enumerate(network: String) -> Result<String, TempuraError> {
+async fn enumerate(network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
   let mut command = get_hwi()?;
@@ -648,12 +640,12 @@ async fn is_address(address: String) -> bool {
 
 #[tauri::command]
 #[specta::specta]
-async fn is_address_for_network(address: String, network: String) -> Result<bool, TempuraError> {
+async fn is_address_for_network(address: String, network: String) -> Result<bool, SvraError> {
   let network: bdk_wallet::bitcoin::Network = Network::from_str(&network)?.into();
 
   let addr = resolve!(
     bdk_wallet::bitcoin::Address::from_str(&address),
-    TempuraErrorType::AddressError
+    SvraErrorType::AddressError
   );
 
   Ok(addr.is_valid_for_network(network))
@@ -665,19 +657,19 @@ async fn is_address_mine(
   address: String,
   network: String,
   descriptors: Descriptors,
-) -> Result<bool, TempuraError> {
+) -> Result<bool, SvraError> {
   let network = Network::from_str(&network)?;
   let mut wallet = get_wallet(network, descriptors)?;
   let network: bdk_wallet::bitcoin::Network = network.into();
 
   let addr = resolve!(
     bdk_wallet::bitcoin::Address::from_str(&address),
-    TempuraErrorType::AddressError
+    SvraErrorType::AddressError
   );
 
   let addr = addr.require_network(network).map_err(|_| {
-    TempuraError::new(
-      TempuraErrorType::AddressError,
+    SvraError::new(
+      SvraErrorType::AddressError,
       &format!(
         "Mismatched address and network. address: {}, network: {}",
         address, network
@@ -696,10 +688,7 @@ async fn is_descriptor(descriptor: String) -> bool {
 
 #[tauri::command]
 #[specta::specta]
-async fn is_descriptor_for_network(
-  descriptor: String,
-  network: String,
-) -> Result<bool, TempuraError> {
+async fn is_descriptor_for_network(descriptor: String, network: String) -> Result<bool, SvraError> {
   let secp = Secp256k1::new();
   let network: bdk_wallet::bitcoin::Network = Network::from_str(&network)?.into();
   let descriptor =
@@ -711,8 +700,8 @@ async fn is_descriptor_for_network(
       bdk_wallet::descriptor::DescriptorError::Key(bdk_wallet::keys::KeyError::InvalidNetwork) => {
         Ok(false)
       }
-      _ => Err(TempuraError::new(
-        TempuraErrorType::DescriptorError(None),
+      _ => Err(SvraError::new(
+        SvraErrorType::DescriptorError(None),
         &e.to_string(),
       )),
     },
@@ -731,10 +720,10 @@ async fn psbt_status(
   psbt: String,
   network: String,
   descriptors: Descriptors,
-) -> Result<PsbtSigningStatus, TempuraError> {
+) -> Result<PsbtSigningStatus, SvraError> {
   let psbt = resolve!(
     bdk_wallet::bitcoin::psbt::Psbt::from_str(&psbt),
-    TempuraErrorType::PsbtError
+    SvraErrorType::PsbtError
   );
   let network = Network::from_str(&network)?;
   let wallet = get_wallet(network, descriptors)?;
@@ -763,7 +752,7 @@ async fn psbt_status(
 
 #[tauri::command]
 #[specta::specta]
-async fn sign(psbt: String, network: String, device_type: String) -> Result<String, TempuraError> {
+async fn sign(psbt: String, network: String, device_type: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
   let mut command = get_hwi()?;
@@ -784,12 +773,12 @@ async fn sign(psbt: String, network: String, device_type: String) -> Result<Stri
   // check for a malicious or unexpected edit to the transaction
   let psbt = extract_psbt(&response).ok_or_else(|| {
     let code = extract_error_code(&response);
-    TempuraError::from_hwi_error_code(code)
+    SvraError::from_hwi_error_code(code)
   })?;
   let signed_txid = extract_txid(&psbt)?;
   if txid.ne(&signed_txid) {
-    return Err(TempuraError::new(
-      TempuraErrorType::TransactionError,
+    return Err(SvraError::new(
+      SvraErrorType::TransactionError,
       "The signed transaction does not match the original transaction. There may be have been malicious edit to the transaction.",
     ));
   }
@@ -805,21 +794,21 @@ async fn sweep(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<PsbtDetails, TempuraError> {
+) -> Result<PsbtDetails, SvraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let mut wallet = get_wallet(network, descriptors)?;
   let wallet_network = wallet.network();
 
   if fee_rate < 0.0 {
-    return Err(TempuraError::new(
-      TempuraErrorType::FeeRateError,
+    return Err(SvraError::new(
+      SvraErrorType::FeeRateError,
       "Fee rate must be a positive number",
     ));
   }
   let fee_rate: u64 = fee_rate.ceil() as u64;
-  let fee_rate = FeeRate::from_sat_per_vb(fee_rate).ok_or(TempuraError::new(
-    TempuraErrorType::FeeRateError,
+  let fee_rate = FeeRate::from_sat_per_vb(fee_rate).ok_or(SvraError::new(
+    SvraErrorType::FeeRateError,
     "Invalid fee rate",
   ))?;
 
@@ -829,12 +818,12 @@ async fn sweep(
 
     let addr = resolve!(
       bdk_wallet::bitcoin::Address::from_str(&address),
-      TempuraErrorType::AddressError
+      SvraErrorType::AddressError
     );
 
     let addr = addr.require_network(wallet_network).map_err(|_| {
-      TempuraError::new(
-        TempuraErrorType::AddressError,
+      SvraError::new(
+        SvraErrorType::AddressError,
         &format!(
           "Mismatched address and network. address: {}, network: {}",
           address, network
@@ -848,7 +837,7 @@ async fn sweep(
     builder.drain_to(addr.script_pubkey());
     builder.fee_rate(fee_rate);
 
-    let psbt = resolve!(builder.finish(), TempuraErrorType::TransactionError);
+    let psbt = resolve!(builder.finish(), SvraErrorType::TransactionError);
     Ok(PsbtDetails::new(psbt, &wallet, is_address_mine))
   })
 }
@@ -859,7 +848,7 @@ async fn wallet(
   network: String,
   descriptors: Descriptors,
   electrum: Option<String>,
-) -> Result<Wallet, TempuraError> {
+) -> Result<Wallet, SvraError> {
   let network = Network::from_str(&network)?;
   let blockchain = get_blockchain(network, electrum)?;
   let mut wallet = get_wallet(network, descriptors)?;
@@ -869,14 +858,14 @@ async fn wallet(
     sync_wallet(&mut wallet, &blockchain)?;
 
     let txs = wallet.transactions();
-    let transactions_result: Result<Vec<Transaction>, TempuraError> = txs
+    let transactions_result: Result<Vec<Transaction>, SvraError> = txs
       .into_iter()
       .map(|mut tx| {
         let bdk_tx: bdk_wallet::bitcoin::Transaction = Arc::make_mut(&mut tx.tx_node.tx).clone();
         let (sent, received) = wallet.sent_and_received(&bdk_tx);
         let fee = resolve!(
           wallet.calculate_fee(&bdk_tx),
-          TempuraErrorType::TransactionError
+          SvraErrorType::TransactionError
         );
         let mut transaction = Transaction {
           version: tx.tx_node.version.0,
@@ -937,7 +926,7 @@ async fn create_window(
 
 #[tauri::command]
 #[specta::specta]
-async fn open_github_url() -> Result<(), TempuraError> {
+async fn open_github_url() -> Result<(), SvraError> {
   #[cfg(target_os = "windows")]
   {
     #[allow(unused_mut)]
@@ -946,7 +935,7 @@ async fn open_github_url() -> Result<(), TempuraError> {
       .creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW)
       .args(["/c", "start", GITHUB_URL])
       .spawn()
-      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+      .map_err(|e| SvraError::new(SvraErrorType::ClientError, &e.to_string()))?;
   }
 
   #[cfg(target_os = "macos")]
@@ -954,7 +943,7 @@ async fn open_github_url() -> Result<(), TempuraError> {
     Command::new("open")
       .arg(GITHUB_URL)
       .spawn()
-      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+      .map_err(|e| SvraError::new(SvraErrorType::ClientError, &e.to_string()))?;
   }
 
   #[cfg(target_os = "linux")]
@@ -962,7 +951,7 @@ async fn open_github_url() -> Result<(), TempuraError> {
     Command::new("xdg-open")
       .arg(GITHUB_URL)
       .spawn()
-      .map_err(|e| TempuraError::new(TempuraErrorType::ClientError, &e.to_string()))?;
+      .map_err(|e| SvraError::new(SvraErrorType::ClientError, &e.to_string()))?;
   }
 
   Ok(())
