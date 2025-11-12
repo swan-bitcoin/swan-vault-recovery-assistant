@@ -1,31 +1,73 @@
-# Tempura
+# Swan Vault Recovery Assistant
 
-Tempura is the world's simplest bitcoin wallet. It is a stateless native desktop application that forgets everything when you're done using it. It works with any wallet descriptor. Did I mention it forgets everything? No breadcrumbs to worry about. What was I talking about?
+Swan Vault Recovery Assistant is a desktop application that helps you verify and restore your Bitcoin wallet without requiring you to type in your recovery phrases. Whether you are testing the recovery process for peace of mind or need to regain access to your funds, Swan Vault Recovery Assistant puts you in control.
 
-Want to test your recovery path? Tempura won't tell.  
-Want to independently verify your balance? Tempura doesn't care.  
-Need to recover your funds from another wallet? Tempura can help.
+## Features
 
-## Core Principles
+- **Import Your Wallet**: To view your wallet, simply paste your descriptor containing your wallet configuration.
+- **Don’t Trust, Verify**: View your wallet in watch-only mode at any time. Double-check your balance, transaction history, and next unused address.
+- **Sign a Transaction**: Connect your signing device via USB to approve transactions securely. Your keys stay in cold storage.
 
-1. Tempura must not persist any data to disk under any circumstances.
-2. Tempura must use a minimal dependency footprint so it may easily be audited.
-3. Tempura is free to use or extend (MIT license).
+## Benefits
+
+- **Easy**: Designed to be straightforward, with no complicated setup.
+- **Private**: No data collected or stored on your computer.
+- **Secure**: Open-source with minimal software dependencies so any developer can audit.
+
+# FAQ
+
+> Does Swan Vault Recovery Assistant ask for my recovery phrase?
+
+No. To view your wallet, Swan Vault Recovery Assistant only needs your wallet configuration (or descriptor), which doesn’t include your keys and can’t authorize transactions. To send funds, you need to connect your signing device via USB and approve the transaction shown on its screen. Your keys never leave your hardware devices.
+
+> Why do I need the wallet descriptor?
+
+Recovery phrases alone are not enough to restore wallets. You also need the wallet configuration, including the script type, public keys, derivation paths, and spending conditions. Descriptors are a widely adopted standard for backing up all of this information in one easily copyable string.
+
+> Can I manually enter my extended public keys (or XPUBs)?
+
+No. While XPUBs are necessary and included in the wallet configuration (or descriptor), restoring a Bitcoin wallet requires additional information like the script type, derivation paths, and spending conditions. Entering these technical details manually increases the risk of human error. To prevent mistakes, Swan Vault Recovery Assistant only supports descriptors.
+
+> What wallets and signing devices does Swan Vault Recovery Assistant support?
+
+Swan Vault Recovery Assistant can import any wallet that supports exporting its configuration as output descriptors, including Swan Vault and many modern Bitcoin wallets. For signing transactions, Blockstream Jade is officially supported for use with Swan Vault Recovery Assistant.
+
+> Does Swan Vault Recovery Assistant collect any data?
+
+Swan Vault Recovery Assistant does not collect any data. However, to display your balance and transaction history, it scans the blockchain through a server. As a result, this server will learn which Bitcoin addresses are associated with your IP address. While this affects privacy, it does not compromise security, since the server cannot access your keys or authorize transactions. By default, Swan Vault Recovery Assistant connects to Blockstream’s server due to its strong reputation, but advanced users can choose a different server or run their own to improve privacy.
+
+# For Developers
+
+This section is intended for developers who want to review the code or contribute to the project. If you are looking to use the application, you can [download the latest release](https://github.com/swan-bitcoin/swan-vault-recovery-assistant/releases).
+
+## Core Design Principles
+
+In order to best protect the user's privacy and security, SVRA is designed with the following core principles:
+
+1. **Zero Data Persistence**: SVRA must not persist any data to disk under any circumstances.
+2. **Minimal Attack Surface**: SVRA must use a minimal dependency footprint so it may easily be audited.
+3. **Open Source Transparency**: SVRA is free to use or extend (MIT license).
 
 ## Additional Design Principles
 
 1. The rust backend must be completely stateless.
-2. The frontend maintains state only in DOM components; a user is always able to see what data is being used.
+2. The frontend maintains state only in DOM components; a user is always able to visually confirm what data is being used.
 
 ## Device Support
 
-Tempura uses [bitcoin-core's HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs). This means that, in theory, any device supported by HWI is supported by tempura.
+SVRA uses [bitcoin-core's open-source HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs).
 
-"In theory, theory and practice are the same. In practice, they are not."
+HWI provides broad device support. However, only Jade devices are officially supported.
 
-Tempura has been well tested with Jade, and has been tested successfully with Trezor. Please report any issues.
+SVRA has been tested with:
 
-## Setup Instructions for Developers
+- Jade
+- Jade Plus
+- Coldcard MK4
+- Coldcard Q
+- Trezor
+
+## Setup Instructions
 
 ### Prereqs
 
@@ -65,8 +107,8 @@ apt-get update && apt-get install -y build-essential curl wget file libwebkit2gt
 1. checkout this repo and cd into it
 
 ```bash
-$ git clone https://github.com/swan-bitcoin/tempura.git
-$ cd tempura
+$ git clone https://github.com/swan-bitcoin/swan-vault-recovery-assistant.git
+$ cd swan-vault-recovery-assistant
 ```
 
 2. install the frontend requirements
@@ -96,7 +138,7 @@ Docker version 24.0.7, build 24.0.7
 
 #### Scenario tests
 
-to run the scenario tests, you'll need the tauri driver and the webkit driver. The common linux steps are below as of this writing; refer to [this guide for the latest steps](https://jonaskruckenberg.github.io/tauri-docs-wip/development/testing.html#prerequisites) for both linux and windows. MacOS is not currently supported.
+To run the scenario tests, you'll need the tauri driver and the webkit driver. The common linux steps are below as of this writing; refer to [this guide for the latest steps](https://jonaskruckenberg.github.io/tauri-docs-wip/development/testing.html#prerequisites) for both linux and windows. MacOS is not currently supported.
 
 ```bash
 sudo apt install webkit2gtk-driver
@@ -111,9 +153,9 @@ A network simulation script is provided in the `/test` directory. It can be ran 
 $ pnpm simnet
 ```
 
-the script will automatically initialize the `docker compose` stack and bring the bitcoin network up to a healthy state for sending transactions and estimating fees. The script may take up to a minute to prepare the network the first time it is ran.
+The script will automatically initialize the `docker compose` stack and bring the bitcoin network up to a healthy state for sending transactions and estimating fees. The script may take up to a minute to prepare the network the first time it is run.
 
-The `~~ NETWORK READY ~~` message will be printed when the setup is done. A couple wallet descriptors will be generated above this message; one funded wallet and one unfunded wallet. The funded wallet's mnemonic will be printed as well so you can test with any PSBT signing software or a physical hardware device. Make sure the hardware device is initialized in test mode and DO NOT USE THIS MNEMONIC WITH A REAL BITCOIN WALLET!
+The `~~ NETWORK READY ~~` message will be printed when the setup is done. A couple of wallet descriptors will be generated above this message; one funded wallet and one unfunded wallet. The funded wallet's mnemonic will be printed as well so you can test with any PSBT signing software or a physical hardware device. Make sure the hardware device is initialized in test mode and DO NOT USE THIS MNEMONIC WITH A REAL BITCOIN WALLET!
 
 If you would like to reset the network (destroying all blocks/transactions in the process), simply run `docker compose down` when the simnet script is not running.
 
@@ -141,7 +183,7 @@ bundle (because its fastest) to check the release build.
 
 ## Committed front-end build outputs
 
-Because Tempura has moderately complex front-end build pipeline that
+Because SVRA has a moderately complex front-end build pipeline that
 transforms its TypeScript and CSS before execution in the application, we
 commit the resulting compiled JavaScript and CSS files for anyone to audit the
 behavior of the application without having to audit the build pipeline itself.
