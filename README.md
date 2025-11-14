@@ -187,3 +187,45 @@ Because SVRA has a moderately complex front-end build pipeline that
 transforms its TypeScript and CSS before execution in the application, we
 commit the resulting compiled JavaScript and CSS files for anyone to audit the
 behavior of the application without having to audit the build pipeline itself.
+
+## Releasing
+
+1.  **Create Release Branch**: From an up-to-date `master` branch, create a new release branch. Replace `<new-version>` with the desired semantic version (e.g., `0.2.0`).
+
+    ```bash
+    git checkout master
+    git pull origin master
+    git checkout -b release/v<new-version>
+    # Example: git checkout -b release/v0.2.0
+    ```
+
+2.  **Bump Version**: On the release branch, run the `pnpm version` command. This updates files, creates a local commit, and creates a local tag.
+
+    ```bash
+    pnpm version <new-version>
+    # Example: pnpm version 0.2.0
+    ```
+
+3.  **Push Branch**: Push your release branch to GitHub to begin the review process.
+
+    ```bash
+    git push origin release/v<new-version>
+    ```
+
+4.  **Create and Merge Pull Request**: Create a pull request from your release branch to `master`. Once it has been reviewed and approved, merge it.
+
+5.  **Push the Tag**: After the pull request is merged, push the tag you created locally in step 2. The `build` workflow is triggered by a tag push.
+
+    ```bash
+    git push origin v<new-version>
+    # Example: git push origin v0.2.0
+    ```
+    *Note: If your local tag gets out of sync, you may need to update it. After pulling the latest `master`, run `git tag -f v<new-version>` to move the tag to the merge commit, then `git push -f origin v<new-version>` to update it on the remote.*
+
+6.  **Approve the Build**: Pushing the tag triggers the `build` workflow, which will immediately pause and wait for manual approval. A designated reviewer must approve the build in the GitHub Actions UI for it to proceed.
+
+7.  **Wait for Build to Complete**: Once approved, the build will resume. Wait for this workflow to complete successfully.
+
+8.  **Create GitHub Release**: Once the build is complete, navigate to the [releases page](https://github.com/swan-bitcoin/swan-vault-recovery-assistant/releases) and create a new release from the tag you just pushed.
+
+9.  **Publish Release**: When you publish the release, the `release` workflow will automatically be triggered, uploading all the build artifacts to your new release.

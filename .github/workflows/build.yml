@@ -3,11 +3,14 @@ name: Build Swan Vault Recovery Assistant release
 on:
   push:
     branches: [master]
+    tags:
+      - 'v*.*.*'
   pull_request:
     types: [opened, synchronize, labeled]
 
 jobs:
   build:
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'tag-approval' || null }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -28,6 +31,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: swan-bitcoin/actions/actions/checkout@master
+
+      - name: Check if tag version matches config files
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
+          TAURI_CONFIG_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          PACKAGE_JSON_VERSION=$(jq -r '.version' package.json)
+
+          if [ "$TAG_VERSION" != "$TAURI_CONFIG_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match tauri.conf.json version ($TAURI_CONFIG_VERSION)."
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$PACKAGE_JSON_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_JSON_VERSION)."
+            exit 1
+          fi
+
+          echo "Tag version ($TAG_VERSION) matches all configuration files."
 
       - name: Set up Rust
         uses: swan-bitcoin/actions/actions-rs/toolchain@master

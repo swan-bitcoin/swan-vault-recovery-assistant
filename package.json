@@ -21,7 +21,8 @@
     "postinstall": "tsx scripts/fetch-hwi.ts",
     "prepare": "husky",
     "simnet": "tsx test/scripts/simulate-network.ts",
-    "simulate-network": "pnpm simnet"
+    "simulate-network": "pnpm simnet",
+    "postversion": "jq --arg new_version \"$npm_package_version\" '.version = $new_version' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json && git add src-tauri/tauri.conf.json"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.7.0",
