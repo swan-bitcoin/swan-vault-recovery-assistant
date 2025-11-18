@@ -206,6 +206,8 @@ jobs:
     needs: build
     if: success() && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: swan-bitcoin/actions/actions/download-artifact@master
@@ -228,7 +230,7 @@ jobs:
           echo "body=$CHANGELOG_BODY" >> $GITHUB_OUTPUT
 
       - name: Create Release and Upload Artifacts
-        uses: softprops/action-gh-release@v1
+        uses: swan-bitcoin/actions/softprops/action-gh-release@master
         with:
           body: ${{ steps.get_changelog.outputs.body }}
           files: |

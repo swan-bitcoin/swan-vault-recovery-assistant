@@ -27,7 +27,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Changeset Check
-        uses: changesets/action@v1
+        uses: swan-bitcoin/actions/changesets/action@master
         with:
           # This will fail the check if a changeset is not present in the PR.
           # It will also post a comment to the PR reminding the author to add one.
