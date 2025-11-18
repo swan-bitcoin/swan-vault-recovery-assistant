@@ -38,6 +38,7 @@ jobs:
           TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
           TAURI_CONFIG_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
           PACKAGE_JSON_VERSION=$(jq -r '.version' package.json)
+          CARGO_TOML_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | cut -d '"' -f 2)
 
           if [ "$TAG_VERSION" != "$TAURI_CONFIG_VERSION" ]; then
             echo "Error: Tag version ($TAG_VERSION) does not match tauri.conf.json version ($TAURI_CONFIG_VERSION)."
@@ -49,7 +50,29 @@ jobs:
             exit 1
           fi
 
+          if [ "$TAG_VERSION" != "$CARGO_TOML_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_TOML_VERSION)."
+            exit 1
+          fi
+
           echo "Tag version ($TAG_VERSION) matches all configuration files."
+
+      - name: Check for Changelog Entry
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
+          CHANGELOG_FILE="CHANGELOG.md"
+          if [ ! -f "$CHANGELOG_FILE" ]; then
+            echo "Error: $CHANGELOG_FILE not found."
+            exit 1
+          fi
+          # Check for a heading like '## [1.2.3]' or '## 1.2.3', case-insensitive
+          if ! grep -q -i -E "^## \[$TAG_VERSION\]" "$CHANGELOG_FILE" && ! grep -q -i -E "^## $TAG_VERSION" "$CHANGELOG_FILE"; then
+            echo "Error: Changelog entry for version $TAG_VERSION not found in $CHANGELOG_FILE."
+            echo "Please add a section like '## [$TAG_VERSION]' to the changelog."
+            exit 1
+          fi
+          echo "Changelog entry for version $TAG_VERSION found."
 
       - name: Set up Rust
         uses: swan-bitcoin/actions/actions-rs/toolchain@master
@@ -179,3 +202,27 @@ jobs:
           path: |
             src-tauri/target/release/bundle/msi/Swan*.msi
             src-tauri/target/release/bundle/nsis/Swan*.exe
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: success() && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: swan-bitcoin/actions/actions/download-artifact@master
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -R artifacts
+
+      - name: Create Release and Upload Artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/swan-vault-recovery-assistant-linux/*
+            artifacts/swan-vault-recovery-assistant-macos/*
+            artifacts/swan-vault-recovery-assistant-windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -22,7 +22,7 @@
     "prepare": "husky",
     "simnet": "tsx test/scripts/simulate-network.ts",
     "simulate-network": "pnpm simnet",
-    "postversion": "jq --arg new_version \"$npm_package_version\" '.version = $new_version' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json && git add src-tauri/tauri.conf.json"
+    "postversion": "jq --arg new_version \"$npm_package_version\" '.version = $new_version' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json && sed -i.bak \"s/^version = \\\".*\\\"/version = \\\"$npm_package_version\\\"/\" src-tauri/Cargo.toml && git add src-tauri/tauri.conf.json src-tauri/Cargo.toml"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.7.0",

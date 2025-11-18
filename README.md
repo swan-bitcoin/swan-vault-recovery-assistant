@@ -190,42 +190,66 @@ behavior of the application without having to audit the build pipeline itself.
 
 ## Releasing
 
-1.  **Create Release Branch**: From an up-to-date `master` branch, create a new release branch. Replace `<new-version>` with the desired semantic version (e.g., `0.2.0`).
+This project uses a fully automated release process triggered by a tag push.
+
+1.  **Create Temporary Branch**: From an up-to-date `master` branch, create a temporary branch to prepare the release.
 
     ```bash
     git checkout master
     git pull origin master
-    git checkout -b release/v<new-version>
-    # Example: git checkout -b release/v0.2.0
+    git checkout -b prep-release
     ```
 
-2.  **Bump Version**: On the release branch, run the `pnpm version` command. This updates files, creates a local commit, and creates a local tag.
+2.  **Update Changelog**: Determine what the next version number will be based on the changes. Add a new section for this version to the `CHANGELOG.md` file with your release notes.
+
+    > The CI process will verify that the `CHANGELOG.md` file contains a markdown heading corresponding to the version tag (e.g., `## [0.2.1]`). This ensures that every release is documented. Following a format like the one suggested by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) is recommended.
+
+3.  **Commit Changelog**: Commit the updated `CHANGELOG.md` file.
 
     ```bash
-    pnpm version <new-version>
-    # Example: pnpm version 0.2.0
+    git add CHANGELOG.md
+    git commit -m "docs: prepare changelog for next release"
     ```
 
-3.  **Push Branch**: Push your release branch to GitHub to begin the review process.
+4.  **Bump Version**: On the `prep-release` branch, run the `pnpm version` command that corresponds to the changes you made. This will create a second commit for the version bump and a local version tag.
 
     ```bash
-    git push origin release/v<new-version>
+    # For a patch release (e.g., 0.2.0 -> 0.2.1)
+    pnpm version patch
+
+    # For a minor release (e.g., 0.2.1 -> 0.3.0)
+    pnpm version minor
     ```
+    The command will output the new version tag (e.g., `v0.2.1`). Use this for the next step.
 
-4.  **Create and Merge Pull Request**: Create a pull request from your release branch to `master`. Once it has been reviewed and approved, merge it.
-
-5.  **Push the Tag**: After the pull request is merged, push the tag you created locally in step 2. The `build` workflow is triggered by a tag push.
+5.  **Rename Branch**: Rename the local branch to include the new version number for clarity.
 
     ```bash
-    git push origin v<new-version>
-    # Example: git push origin v0.2.0
+    git branch -m release/<tag-name>
+    # Example: git branch -m release/v0.2.1
     ```
-    *Note: If your local tag gets out of sync, you may need to update it. After pulling the latest `master`, run `git tag -f v<new-version>` to move the tag to the merge commit, then `git push -f origin v<new-version>` to update it on the remote.*
 
-6.  **Approve the Build**: Pushing the tag triggers the `build` workflow, which will immediately pause and wait for manual approval. A designated reviewer must approve the build in the GitHub Actions UI for it to proceed.
+6.  **Push Branch**: Push your newly named release branch to GitHub to begin the review process.
 
-7.  **Wait for Build to Complete**: Once approved, the build will resume. Wait for this workflow to complete successfully.
+    ```bash
+    git push origin release/<tag-name>
+    # Example: git push origin release/v0.2.1
+    ```
 
-8.  **Create GitHub Release**: Once the build is complete, navigate to the [releases page](https://github.com/swan-bitcoin/swan-vault-recovery-assistant/releases) and create a new release from the tag you just pushed.
+7.  **Create and Merge Pull Request**: Create a pull request from your release branch to `master`. It will contain two commits: one for the changelog and one for the version bump. Once reviewed and approved, merge it.
 
-9.  **Publish Release**: When you publish the release, the `release` workflow will automatically be triggered, uploading all the build artifacts to your new release.
+8.  **Push the Tag**: After the pull request is merged, push the tag that was created locally in step 4. This is the final step that kicks off the automated release.
+
+    ```bash
+    git push origin <tag-name>
+    # Example: git push origin v0.2.1
+    ```
+    *Note: If your local tag points to the wrong commit (e.g., if `master` was updated while your PR was open), you may need to move it. After pulling the latest `master`, run `git tag -f <tag-name>` to move the tag to the merge commit, then `git push -f origin <tag-name>` to update it on the remote.*
+
+9.  **Approve the Build**: Pushing the tag triggers the `build` workflow, which will immediately pause and wait for manual approval from a designated reviewer in the GitHub Actions UI.
+
+10. **Done!**: Once the build is approved, the workflow will automatically:
+    - Build the application for all platforms.
+    - Create a new GitHub Release corresponding to your tag.
+    - Upload all the compiled application files to the release.
+    You can monitor the progress in the "Actions" tab on GitHub.
