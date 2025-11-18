@@ -190,66 +190,57 @@ behavior of the application without having to audit the build pipeline itself.
 
 ## Releasing
 
-This project uses a fully automated release process triggered by a tag push.
+This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. The release process is automated and enforced by CI checks.
 
-1.  **Create Temporary Branch**: From an up-to-date `master` branch, create a temporary branch to prepare the release.
+### Developer Workflow: Adding a Changeset
+
+When you make any change that should be included in the release notes (e.g., a new feature, a bug fix), you must add a "changeset".
+
+1.  **Make your code changes** on a feature branch.
+
+2.  **Run `pnpm changeset add`**: This command will ask you to classify your change as a `patch`, `minor`, or `major` update and to write a summary of the change.
+
+3.  **Commit the changeset file**: A new markdown file will be created in the `.changeset` directory. Commit this file along with your code changes.
+
+A CI check will run on your pull request to ensure you haven't forgotten to add a changeset.
+
+### Release Workflow: Creating a New Release
+
+1.  **Create a Release PR**: When you are ready to release, create a new branch named `release` and open a pull request to `master`.
 
     ```bash
     git checkout master
     git pull origin master
-    git checkout -b prep-release
+    git checkout -b release
     ```
 
-2.  **Update Changelog**: Determine what the next version number will be based on the changes. Add a new section for this version to the `CHANGELOG.md` file with your release notes.
-
-    > The CI process will verify that the `CHANGELOG.md` file contains a markdown heading corresponding to the version tag (e.g., `## [0.2.1]`). This ensures that every release is documented. Following a format like the one suggested by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) is recommended.
-
-3.  **Commit Changelog**: Commit the updated `CHANGELOG.md` file.
+2.  **Version and Sync**: On the `release` branch, run the new `release:version` script. This single command consumes all changeset files and updates the version in the `CHANGELOG.md`, `package.json`, `tauri.conf.json`, and `Cargo.toml` files.
 
     ```bash
-    git add CHANGELOG.md
-    git commit -m "docs: prepare changelog for next release"
+    pnpm release:version
     ```
 
-4.  **Bump Version**: On the `prep-release` branch, run the `pnpm version` command that corresponds to the changes you made. This will create a second commit for the version bump and a local version tag.
+3.  **Commit Changes**: Commit all the changes made by the script.
 
     ```bash
-    # For a patch release (e.g., 0.2.0 -> 0.2.1)
-    pnpm version patch
-
-    # For a minor release (e.g., 0.2.1 -> 0.3.0)
-    pnpm version minor
+    git add .
+    git commit -m "chore: version release"
     ```
-    The command will output the new version tag (e.g., `v0.2.1`). Use this for the next step.
 
-5.  **Rename Branch**: Rename the local branch to include the new version number for clarity.
+4.  **Push and Merge**: Push the `release` branch and merge the pull request once it's approved.
+
+5.  **Tag the Release**: After merging, check out the `master` branch, pull the latest changes, and run the `changeset tag` command. This will create a Git tag for the new version.
 
     ```bash
-    git branch -m release/<tag-name>
-    # Example: git branch -m release/v0.2.1
+    git checkout master
+    git pull origin master
+    pnpm changeset tag
     ```
 
-6.  **Push Branch**: Push your newly named release branch to GitHub to begin the review process.
+6.  **Push the Tag**: Push the new tag to GitHub. This is the final step that kicks off the automated release build.
 
     ```bash
-    git push origin release/<tag-name>
-    # Example: git push origin release/v0.2.1
+    git push --follow-tags
     ```
 
-7.  **Create and Merge Pull Request**: Create a pull request from your release branch to `master`. It will contain two commits: one for the changelog and one for the version bump. Once reviewed and approved, merge it.
-
-8.  **Push the Tag**: After the pull request is merged, push the tag that was created locally in step 4. This is the final step that kicks off the automated release.
-
-    ```bash
-    git push origin <tag-name>
-    # Example: git push origin v0.2.1
-    ```
-    *Note: If your local tag points to the wrong commit (e.g., if `master` was updated while your PR was open), you may need to move it. After pulling the latest `master`, run `git tag -f <tag-name>` to move the tag to the merge commit, then `git push -f origin <tag-name>` to update it on the remote.*
-
-9.  **Approve the Build**: Pushing the tag triggers the `build` workflow, which will immediately pause and wait for manual approval from a designated reviewer in the GitHub Actions UI.
-
-10. **Done!**: Once the build is approved, the workflow will automatically:
-    - Build the application for all platforms.
-    - Create a new GitHub Release corresponding to your tag.
-    - Upload all the compiled application files to the release.
-    You can monitor the progress in the "Actions" tab on GitHub.
+7.  **Approve and Monitor**: Pushing the tag triggers the `build` workflow, which will pause for manual approval. Once approved, the workflow will automatically build the application, create a GitHub Release, and upload the assets.

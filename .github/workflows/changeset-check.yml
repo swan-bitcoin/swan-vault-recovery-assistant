@@ -1,0 +1,36 @@
+name: Changeset Check
+
+on:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: swan-bitcoin/actions/actions/checkout@master
+        with:
+          fetch-depth: 0 # Required for changeset action to fetch all history
+
+      - name: Set up pnpm
+        uses: swan-bitcoin/actions/pnpm/action-setup@master
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: swan-bitcoin/actions/actions/setup-node@master
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Changeset Check
+        uses: changesets/action@v1
+        with:
+          # This will fail the check if a changeset is not present in the PR.
+          # It will also post a comment to the PR reminding the author to add one.
+          version: pnpm changeset version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

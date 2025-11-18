@@ -32,6 +32,21 @@ jobs:
       - name: Checkout code
         uses: swan-bitcoin/actions/actions/checkout@master
 
+      - name: Verify Tag is on Master Branch
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # The default checkout is shallow. Fetch the master branch
+          # so we can perform the ancestry check.
+          git fetch origin master
+          # Check if the commit of the tag is an ancestor of the master branch.
+          # This prevents building tags from unmerged branches.
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/master; then
+            echo "Error: Tag ${{ github.ref_name }} points to a commit (${{ github.sha }}) that is not on the master branch."
+            echo "This is a security risk. Aborting build."
+            exit 1
+          fi
+          echo "Tag ${{ github.ref_name }} is on the master branch. Proceeding."
+
       - name: Check if tag version matches config files
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -56,23 +71,6 @@ jobs:
           fi
 
           echo "Tag version ($TAG_VERSION) matches all configuration files."
-
-      - name: Check for Changelog Entry
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
-          CHANGELOG_FILE="CHANGELOG.md"
-          if [ ! -f "$CHANGELOG_FILE" ]; then
-            echo "Error: $CHANGELOG_FILE not found."
-            exit 1
-          fi
-          # Check for a heading like '## [1.2.3]' or '## 1.2.3', case-insensitive
-          if ! grep -q -i -E "^## \[$TAG_VERSION\]" "$CHANGELOG_FILE" && ! grep -q -i -E "^## $TAG_VERSION" "$CHANGELOG_FILE"; then
-            echo "Error: Changelog entry for version $TAG_VERSION not found in $CHANGELOG_FILE."
-            echo "Please add a section like '## [$TAG_VERSION]' to the changelog."
-            exit 1
-          fi
-          echo "Changelog entry for version $TAG_VERSION found."
 
       - name: Set up Rust
         uses: swan-bitcoin/actions/actions-rs/toolchain@master
@@ -217,9 +215,22 @@ jobs:
       - name: List artifacts
         run: ls -R artifacts
 
+      - name: Extract Latest Changelog Entry
+        id: get_changelog
+        run: |
+          # This script extracts the notes for the most recent version from the changelog.
+          # It prints all lines between the first and second '## [' headings.
+          CHANGELOG_BODY=$(awk '/^## \[/{c++; if(c==2)exit} c&&c<2' CHANGELOG.md)
+          # Escape characters for multiline output
+          CHANGELOG_BODY="${CHANGELOG_BODY//'%'/'%25'}"
+          CHANGELOG_BODY="${CHANGELOG_BODY//$'\n'/'%0A'}"
+          CHANGELOG_BODY="${CHANGELOG_BODY//$'\r'/'%0D'}"
+          echo "body=$CHANGELOG_BODY" >> $GITHUB_OUTPUT
+
       - name: Create Release and Upload Artifacts
         uses: softprops/action-gh-release@v1
         with:
+          body: ${{ steps.get_changelog.outputs.body }}
           files: |
             artifacts/swan-vault-recovery-assistant-linux/*
             artifacts/swan-vault-recovery-assistant-macos/*
