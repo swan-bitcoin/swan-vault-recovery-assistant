@@ -21,20 +21,18 @@
     "postinstall": "tsx scripts/fetch-hwi.ts",
     "prepare": "husky",
     "simnet": "tsx test/scripts/simulate-network.ts",
-    "simulate-network": "pnpm simnet",
-    "changeset": "changeset",
-    "release:version": "pnpm changeset version && pnpm tsx scripts/sync-versions.ts"
+    "simulate-network": "pnpm simnet"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.7.0",
     "@tauri-apps/plugin-clipboard-manager": "^2.3.0"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.29.7",
     "@eslint/js": "^9.32.0",
     "@tauri-apps/cli": "^2.7.1",
     "@types/node": "^22.17.0",
     "@types/selenium-webdriver": "^4.1.28",
+    "@types/semver": "^7.7.1",
     "autoprefixer": "^10.4.21",
     "bip32": "^4.0.0",
     "bip39": "^3.1.0",
@@ -51,6 +49,7 @@
     "progress-stream": "^2.0.0",
     "pure-rand": "^6.1.0",
     "selenium-webdriver": "^4.34.0",
+    "semver": "^7.7.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
     "tar": "^7.4.3",

@@ -217,22 +217,10 @@ jobs:
       - name: List artifacts
         run: ls -R artifacts
 
-      - name: Extract Latest Changelog Entry
-        id: get_changelog
-        run: |
-          # This script extracts the notes for the most recent version from the changelog.
-          # It prints all lines between the first and second '## [' headings.
-          CHANGELOG_BODY=$(awk '/^## \[/{c++; if(c==2)exit} c&&c<2' CHANGELOG.md)
-          # Escape characters for multiline output
-          CHANGELOG_BODY="${CHANGELOG_BODY//'%'/'%25'}"
-          CHANGELOG_BODY="${CHANGELOG_BODY//$'\n'/'%0A'}"
-          CHANGELOG_BODY="${CHANGELOG_BODY//$'\r'/'%0D'}"
-          echo "body=$CHANGELOG_BODY" >> $GITHUB_OUTPUT
-
       - name: Create Release and Upload Artifacts
         uses: swan-bitcoin/actions/softprops/action-gh-release@master
         with:
-          body: ${{ steps.get_changelog.outputs.body }}
+          generate_release_notes: true
           files: |
             artifacts/swan-vault-recovery-assistant-linux/*
             artifacts/swan-vault-recovery-assistant-macos/*

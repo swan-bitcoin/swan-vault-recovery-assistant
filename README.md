@@ -190,57 +190,53 @@ behavior of the application without having to audit the build pipeline itself.
 
 ## Releasing
 
-This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. The release process is automated and enforced by CI checks.
+This project uses a streamlined, tag-driven release process with automatically generated release notes.
 
-### Developer Workflow: Adding a Changeset
+### Developer Workflow: Pull Requests
 
-When you make any change that should be included in the release notes (e.g., a new feature, a bug fix), you must add a "changeset".
+To ensure high-quality release notes, it is mandatory for all pull requests to have a clear and descriptive title. The automated release process uses these PR titles to build the changelog for each release.
 
-1.  **Make your code changes** on a feature branch.
+### Creating a New Release
 
-2.  **Run `pnpm changeset add`**: This command will ask you to classify your change as a `patch`, `minor`, or `major` update and to write a summary of the change.
-
-3.  **Commit the changeset file**: A new markdown file will be created in the `.changeset` directory. Commit this file along with your code changes.
-
-A CI check will run on your pull request to ensure you haven't forgotten to add a changeset.
-
-### Release Workflow: Creating a New Release
-
-1.  **Create a Release PR**: When you are ready to release, create a new branch named `release` and open a pull request to `master`.
+1.  **Create a Release Branch**: From an up-to-date `master` branch, create a branch for the release preparation.
 
     ```bash
     git checkout master
     git pull origin master
-    git checkout -b release
+    git checkout -b release-preparation
     ```
 
-2.  **Version and Sync**: On the `release` branch, run the new `release:version` script. This single command consumes all changeset files and updates the version in the `CHANGELOG.md`, `package.json`, `tauri.conf.json`, and `Cargo.toml` files.
+2.  **Bump and Sync Versions**: Run the `sync-versions.ts` script with the desired bump type (`patch`, `minor`, or `major`). This command updates all necessary version files.
 
     ```bash
-    pnpm release:version
+    pnpm tsx scripts/sync-versions.ts patch
     ```
 
-3.  **Commit Changes**: Commit all the changes made by the script.
+3.  **Commit the Version Bump**: Add and commit all the file changes with a descriptive message. Note the new version number for a later step.
 
     ```bash
     git add .
-    git commit -m "chore: version release"
+    git commit -m "Release v0.2.0"
     ```
 
-4.  **Push and Merge**: Push the `release` branch and merge the pull request once it's approved.
+4.  **Push the Branch**: Push *only the branch* to GitHub to begin the review process. **Do not push any tags yet.**
 
-5.  **Tag the Release**: After merging, check out the `master` branch, pull the latest changes, and run the `changeset tag` command. This will create a Git tag for the new version.
+    ```bash
+    git push origin release-preparation
+    ```
+
+5.  **Create and Merge Pull Request**: Create a pull request from `release-preparation` to `master`. Once it has been reviewed and approved, merge it.
+
+6.  **Tag `master` and Push the Tag**: After the pull request is merged, update your local `master` branch. Then, create a tag on the new merge commit and push the tag to GitHub. This is the final step that triggers the automated release.
 
     ```bash
     git checkout master
     git pull origin master
-    pnpm changeset tag
+    git tag v0.2.0
+    git push origin v0.2.0
     ```
 
-6.  **Push the Tag**: Push the new tag to GitHub. This is the final step that kicks off the automated release build.
-
-    ```bash
-    git push --follow-tags
-    ```
-
-7.  **Approve and Monitor**: Pushing the tag triggers the `build` workflow, which will pause for manual approval. Once approved, the workflow will automatically build the application, create a GitHub Release, and upload the assets.
+7.  **Approve and Monitor**: Pushing the tag to `master` triggers the `build` workflow, which will pause for manual approval. Once approved, the workflow will automatically:
+    - Build the application for all platforms.
+    - Create a new GitHub Release with notes generated from all the PRs merged since the last release.
+    - Upload all the compiled application files to the release.
