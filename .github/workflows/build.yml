@@ -3,11 +3,14 @@ name: Build Swan Vault Recovery Assistant release
 on:
   push:
     branches: [master]
+    tags:
+      - 'v*.*.*'
   pull_request:
     types: [opened, synchronize, labeled]
 
 jobs:
   build:
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'tag-approval' || null }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -28,6 +31,46 @@ jobs:
     steps:
       - name: Checkout code
         uses: swan-bitcoin/actions/actions/checkout@master
+
+      - name: Verify Tag is on Master Branch
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # The default checkout is shallow. Fetch the master branch
+          # so we can perform the ancestry check.
+          git fetch origin master
+          # Check if the commit of the tag is an ancestor of the master branch.
+          # This prevents building tags from unmerged branches.
+          if ! git merge-base --is-ancestor ${{ github.sha }} origin/master; then
+            echo "Error: Tag ${{ github.ref_name }} points to a commit (${{ github.sha }}) that is not on the master branch."
+            echo "This is a security risk. Aborting build."
+            exit 1
+          fi
+          echo "Tag ${{ github.ref_name }} is on the master branch. Proceeding."
+
+      - name: Check if tag version matches config files
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
+          TAURI_CONFIG_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          PACKAGE_JSON_VERSION=$(jq -r '.version' package.json)
+          CARGO_TOML_VERSION=$(grep '^version = ' src-tauri/Cargo.toml | cut -d '"' -f 2)
+
+          if [ "$TAG_VERSION" != "$TAURI_CONFIG_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match tauri.conf.json version ($TAURI_CONFIG_VERSION)."
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$PACKAGE_JSON_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_JSON_VERSION)."
+            exit 1
+          fi
+
+          if [ "$TAG_VERSION" != "$CARGO_TOML_VERSION" ]; then
+            echo "Error: Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_TOML_VERSION)."
+            exit 1
+          fi
+
+          echo "Tag version ($TAG_VERSION) matches all configuration files."
 
       - name: Set up Rust
         uses: swan-bitcoin/actions/actions-rs/toolchain@master
@@ -157,3 +200,30 @@ jobs:
           path: |
             src-tauri/target/release/bundle/msi/Swan*.msi
             src-tauri/target/release/bundle/nsis/Swan*.exe
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: success() && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: swan-bitcoin/actions/actions/download-artifact@master
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: ls -R artifacts
+
+      - name: Create Release and Upload Artifacts
+        uses: swan-bitcoin/actions/softprops/action-gh-release@master
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/swan-vault-recovery-assistant-linux/*
+            artifacts/swan-vault-recovery-assistant-macos/*
+            artifacts/swan-vault-recovery-assistant-windows/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

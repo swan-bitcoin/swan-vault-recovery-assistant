@@ -187,3 +187,56 @@ Because SVRA has a moderately complex front-end build pipeline that
 transforms its TypeScript and CSS before execution in the application, we
 commit the resulting compiled JavaScript and CSS files for anyone to audit the
 behavior of the application without having to audit the build pipeline itself.
+
+## Releasing
+
+This project uses a streamlined, tag-driven release process with automatically generated release notes.
+
+### Developer Workflow: Pull Requests
+
+To ensure high-quality release notes, it is mandatory for all pull requests to have a clear and descriptive title. The automated release process uses these PR titles to build the changelog for each release.
+
+### Creating a New Release
+
+1.  **Create a Release Branch**: From an up-to-date `master` branch, create a branch for the release preparation.
+
+    ```bash
+    git checkout master
+    git pull origin master
+    git checkout -b release-preparation
+    ```
+
+2.  **Bump and Sync Versions**: Run the `sync-versions.ts` script with the desired bump type (`patch`, `minor`, or `major`). This command updates all necessary version files.
+
+    ```bash
+    pnpm tsx scripts/sync-versions.ts patch
+    ```
+
+3.  **Commit the Version Bump**: Add and commit all the file changes with a descriptive message. Note the new version number for a later step.
+
+    ```bash
+    git add .
+    git commit -m "Release v0.2.0"
+    ```
+
+4.  **Push the Branch**: Push *only the branch* to GitHub to begin the review process. **Do not push any tags yet.**
+
+    ```bash
+    git push origin release-preparation
+    ```
+
+5.  **Create and Merge Pull Request**: Create a pull request from `release-preparation` to `master`. Once it has been reviewed and approved, merge it.
+
+6.  **Tag `master` and Push the Tag**: After the pull request is merged, update your local `master` branch. Then, create a tag on the new merge commit and push the tag to GitHub. This is the final step that triggers the automated release.
+
+    ```bash
+    git checkout master
+    git pull origin master
+    git tag v0.2.0
+    git push origin v0.2.0
+    ```
+
+7.  **Approve and Monitor**: Pushing the tag to `master` triggers the `build` workflow, which will pause for manual approval. Once approved, the workflow will automatically:
+    - Build the application for all platforms.
+    - Create a new GitHub Release with notes generated from all the PRs merged since the last release.
+    - Upload all the compiled application files to the release.
