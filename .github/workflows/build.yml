@@ -35,6 +35,7 @@ jobs:
 
       - name: Verify Tag is on Master Branch
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         run: |
           # The default checkout is shallow. Fetch the master branch
           # so we can perform the ancestry check.
@@ -50,6 +51,7 @@ jobs:
 
       - name: Check if tag version matches config files
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         run: |
           TAG_VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/v//')
           TAURI_CONFIG_VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
