@@ -227,8 +227,11 @@ jobs:
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            artifacts/swan-vault-recovery-assistant-linux/**
-            artifacts/swan-vault-recovery-assistant-macos/**
-            artifacts/swan-vault-recovery-assistant-windows/**
+            artifacts/swan-vault-recovery-assistant-linux/**/swan*.deb
+            artifacts/swan-vault-recovery-assistant-linux/**/swan*.AppImage
+            artifacts/swan-vault-recovery-assistant-linux/**/swan*.rpm
+            artifacts/swan-vault-recovery-assistant-macos/**/swan*.dmg
+            artifacts/swan-vault-recovery-assistant-windows/**/swan*.exe
+            artifacts/swan-vault-recovery-assistant-windows/**/swan*.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
