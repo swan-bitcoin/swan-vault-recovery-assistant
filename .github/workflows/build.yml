@@ -225,9 +225,10 @@ jobs:
         uses: swan-bitcoin/actions/softprops/action-gh-release@master
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            artifacts/swan-vault-recovery-assistant-linux/*
-            artifacts/swan-vault-recovery-assistant-macos/*
-            artifacts/swan-vault-recovery-assistant-windows/*
+            artifacts/swan-vault-recovery-assistant-linux/**
+            artifacts/swan-vault-recovery-assistant-macos/**
+            artifacts/swan-vault-recovery-assistant-windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
