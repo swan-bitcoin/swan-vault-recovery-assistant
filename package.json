@@ -10,6 +10,7 @@
     "clean": "rm -rf dist && rm -rf src-tauri/target",
     "preview": "vite preview",
     "tauri": "tauri",
+    "tauri:build": "tauri build && tsx scripts/rename-artifacts.ts",
     "lint": "eslint .",
     "test": "pnpm test:watch run",
     "test:scenario": "pnpm test:scenario:watch run",
