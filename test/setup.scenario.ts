@@ -13,8 +13,21 @@ function log(message: string, ...args: any): void {
 export let driver: WebDriver
 let tauriDriver: ChildProcess
 
-const application = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release', 'swan_vault_recovery_assistant')
-const hashFile = path.resolve(__dirname, '..', 'src-tauri', 'target', 'swan_vault_recovery_assistant-hashfile')
+function getApplicationPath(): string {
+  const targetDir = path.resolve(__dirname, '..', 'src-tauri', 'target', 'release')
+
+  switch (os.platform()) {
+    case 'win32':
+      return path.join(targetDir, 'Swan Vault Recovery Assistant.exe')
+    case 'darwin':
+      return path.join(targetDir, 'Swan Vault Recovery Assistant')
+    default: // linux and others
+      return path.join(targetDir, 'swan-vault-recovery-assistant')
+  }
+}
+
+const application = getApplicationPath()
+const hashFile = path.resolve(__dirname, '..', 'src-tauri', 'target', 'swan-vault-recovery-assistant-hashfile')
 
 // a list of files and directories to hash to determine when we should build
 const tauriDir = path.resolve(__dirname, '..', 'src-tauri')
@@ -63,33 +76,39 @@ function hashFiles(paths: string[]): string {
   return hash.digest('hex')
 }
 
+async function build() {
+  if (process.env.SVRA_SCENARIO_SKIP_BUILD) {
+    log('build will be skipped because SVRA_SCENARIO_SKIP_BUILD is set.')
+    return
+  }
+
+  // perform a build if the hash file doesn't exist (first run) or if the source files have changed
+  let currentHash
+  const hashFileExists = fs.existsSync(hashFile)
+  if (hashFileExists) {
+    const previousHash = fs.readFileSync(hashFile, 'utf8')
+
+    // gen the the frontend 'dist' contents and hash the source directories
+    await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
+    currentHash = hashFiles(sourcePaths)
+
+    if (currentHash === previousHash) {
+      log('build will be skipped because source files have not changed.')
+      return
+    }
+  }
+
+  // either no hash file exists or source files changed, run a build and generate the hashfile
+  await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
+  fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
+}
+
 beforeAll(async () => {
   if (os.platform() === 'darwin') {
     throw new Error('Platform tests are not supported on MacOS. Refer to the README for instructions.')
   }
 
-  if (process.env.SVRA_SCENARIO_SKIP_BUILD) {
-    log('SVRA_SCENARIO_SKIP_BUILD is set- skipping build.')
-  } else {
-    // perform a build if the hash file doesn't exist (first run) or if the source files have changed
-    let currentHash
-    let shouldBuild = !fs.existsSync(hashFile)
-    if (!shouldBuild) {
-      const previousHash = fs.readFileSync(hashFile, 'utf8')
-
-      // gen the the frontend 'dist' contents and hash the source directories
-      await spawnSync('pnpm', ['build'], { stdio: 'inherit' })
-      currentHash = hashFiles(sourcePaths)
-      shouldBuild = currentHash !== previousHash
-    }
-
-    if (shouldBuild) {
-      await spawnSync('pnpm', ['tauri', 'build', '--no-bundle'], { stdio: 'inherit' })
-      fs.writeFileSync(hashFile, currentHash ?? hashFiles(sourcePaths))
-    } else {
-      log('build will be skipped because source files have not changed')
-    }
-  }
+  await build()
 
   tauriDriver = spawn(path.resolve(os.homedir(), '.cargo', 'bin', 'tauri-driver'), [], {
     // stdio: ['ignore', process.stdout, process.stderr],
