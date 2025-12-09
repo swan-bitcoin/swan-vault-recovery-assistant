@@ -115,6 +115,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
       - name: Debug cache contents
+        shell: bash
         run: |
           echo "=== Checking bundle directory after cache restore ==="
           if [ -d "src-tauri/target/release/bundle" ]; then
