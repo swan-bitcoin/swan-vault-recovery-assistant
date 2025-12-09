@@ -114,6 +114,16 @@ jobs:
             !src-tauri/target/release/bundle
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
 
+      - name: Debug cache contents
+        run: |
+          echo "=== Checking bundle directory after cache restore ==="
+          if [ -d "src-tauri/target/release/bundle" ]; then
+            echo "Bundle directory EXISTS after cache restore:"
+            ls -alR src-tauri/target/release/bundle/
+          else
+            echo "Bundle directory does NOT exist after cache restore (expected)"
+          fi
+
       - name: Import Apple Developer Certificate
         if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         env:

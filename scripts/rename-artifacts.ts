@@ -1,4 +1,4 @@
-import { readdirSync, renameSync, statSync, lstatSync } from 'fs'
+import { readdirSync, renameSync, statSync, lstatSync, rmSync, existsSync } from 'fs'
 import { join, dirname, extname } from 'path'
 
 /**
@@ -52,6 +52,15 @@ const renameArtifactsInDir = (dir: string, depth: number = 0): void => {
         // Rename .app bundles (macOS) - don't recurse into them
         const newName = entry.replace(PRODUCT_NAME, KEBAB_NAME)
         const newPath = join(dir, newName)
+
+        // Remove existing destination if it exists (e.g., from cached builds)
+        if (existsSync(newPath)) {
+          console.log(`Removing existing directory at destination: ${newName}`)
+          rmSync(newPath, { recursive: true, force: true })
+        } else {
+          console.log(`Destination does not exist (as expected): ${newName}`)
+        }
+
         console.log(`Renaming directory: ${entry} -> ${newName}`)
         renameSync(fullPath, newPath)
       } else if (!entry.endsWith('.AppDir')) {
@@ -61,6 +70,15 @@ const renameArtifactsInDir = (dir: string, depth: number = 0): void => {
     } else if (stat.isFile() && ARTIFACT_EXTENSIONS.has(ext) && entry.includes(PRODUCT_NAME)) {
       const newName = entry.replace(PRODUCT_NAME, KEBAB_NAME)
       const newPath = join(dirname(fullPath), newName)
+
+      // Remove existing destination if it exists (e.g., from cached builds)
+      if (existsSync(newPath)) {
+        console.log(`Removing existing file at destination: ${newName}`)
+        rmSync(newPath, { force: true })
+      } else {
+        console.log(`Destination does not exist (as expected): ${newName}`)
+      }
+
       console.log(`Renaming file: ${entry} -> ${newName}`)
       renameSync(fullPath, newPath)
     }
