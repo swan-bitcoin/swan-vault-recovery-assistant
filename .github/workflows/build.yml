@@ -109,9 +109,21 @@ jobs:
             !src-tauri/target/release/hwi
             !src-tauri/target/release/hwi.exe
             !src-tauri/target/release/swan-vault-recovery-assistant
-            !src-tauri/target/release/swan-vault-recovery-assistant.exe
+            !src-tauri/target/release/Swan Vault Recovery Assistant
+            !src-tauri/target/release/Swan Vault Recovery Assistant.exe
             !src-tauri/target/release/bundle
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '.github/workflows/build.yml') }}
+
+      - name: Debug cache contents
+        shell: bash
+        run: |
+          echo "=== Checking bundle directory after cache restore ==="
+          if [ -d "src-tauri/target/release/bundle" ]; then
+            echo "Bundle directory EXISTS after cache restore:"
+            ls -alR src-tauri/target/release/bundle/
+          else
+            echo "Bundle directory does NOT exist after cache restore (expected)"
+          fi
 
       - name: Import Apple Developer Certificate
         if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
@@ -151,11 +163,11 @@ jobs:
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-        run: pnpm tauri build
+        run: pnpm tauri:build
 
       - name: Build project (unsigned)
         if: ${{ matrix.os != 'macos-latest' || matrix.isPR }}
-        run: pnpm tauri build
+        run: pnpm tauri:build
 
       - name: Check for git diffs after build
         run: pnpm ci:gitdiff
@@ -171,8 +183,9 @@ jobs:
             src-tauri/target/
             !src-tauri/target/release/hwi
             !src-tauri/target/release/hwi.exe
-            !src-tauri/target/release/swan_vault_recovery_assistant
-            !src-tauri/target/release/swan_vault_recovery_assistant.exe
+            !src-tauri/target/release/swan-vault-recovery-assistant
+            !src-tauri/target/release/Swan Vault Recovery Assistant
+            !src-tauri/target/release/Swan Vault Recovery Assistant.exe
             !src-tauri/target/release/bundle
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
