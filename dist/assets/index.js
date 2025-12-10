@@ -363,11 +363,11 @@ const isChangeDescriptor = (descriptor) => {
 const populateTransactionOverview = ({ address, outbound, fee }) => {
   const overviewAmount = document.getElementById('transaction-overview-amount')
   if (overviewAmount) {
-    overviewAmount.textContent = Sats(outbound)
+    overviewAmount.innerHTML = Sats(outbound)
   }
   const overviewFee = document.getElementById('transaction-overview-fee')
   if (overviewFee) {
-    overviewFee.textContent = Sats(fee || '')
+    overviewFee.innerHTML = Sats(fee || '')
   }
   const overviewAddress = document.getElementById('transaction-overview-address')
   if (overviewAddress) {
