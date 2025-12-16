@@ -13,6 +13,10 @@ jobs:
     environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'tag-approval' || null }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     strategy:
       matrix:
         # https://github.com/actions/runner-images
@@ -200,6 +204,15 @@ jobs:
             src-tauri/target/release/bundle/appimage/swan*.AppImage
             src-tauri/target/release/bundle/rpm/swan*.rpm
 
+      - name: Generate build provenance attestation (linux)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: swan-bitcoin/actions/actions/attest-build-provenance@master
+        with:
+          subject-path: |
+            src-tauri/target/release/bundle/deb/swan*.deb
+            src-tauri/target/release/bundle/appimage/swan*.AppImage
+            src-tauri/target/release/bundle/rpm/swan*.rpm
+
       - name: Publish artifacts (macos)
         if: ${{ matrix.os == 'macos-latest' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
@@ -209,12 +222,28 @@ jobs:
             src-tauri/target/release/bundle/macos/swan*.app
             src-tauri/target/release/bundle/dmg/swan*.dmg
 
+      - name: Generate build provenance attestation (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        uses: swan-bitcoin/actions/actions/attest-build-provenance@master
+        with:
+          subject-path: |
+            src-tauri/target/release/bundle/macos/swan*.app
+            src-tauri/target/release/bundle/dmg/swan*.dmg
+
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
           name: swan-vault-recovery-assistant-windows
           path: |
+            src-tauri/target/release/bundle/msi/swan*.msi
+            src-tauri/target/release/bundle/nsis/swan*.exe
+
+      - name: Generate build provenance attestation (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: swan-bitcoin/actions/actions/attest-build-provenance@master
+        with:
+          subject-path: |
             src-tauri/target/release/bundle/msi/swan*.msi
             src-tauri/target/release/bundle/nsis/swan*.exe
 
