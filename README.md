@@ -38,7 +38,7 @@ Swan Vault Recovery Assistant does not collect any data. However, to display you
 
 # Verifying Your Download
 
-When you download software that handles Bitcoin, you are trusting that software with access to your funds. A malicious or tampered binary could steal your private keys, modify transaction outputs, or compromise your security in ways that are difficult to detect.
+When you download software that handles Bitcoin, you are trusting that software with access to your funds. A malicious or tampered binary could modify transaction outputs or compromise your security in ways that are difficult to detect.
 
 **Don't trust, verify.**
 
