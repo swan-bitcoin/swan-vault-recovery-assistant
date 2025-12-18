@@ -137,45 +137,47 @@ gh auth login
 
 If you don't have a GitHub account, you can still perform attestation verification using offline mode (see [Verification Without a GitHub Account](#verification-without-a-github-account) below).
 
+replace `<version>` with the version you want to download, such as `v1.0.0`
+
 ### Windows
 
 ```powershell
 # Download the release
-gh release download v1.0.0 --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.exe"
+gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.exe"
 
 # Verify attestation (essential)
 gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant --tag v1.0.0
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
 ```
 
 ### macOS
 
 ```bash
 # Download the release
-gh release download v1.0.0 --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.dmg"
+gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.dmg"
 
 # Verify attestation (essential)
 gh attestation verify swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant --tag v1.0.0
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
 ```
 
 ### Linux
 
 ```bash
 # Download the release (choose your preferred format)
-gh release download v1.0.0 --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.deb"       # Debian/Ubuntu
-# gh release download v1.0.0 --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.rpm"     # Fedora/RHEL
-# gh release download v1.0.0 --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.AppImage" # Universal
+gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.deb"       # Debian/Ubuntu
+# gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.rpm"     # Fedora/RHEL
+# gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant --pattern "*.AppImage" # Universal
 
 # Verify attestation (essential)
 gh attestation verify swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant --tag v1.0.0
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
 ```
 
 ---
@@ -192,6 +194,8 @@ A build provenance attestation is a cryptographically signed statement that docu
 - **From what source** it was built (the exact commit in the repository)
 
 Think of it like a notarized certificate of origin for software. Just as you might verify a gold bar's authenticity through assay marks and chain of custody documentation, attestations let you verify a binary's authenticity through cryptographic proof.
+
+You can find more detailed information at the [GitHub Attestations Documentation](https://docs.github.com/en/actions/concepts/security/artifact-attestations).
 
 ### How Do Attestations Work?
 
@@ -232,7 +236,7 @@ Attestations verify the build process, but they cannot guarantee:
 - The developers' intentions are good
 - The software will work correctly on your system
 
-Attestations are one layer of security in a defense-in-depth approach. They eliminate certain attack vectors (compromised build machines, man-in-the-middle attacks on downloads, malicious binary substitution) while other security practices address other risks.
+Attestations are one layer of security in a defense-in-depth approach. They eliminate certain attack vectors (man-in-the-middle attacks on downloads or malicious binary substitution) while other security practices address other risks.
 
 ---
 
@@ -246,8 +250,8 @@ First, download the appropriate binary for your operating system from the releas
 # List available releases
 gh release list --repo swan-bitcoin/swan-vault-recovery-assistant
 
-# Download a specific version (replace with your OS-appropriate pattern)
-gh release download v1.0.0 \
+# Download a specific <version>, such as v1.0.0 (replace with your OS-appropriate pattern)
+gh release download <version> \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
   --pattern "*.dmg"  # macOS
   # --pattern "*.deb"  # Debian/Ubuntu
@@ -266,7 +270,7 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_amd64.deb \
   --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
-**Successful output:**
+**Example successful output:**
 
 ```
 Loaded digest sha256:abc123... for file://swan-vault-recovery-assistant_1.0.0_amd64.deb
@@ -284,7 +288,7 @@ This output confirms:
 - The attestation was created by the `build.yml` workflow
 - The build was triggered by the `v1.0.0` tag
 
-**Failed output (do not use the binary):**
+**Example failed output (do not use the binary):**
 
 ```
 ✗ Verification failed!
@@ -299,7 +303,7 @@ The `gh release verify-asset` command confirms the release was signed by an auth
 ```bash
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag v1.0.0
+  --tag <version>
 ```
 
 **Successful output:**
@@ -333,7 +337,7 @@ This displays the complete attestation including:
 
 ```bash
 # Download
-gh release download v1.0.0 \
+gh release download <version> \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
   --pattern "*.dmg"
 
@@ -344,14 +348,14 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_aarch64.dmg \
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag v1.0.0
+  --tag <version>
 ```
 
 ### Windows (.msi or .exe)
 
 ```powershell
 # Download
-gh release download v1.0.0 `
+gh release download <version> `
   --repo swan-bitcoin/swan-vault-recovery-assistant `
   --pattern "*.msi"
 
@@ -362,14 +366,14 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.msi `
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.msi `
   --repo swan-bitcoin/swan-vault-recovery-assistant `
-  --tag v1.0.0
+  --tag <version>
 ```
 
 ### Linux AppImage
 
 ```bash
 # Download
-gh release download v1.0.0 \
+gh release download <version> \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
   --pattern "*.AppImage"
 
@@ -380,7 +384,7 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_amd64.AppImage \
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.AppImage \
   --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag v1.0.0
+  --tag <version>
 ```
 
 ---
@@ -389,7 +393,9 @@ gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.AppImage \
 
 If you don't have a GitHub account, you can still verify build attestations using offline verification. This method uses a trusted root certificate to verify signatures without contacting GitHub's API.
 
-Github's instructions are [here](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/verify-attestations-offline). Yet Github requires you to be logged in to use the `gh attestation download` command as well. The remainder of this section demonstrate how to apply this guide to verify Swan Vault Recovery Assistant build attestations without a GitHub account.
+GitHub's official instructions are [here](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/verify-attestations-offline). However, GitHub's documented approach requires authentication for downloading attestation bundles.
+
+For Swan Vault Recovery Assistant, we provide an alternative approach that works without a GitHub account. The remainder of this section demonstrates how to verify build attestations without authentication.
 
 ### Download the Components
 
@@ -453,6 +459,4 @@ If you encounter problems verifying a release or have questions about this proce
 
 1. Check the [GitHub Issues](https://github.com/swan-bitcoin/swan-vault-recovery-assistant/issues) for known problems
 2. Open a new issue if your problem isn't already reported
-3. Contact Swan support if you need immediate assistance
-
-Remember: **If build attestation verification fails, do not use the binary.** Download a fresh copy from the official releases page and try again. If verification continues to fail, report the issue immediately.
+3. [Contact Swan support](https://help.swanbitcoin.com/hc/en-us/requests/new) if you need immediate assistance
