@@ -36,6 +36,58 @@ Swan Vault Recovery Assistant can import any wallet that supports exporting its 
 
 Swan Vault Recovery Assistant does not collect any data. However, to display your balance and transaction history, it scans the blockchain through a server. As a result, this server will learn which Bitcoin addresses are associated with your IP address. While this affects privacy, it does not compromise security, since the server cannot access your keys or authorize transactions. By default, Swan Vault Recovery Assistant connects to Blockstream’s server due to its strong reputation, but advanced users can choose a different server or run their own to improve privacy.
 
+# Verifying Your Download
+
+When you download software that handles Bitcoin, you are trusting that software with access to your funds. A malicious or tampered binary could modify transaction outputs or compromise your security in ways that are difficult to detect.
+
+**Don't trust, verify.**
+
+This principle, central to Bitcoin itself, applies equally to the software you use. Verification allows you to independently confirm that:
+
+1. **The binary you downloaded is authentic** - It was actually built and released by Swan, not by an attacker who compromised a download mirror or performed a man-in-the-middle attack.
+
+2. **The binary matches the source code** - The executable was built from the exact source code in this repository, not from modified code with hidden malware.
+
+3. **The build process was not tampered with** - The binary was produced by GitHub's secure build infrastructure, with a cryptographic chain of custody from source to release.
+
+## Official Download Source
+
+Swan distributes Swan Vault Recovery Assistant **exclusively** through official GitHub releases:
+
+**https://github.com/swan-bitcoin/swan-vault-recovery-assistant/releases**
+
+You should **always**:
+
+- Download binaries only from the official GitHub releases page linked above
+- Verify the build attestation before installing or running the binary
+- Be suspicious of binaries obtained from any other source, including links in emails, social media, or third-party websites
+
+## Quick Verification
+
+After downloading a release, verify its authenticity using the [GitHub CLI](https://cli.github.com/):
+
+```
+# Verify build attestation (essential)
+gh attestation verify <filename> --repo swan-bitcoin/swan-vault-recovery-assistant
+
+# Verify release asset (recommended)
+gh release verify-asset <filename> --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
+```
+
+For example, to verify a Windows installer:
+
+```
+# Verify build attestation (essential)
+gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
+
+# Verify release asset (recommended)
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant --tag v1.0.0
+```
+
+Build attestation verification is the essential step that cryptographically proves the binary was built by GitHub Actions from this repository. Release asset verification provides additional assurance. **If either verification fails, do not use the binary.**
+
+For detailed verification instructions, examples for other operating systems, how to verify without a GitHub account, or to learn more about this process, see the [full verification guide](docs/verifying-releases.md).
+
 # For Developers
 
 This section is intended for developers who want to review the code or contribute to the project. If you are looking to use the application, you can [download the latest release](https://github.com/swan-bitcoin/swan-vault-recovery-assistant/releases).
@@ -219,7 +271,7 @@ To ensure high-quality release notes, it is mandatory for all pull requests to h
     git commit -m "Release v0.2.0"
     ```
 
-4.  **Push the Branch**: Push *only the branch* to GitHub to begin the review process. **Do not push any tags yet.**
+4.  **Push the Branch**: Push _only the branch_ to GitHub to begin the review process. **Do not push any tags yet.**
 
     ```bash
     git push origin release-preparation
