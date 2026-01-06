@@ -8,8 +8,15 @@ import * as os from 'os'
 import * as tar from 'tar'
 import progress from 'progress-stream'
 
-const HWI_VERSION = '3.1.0'
-const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
+// HWI binaries are downloaded from swan-bitcoin/HWI-builder rather than bitcoin-core/HWI.
+// This build-only repository produces binaries from the official upstream source code because
+// the official release process has stalled. See https://github.com/swan-bitcoin/HWI-builder
+const HWI_VERSION = '3.2.0+swan.1'
+const URL_BASE = `https://github.com/swan-bitcoin/HWI-builder/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
+
+// restore this when bitcoin-core/HWI releases a new version above 3.1.0 and retire swan-bitcoin/HWI-builder
+// const HWI_VERSION = '3.1.0'
+// const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
 const MIB_SIZE = 1024 * 1024
 
 function progressStream(totalSize: number) {
