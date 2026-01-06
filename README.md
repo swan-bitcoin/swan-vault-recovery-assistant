@@ -261,7 +261,7 @@ To ensure high-quality release notes, it is mandatory for all pull requests to h
 2.  **Bump and Sync Versions**: Run the `sync-versions.ts` script with the desired bump type (`patch`, `minor`, or `major`). This command updates all necessary version files.
 
     ```bash
-    pnpm tsx scripts/sync-versions.ts patch
+    pnpm sync-versions patch
     ```
 
 3.  **Commit the Version Bump**: Add and commit all the file changes with a descriptive message. Note the new version number for a later step.
