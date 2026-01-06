@@ -1,7 +1,7 @@
 {
   "name": "swan-vault-recovery-assistant",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -22,7 +22,8 @@
     "postinstall": "tsx scripts/fetch-hwi.ts",
     "prepare": "husky",
     "simnet": "tsx test/scripts/simulate-network.ts",
-    "simulate-network": "pnpm simnet"
+    "simulate-network": "pnpm simnet",
+    "sync-versions": "tsx scripts/sync-versions.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.7.0",
