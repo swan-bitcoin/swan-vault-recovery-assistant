@@ -263,9 +263,62 @@ jobs:
       - name: List artifacts
         run: ls -R artifacts
 
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat << 'EOF' > release_notes.md
+          ## Verification
+
+          This release uses [immutable releases](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#immutable-releases) and [artifact attestations](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds) to provide cryptographic proof of build provenance.
+
+          **Download artifacts first**, either from this GitHub release page or via CLI:
+          ```bash
+          # Download a specific asset
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --pattern 'swan-vault-recovery-assistant*.dmg'
+
+          # Or download all assets
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }}
+          ```
+
+          **Verify Immutable Release:**
+          ```bash
+          # Verify a specific asset was published via immutable release
+          gh release verify-asset swan-vault-recovery-assistant_${{ github.ref_name }}_amd64.AppImage --repo ${{ github.repository }}
+
+          # Or verify all downloaded assets
+          for f in swan-vault-recovery-assistant*; do gh release verify-asset "$f" --repo ${{ github.repository }}; done
+
+          # Immutable releases guarantee:
+          # - The release was created by an automated workflow, not a human
+          # - Release artifacts cannot be modified or replaced after publication
+          # - The release is permanently linked to the workflow run that created it
+          ```
+
+          **Verify Artifact Attestations:**
+          ```bash
+          # Verify build provenance attestation for a specific artifact
+          gh attestation verify swan-vault-recovery-assistant_${{ github.ref_name }}_amd64.AppImage --repo ${{ github.repository }}
+
+          # Or verify all downloaded assets
+          for f in swan-vault-recovery-assistant*; do gh attestation verify "$f" --repo ${{ github.repository }}; done
+
+          # Successful verification confirms:
+          # - The artifact was built by GitHub Actions in this repository
+          # - The artifact has not been modified since the build
+          ```
+
+          For detailed verification instructions, see the [full verification guide](https://github.com/${{ github.repository }}/blob/master/docs/verifying-releases.md).
+
+          ---
+
+          EOF
+
+          echo "Generated release notes"
+
       - name: Create Release and Upload Artifacts
         uses: swan-bitcoin/actions/softprops/action-gh-release@master
         with:
+          body_path: release_notes.md
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |

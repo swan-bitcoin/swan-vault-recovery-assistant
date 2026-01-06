@@ -149,7 +149,7 @@ gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant 
 gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ### macOS
@@ -162,7 +162,7 @@ gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant 
 gh attestation verify swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ### Linux
@@ -177,7 +177,7 @@ gh release download <version> --repo swan-bitcoin/swan-vault-recovery-assistant 
 gh attestation verify swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release signature (recommended, requires GitHub account)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ---
@@ -302,8 +302,7 @@ The `gh release verify-asset` command confirms the release was signed by an auth
 
 ```bash
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.deb \
-  --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag <version>
+  --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 **Successful output:**
@@ -347,8 +346,7 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_aarch64.dmg \
 
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_aarch64.dmg \
-  --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag <version>
+  --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ### Windows (.msi or .exe)
@@ -365,8 +363,7 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.msi `
 
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.msi `
-  --repo swan-bitcoin/swan-vault-recovery-assistant `
-  --tag <version>
+  --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ### Linux AppImage
@@ -383,8 +380,7 @@ gh attestation verify swan-vault-recovery-assistant_1.0.0_amd64.AppImage \
 
 # Verify release signature
 gh release verify-asset swan-vault-recovery-assistant_1.0.0_amd64.AppImage \
-  --repo swan-bitcoin/swan-vault-recovery-assistant \
-  --tag <version>
+  --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 ---

@@ -71,7 +71,7 @@ After downloading a release, verify its authenticity using the [GitHub CLI](http
 gh attestation verify <filename> --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release asset (recommended)
-gh release verify-asset <filename> --repo swan-bitcoin/swan-vault-recovery-assistant --tag <version>
+gh release verify-asset <filename> --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 For example, to verify a Windows installer:
@@ -81,7 +81,7 @@ For example, to verify a Windows installer:
 gh attestation verify swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
 
 # Verify release asset (recommended)
-gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant --tag v1.0.0
+gh release verify-asset swan-vault-recovery-assistant_1.0.0_x64-setup.exe --repo swan-bitcoin/swan-vault-recovery-assistant
 ```
 
 Build attestation verification is the essential step that cryptographically proves the binary was built by GitHub Actions from this repository. Release asset verification provides additional assurance. **If either verification fails, do not use the binary.**
