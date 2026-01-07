@@ -948,6 +948,7 @@ async function loadWallet() {
             })
         instrumentStartRecoveryButton(tempuraItem)
       }
+      instrumentCopyButtons(tempuraItem)
       addToConversation(tempuraItem)
       await sleep(400)
     }
