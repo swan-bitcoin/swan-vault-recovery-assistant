@@ -315,11 +315,14 @@ jobs:
 
           echo "Generated release notes"
 
-      - name: Create Release and Upload Artifacts
+      - name: Create Draft Release
+        id: create_release
         uses: swan-bitcoin/actions/softprops/action-gh-release@master
         with:
           body_path: release_notes.md
           generate_release_notes: true
+          draft: true
+          tag_name: ${{ github.ref_name }}
           fail_on_unmatched_files: true
           files: |
             artifacts/swan-vault-recovery-assistant-linux/**/swan*.deb
@@ -328,5 +331,14 @@ jobs:
             artifacts/swan-vault-recovery-assistant-macos/**/swan*.dmg
             artifacts/swan-vault-recovery-assistant-windows/**/swan*.exe
             artifacts/swan-vault-recovery-assistant-windows/**/swan*.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish Release
+        id: publish_release
+        uses: swan-bitcoin/actions/softprops/action-gh-release@master
+        with:
+          draft: false
+          tag_name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
