@@ -233,6 +233,9 @@ async function loadWallet() {
         instrumentStartRecoveryButton(tempuraItem)
       }
 
+      // other message types that contain copy buttons, such as address display
+      instrumentCopyButtons(tempuraItem)
+
       addToConversation(tempuraItem)
 
       await sleep(400)
