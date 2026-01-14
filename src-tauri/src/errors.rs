@@ -197,21 +197,3 @@ macro_rules! resolve {
   };
 }
 
-#[macro_export]
-macro_rules! resolve_io {
-  ($expr:expr) => {{
-    let o = $expr.output().map_err(|e| {
-      if e.kind() == std::io::ErrorKind::NotFound {
-        return SvraError::new(
-          SvraErrorType::CommandError,
-          "HWI executable not found in PATH or working directory.",
-        );
-      }
-      SvraError::new(SvraErrorType::CommandError, &e.to_string())
-    })?;
-    let response = String::from_utf8(o.stdout);
-    #[cfg(debug_assertions)]
-    println!("{:?}", response);
-    resolve!(response, SvraErrorType::ParseError)
-  }};
-}

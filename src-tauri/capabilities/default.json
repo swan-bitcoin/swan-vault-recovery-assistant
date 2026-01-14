@@ -9,6 +9,16 @@
     "core:app:allow-app-show",
     "core:app:allow-app-hide",
     "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "hwi",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    }
   ]
 }

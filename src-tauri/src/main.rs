@@ -7,7 +7,6 @@ use std::os::windows::process::CommandExt;
 const COMMAND_FLAG_CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use std::collections::BTreeMap;
-
 use std::process::Command;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -23,6 +22,7 @@ use network::{HwiNetwork, Network};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri::Manager;
+use tauri_plugin_shell::ShellExt;
 
 // bdk and bitcoin imports
 use bdk_electrum::electrum_client::Client;
@@ -301,18 +301,6 @@ fn get_blockchain(
   Ok(BdkElectrumClient::new(client))
 }
 
-fn get_hwi() -> Result<Command, SvraError> {
-  let hwi_path = hwi_path();
-
-  #[allow(unused_mut)]
-  let mut command = Command::new(&hwi_path);
-  #[cfg(target_os = "windows")]
-  {
-    command.creation_flags(COMMAND_FLAG_CREATE_NO_WINDOW);
-  }
-  Ok(command)
-}
-
 fn get_wallet(network: Network, descriptors: Descriptors) -> Result<bdk_wallet::Wallet, SvraError> {
   let secp = Secp256k1::new();
   let network: bdk_wallet::bitcoin::Network = network.into();
@@ -466,47 +454,6 @@ fn split_descriptor_if_multipath(descriptor: &str) -> Result<Option<(String, Str
   Ok(Some((receive, change)))
 }
 
-/**
- * some expected locations for the hwi executable will not be found when searching the system PATH.
- *
- * this function will attempt to find the hwi executable in the following locations, by priority:
- *   - the directory where the binary is running from, or current directory
- *   - the CARGO_TARGET_DIR environment variable, if specified
- */
-fn hwi_path() -> String {
-  let mut paths: Vec<String> = Vec::new();
-  if let Ok(path) = std::env::var("CARGO_TARGET_DIR") {
-    paths.push(path);
-  }
-
-  let mut exe_parent_path: String = String::from(".");
-  if let Ok(exe_path) = std::env::current_exe() {
-    if let Some(parent_dir) = exe_path.parent() {
-      exe_parent_path = parent_dir.to_string_lossy().into_owned();
-    }
-  }
-  paths.insert(0, exe_parent_path);
-
-  // search each directory for the executable
-  let hwi_name = if cfg!(windows) { "hwi.exe" } else { "hwi" };
-  let hwi_path = paths
-    .iter()
-    .map(|dir| std::path::Path::new(dir).join(hwi_name))
-    .find(|path| {
-      path.exists()
-        && std::fs::metadata(path)
-          .map(|meta| meta.is_file())
-          .unwrap_or(false)
-    });
-
-  if let Some(hwi_path) = hwi_path {
-    return hwi_path.to_string_lossy().into_owned();
-  }
-
-  // let the system try to find it in PATH, '.exe' not necessary.
-  String::from("hwi")
-}
-
 fn sync_wallet(
   wallet: &mut bdk_wallet::Wallet,
   blockchain: &BdkElectrumClient<Client>,
@@ -620,16 +567,34 @@ async fn estimate_fee(
 
 #[tauri::command]
 #[specta::specta]
-async fn enumerate(network: String) -> Result<String, SvraError> {
+async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
-  let mut command = get_hwi()?;
 
-  Ok(resolve_io!(command.args([
-    "--chain",
-    network.as_str(),
-    "enumerate"
-  ])))
+  let output = app
+    .shell()
+    .sidecar("hwi")
+    .map_err(|e| SvraError::new(SvraErrorType::CommandError, &e.to_string()))?
+    .args(["--chain", network.as_str(), "enumerate"])
+    .output()
+    .await
+    .map_err(|e| {
+      if e.to_string().contains("No such file") || e.to_string().contains("not found") {
+        return SvraError::new(
+          SvraErrorType::CommandError,
+          "HWI executable not found in PATH or working directory.",
+        );
+      }
+      SvraError::new(SvraErrorType::CommandError, &e.to_string())
+    })?;
+
+  let response =
+    String::from_utf8(output.stdout).map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()))?;
+
+  #[cfg(debug_assertions)]
+  println!("{:?}", response);
+
+  Ok(response)
 }
 
 #[tauri::command]
@@ -752,23 +717,48 @@ async fn psbt_status(
 
 #[tauri::command]
 #[specta::specta]
-async fn sign(psbt: String, network: String, device_type: String) -> Result<String, SvraError> {
+async fn sign(
+  app: tauri::AppHandle,
+  psbt: String,
+  network: String,
+  device_type: String,
+) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
-  let mut command = get_hwi()?;
 
   // grab the txid of the transaction before calling the external binary
   // this allows us to detect malicious or unexpected edits to the transaction.
   let txid = extract_txid(&psbt)?;
 
-  let response = resolve_io!(command.args([
-    "--chain",
-    network.as_str(),
-    "--device-type",
-    &device_type,
-    "signtx",
-    &psbt
-  ]));
+  let output = app
+    .shell()
+    .sidecar("hwi")
+    .map_err(|e| SvraError::new(SvraErrorType::CommandError, &e.to_string()))?
+    .args([
+      "--chain",
+      network.as_str(),
+      "--device-type",
+      &device_type,
+      "signtx",
+      &psbt,
+    ])
+    .output()
+    .await
+    .map_err(|e| {
+      if e.to_string().contains("No such file") || e.to_string().contains("not found") {
+        return SvraError::new(
+          SvraErrorType::CommandError,
+          "HWI executable not found in PATH or working directory.",
+        );
+      }
+      SvraError::new(SvraErrorType::CommandError, &e.to_string())
+    })?;
+
+  let response =
+    String::from_utf8(output.stdout).map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()))?;
+
+  #[cfg(debug_assertions)]
+  println!("{:?}", response);
 
   // check for a malicious or unexpected edit to the transaction
   let psbt = extract_psbt(&response).ok_or_else(|| {
@@ -995,6 +985,7 @@ fn main() {
 
   tauri::Builder::default()
     .plugin(tauri_plugin_clipboard_manager::init())
+    .plugin(tauri_plugin_shell::init())
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
       specta_builder.mount_events(app);
