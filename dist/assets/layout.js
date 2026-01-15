@@ -43,6 +43,23 @@ const Sats = (sats) => {
   const trailing = combinedStr.slice(splitIndex)
   return `₿<span class="opacity-70">${leading}</span>${trailing}`
 }
+const CircularTickIcon = `<svg
+    xmlns="http://www.w3.org/2000/svg"
+    class="h-6 w-6 shrink-0 stroke-current"
+    fill="none"
+    viewBox="0 0 24 24">
+    <path
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>`
+const Success = (text) => `
+<div class="flex gap-1 items-center">
+  ${CircularTickIcon}
+  <span>${text}</span>
+</div>
+`
 let DOM
 function clearStatusIndicators(element) {
   element.classList.remove('input-success')
@@ -219,6 +236,135 @@ const setThemeBasedOnSystemPreference = () => {
     document.documentElement.setAttribute('data-theme', 'cupcake')
   }
 }
+function getDevice(val) {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 0) {
+    throw new Error('No devices found')
+  }
+  if (devices.length > 1) {
+    throw new Error('Multiple devices found. Please unplug all but one device.')
+  }
+  const device = devices[0]
+  if (device.error) {
+    throw new Error(`Device error: ${device.error}`)
+  }
+  return device
+}
+function getDeviceMessage(val) {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 0) {
+    return 'No devices found'
+  }
+  let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
+  devices.forEach((device, index, arr) => {
+    message = message.concat(`${sanitize(device.model)} device `)
+    if (device.error) {
+      message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
+    } else if (device.fingerprint) {
+      message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
+    } else {
+      message = message.concat('with no fingerprint')
+    }
+    if (index < arr.length - 1) {
+      message = message.concat(', ')
+    }
+  })
+  if (devices.length > 1) {
+    message = message.concat(']')
+  }
+  return message
+}
+function getDevicePrompt(val) {
+  const devices = parseDeviceResponse(val)
+  if (devices.length === 0) {
+    return 'Make sure your device is connected. Perhaps try a different cable.'
+  }
+  if (devices.length === 1) {
+    return 'You may want to sign with this device next...'
+  }
+  return 'Make sure only one device is connected.'
+}
+function getPsbtStatusMessage(status) {
+  let message
+  switch (status) {
+    case 'Unsigned':
+      message = 'The transaction still is unsigned.'
+      break
+    case 'PartiallySigned':
+      message =
+        'The transaction is now partially signed. You need to add the signature from another key before you can broadcast it.'
+      break
+    case 'FullySigned':
+      message = 'The transaction is fully signed 🎉. You can broadcast it now.'
+      break
+    default:
+      message = 'The PSBT is in an unknown state.'
+      break
+  }
+  return message
+}
+function getSignResultAndPsbt(val) {
+  const signResponse = parseSignResponse(val)
+  const message = signResponse.signed
+    ? Success('Great! Added a signature to the transaction.')
+    : 'A signature was not added, have you already signed with this device?'
+  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
+}
+function sanitize(input) {
+  const map = /* @__PURE__ */ new Map([
+    ['&', '&amp;'],
+    ['<', '&lt;'],
+    ['>', '&gt;'],
+    ['"', '&quot;'],
+    ["'", '&#039;'],
+  ])
+  return input.replace(/[&<>"']/g, (m) => {
+    return map.get(m) || m
+  })
+}
+const isDevice = (item) => {
+  if (typeof item !== 'object' || item === null) return false
+  const device = item
+  return (
+    typeof device.type === 'string' &&
+    typeof device.model === 'string' &&
+    typeof device.path === 'string' &&
+    typeof device.needs_pin_sent === 'boolean' &&
+    typeof device.needs_passphrase_sent === 'boolean'
+  )
+}
+const isSignResponse = (item) => {
+  if (typeof item !== 'object' || item === null) return false
+  const signResponse = item
+  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
+}
+function parseDeviceResponse(val) {
+  const parsed = parseJson(val)
+  if (!Array.isArray(parsed) || !parsed.every((item) => isDevice(item))) {
+    throw new Error(`Invalid device list found when enumerating devices.
+response: ${val}`)
+  }
+  return parsed
+}
+function parseJson(val) {
+  if (typeof val !== 'string') {
+    throw new Error(`Expected a JSON string response, found ${typeof val}.
+response: ${val}`)
+  }
+  const parsed = JSON.parse(val)
+  if (parsed == null ? void 0 : parsed.error) {
+    throw new Error(parsed.error)
+  }
+  return parsed
+}
+function parseSignResponse(val) {
+  const parsed = parseJson(val)
+  if (!isSignResponse(parsed)) {
+    throw new Error(`Invalid response when attempting to sign PSBT.
+response: ${val}`)
+  }
+  return parsed
+}
 const hideTempMessage = () => {
   DOM.outputs.tempMessageContainer.classList.add('hidden')
 }
@@ -228,7 +374,7 @@ const showTempMessage = (content) => {
   scrollToLastMessage()
 }
 const showTempLoadingMessage = (content) => {
-  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${sanitize(content)}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
   scrollToLastMessage()
 }
@@ -249,13 +395,20 @@ document.addEventListener('DOMContentLoaded', () => {
   })
 })
 export {
+  CircularTickIcon as C,
   DOM as D,
   Sats as S,
-  showTempLoadingMessage as a,
-  hideTempMessage as b,
+  sanitize as a,
+  showTempLoadingMessage as b,
   clearStatusIndicators as c,
+  hideTempMessage as d,
+  getDeviceMessage as e,
+  getDevicePrompt as f,
   getUserInputs as g,
   handleError as h,
   initializeDOM as i,
+  getDevice as j,
+  getSignResultAndPsbt as k,
+  getPsbtStatusMessage as l,
   scrollToLastMessage as s,
 }

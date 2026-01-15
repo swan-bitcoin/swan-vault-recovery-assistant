@@ -240,6 +240,8 @@ transforms its TypeScript and CSS before execution in the application, we
 commit the resulting compiled JavaScript and CSS files for anyone to audit the
 behavior of the application without having to audit the build pipeline itself.
 
+When you modify TypeScript or CSS files, the pre-commit hook automatically runs `pnpm build` and stages the updated dist files. To preview build output before committing, run `pnpm build` manually.
+
 ## Releasing
 
 This project uses a streamlined, tag-driven release process with automatically generated release notes.
