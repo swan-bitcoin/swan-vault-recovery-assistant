@@ -75,8 +75,26 @@ const addSignatureToSignHistory = (device: Device) => {
   const newSignature = document.createElement('li')
   newSignature.className = 'border rounded-md p-2 bg-success/10 border-success flex group gap-2 text-success'
 
-  const icon = CircularTickIcon
-  newSignature.innerHTML = `${icon}<div class="flex flex-col"><span class="text-success-content">${getDeviceName(device)}</span><span class="text-sm text-success-content/70">${device.fingerprint}</span></div>`
+  // Add icon using innerHTML (safe - it's a trusted constant)
+  newSignature.innerHTML = CircularTickIcon
+
+  // Create container div for device info
+  const deviceInfo = document.createElement('div')
+  deviceInfo.className = 'flex flex-col'
+
+  // Add device name (sanitized via textContent)
+  const deviceName = document.createElement('span')
+  deviceName.className = 'text-success-content'
+  deviceName.textContent = getDeviceName(device) // textContent automatically escapes
+
+  // Add fingerprint (sanitized via textContent)
+  const fingerprint = document.createElement('span')
+  fingerprint.className = 'text-sm text-success-content/70'
+  fingerprint.textContent = device.fingerprint || '' // textContent automatically escapes
+
+  deviceInfo.appendChild(deviceName)
+  deviceInfo.appendChild(fingerprint)
+  newSignature.appendChild(deviceInfo)
 
   return newSignature
 }
@@ -375,6 +393,8 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
     await sleep(400)
 
     const enumeration = await commands.enumerate(network)
+
+    // the device object comes from HWI, which could be untrusted if using a malicious version, so we should make sure XSS and other exploits are not possible.
     const device = getDevice(enumeration)
 
     hideTempMessage()
@@ -383,10 +403,12 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
       ...(device.type === 'jade'
         ? [
             {
-              content: getJadeDevice({ fingerprint: device.fingerprint ?? '' }),
+              // Sanitize fingerprint before passing to getJadeDevice
+              content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
               type: 'image' as const,
             },
             {
+              // getDeviceName already returns sanitized value
               content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
               footer: new Date().toLocaleString(),
               type: 'bubble' as const,
@@ -394,10 +416,12 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
           ]
         : [
             {
-              content: `Found a ${device.type} with fingerprint ${device.fingerprint}.`,
+              // Sanitize device.type and device.fingerprint to prevent XSS
+              content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
               type: 'bubble' as const,
             },
             {
+              // getDeviceName already returns sanitized value
               content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
               type: 'bubble' as const,
             },

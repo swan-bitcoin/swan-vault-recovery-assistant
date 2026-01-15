@@ -1,5 +1,6 @@
 import { DOM } from '../dom'
 import { scrollToLastMessage } from './scrollToLastMessage'
+import { sanitize } from '../parsing'
 
 export const hideTempMessage = () => {
   DOM.outputs.tempMessageContainer.classList.add('hidden')
@@ -13,7 +14,8 @@ export const showTempMessage = (content: string) => {
 }
 
 export const showTempLoadingMessage = (content: string) => {
-  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${content}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
+  // Sanitize content to prevent XSS as defense-in-depth
+  DOM.outputs.tempMessage.innerHTML = `<div class="flex items-center gap-2">${content ? `<span>${sanitize(content)}</span>` : ''}<span class="loading loading-spinner loading-sm opacity-70"></span></div>`
   DOM.outputs.tempMessageContainer.classList.remove('hidden')
 
   scrollToLastMessage()

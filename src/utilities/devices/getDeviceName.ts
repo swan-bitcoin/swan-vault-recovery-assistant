@@ -1,4 +1,4 @@
-import { Device } from '../../parsing'
+import { Device, sanitize } from '../../parsing'
 
 export function getDeviceName(device: Device) {
   switch (device.type) {
@@ -6,7 +6,8 @@ export function getDeviceName(device: Device) {
       return 'Jade'
     }
     default: {
-      return device.type
+      // Sanitize unknown device types to prevent XSS
+      return sanitize(device.type)
     }
   }
 }

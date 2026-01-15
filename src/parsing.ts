@@ -43,11 +43,14 @@ export function getDeviceMessage(val: unknown): string {
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
 
   devices.forEach((device, index, arr) => {
-    message = message.concat(`${device.model} device `)
+    // Sanitize device.model to prevent XSS
+    message = message.concat(`${sanitize(device.model)} device `)
     if (device.error) {
-      message = message.concat(`which is reporting an error: '${device.error}'`)
+      // Sanitize device.error to prevent XSS
+      message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
-      message = message.concat(`with fingerprint '${device.fingerprint}'`)
+      // Sanitize device.fingerprint to prevent XSS
+      message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
     } else {
       message = message.concat('with no fingerprint')
     }

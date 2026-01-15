@@ -5,9 +5,16 @@ import {
   g as getUserInputs,
   c as clearStatusIndicators,
   h as handleError,
+  a as sanitize,
   i as initializeDOM,
-  a as showTempLoadingMessage,
-  b as hideTempMessage,
+  b as showTempLoadingMessage,
+  d as hideTempMessage,
+  e as getDeviceMessage,
+  f as getDevicePrompt,
+  j as getDevice,
+  k as getSignResultAndPsbt,
+  l as getPsbtStatusMessage,
+  C as CircularTickIcon,
 } from './layout.js'
 typeof SuppressedError === 'function'
   ? SuppressedError
@@ -202,23 +209,6 @@ const Transactions = (transactions) => {
   })
   return sortedTransactions.map(TxRow).join('\n')
 }
-const CircularTickIcon = `<svg
-    xmlns="http://www.w3.org/2000/svg"
-    class="h-6 w-6 shrink-0 stroke-current"
-    fill="none"
-    viewBox="0 0 24 24">
-    <path
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>`
-const Success = (text) => `
-<div class="flex gap-1 items-center">
-  ${CircularTickIcon}
-  <span>${text}</span>
-</div>
-`
 const Address = ({ address }) => {
   return `
     <div class="flex items-center space-x-2 relative">
@@ -373,135 +363,6 @@ const populateTransactionOverview = ({ address, outbound, fee }) => {
   if (overviewAddress) {
     overviewAddress.textContent = address
   }
-}
-function getDevice(val) {
-  const devices = parseDeviceResponse(val)
-  if (devices.length === 0) {
-    throw new Error('No devices found')
-  }
-  if (devices.length > 1) {
-    throw new Error('Multiple devices found. Please unplug all but one device.')
-  }
-  const device = devices[0]
-  if (device.error) {
-    throw new Error(`Device error: ${device.error}`)
-  }
-  return device
-}
-function getDeviceMessage(val) {
-  const devices = parseDeviceResponse(val)
-  if (devices.length === 0) {
-    return 'No devices found'
-  }
-  let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
-  devices.forEach((device, index, arr) => {
-    message = message.concat(`${device.model} device `)
-    if (device.error) {
-      message = message.concat(`which is reporting an error: '${device.error}'`)
-    } else if (device.fingerprint) {
-      message = message.concat(`with fingerprint '${device.fingerprint}'`)
-    } else {
-      message = message.concat('with no fingerprint')
-    }
-    if (index < arr.length - 1) {
-      message = message.concat(', ')
-    }
-  })
-  if (devices.length > 1) {
-    message = message.concat(']')
-  }
-  return message
-}
-function getDevicePrompt(val) {
-  const devices = parseDeviceResponse(val)
-  if (devices.length === 0) {
-    return 'Make sure your device is connected. Perhaps try a different cable.'
-  }
-  if (devices.length === 1) {
-    return 'You may want to sign with this device next...'
-  }
-  return 'Make sure only one device is connected.'
-}
-function getPsbtStatusMessage(status) {
-  let message
-  switch (status) {
-    case 'Unsigned':
-      message = 'The transaction still is unsigned.'
-      break
-    case 'PartiallySigned':
-      message =
-        'The transaction is now partially signed. You need to add the signature from another key before you can broadcast it.'
-      break
-    case 'FullySigned':
-      message = 'The transaction is fully signed 🎉. You can broadcast it now.'
-      break
-    default:
-      message = 'The PSBT is in an unknown state.'
-      break
-  }
-  return message
-}
-function getSignResultAndPsbt(val) {
-  const signResponse = parseSignResponse(val)
-  const message = signResponse.signed
-    ? Success('Great! Added a signature to the transaction.')
-    : 'A signature was not added, have you already signed with this device?'
-  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
-}
-function sanitize(input) {
-  const map = /* @__PURE__ */ new Map([
-    ['&', '&amp;'],
-    ['<', '&lt;'],
-    ['>', '&gt;'],
-    ['"', '&quot;'],
-    ["'", '&#039;'],
-  ])
-  return input.replace(/[&<>"']/g, (m) => {
-    return map.get(m) || m
-  })
-}
-const isDevice = (item) => {
-  if (typeof item !== 'object' || item === null) return false
-  const device = item
-  return (
-    typeof device.type === 'string' &&
-    typeof device.model === 'string' &&
-    typeof device.path === 'string' &&
-    typeof device.needs_pin_sent === 'boolean' &&
-    typeof device.needs_passphrase_sent === 'boolean'
-  )
-}
-const isSignResponse = (item) => {
-  if (typeof item !== 'object' || item === null) return false
-  const signResponse = item
-  return typeof signResponse.psbt === 'string' && typeof signResponse.signed === 'boolean'
-}
-function parseDeviceResponse(val) {
-  const parsed = parseJson(val)
-  if (!Array.isArray(parsed) || !parsed.every((item) => isDevice(item))) {
-    throw new Error(`Invalid device list found when enumerating devices.
-response: ${val}`)
-  }
-  return parsed
-}
-function parseJson(val) {
-  if (typeof val !== 'string') {
-    throw new Error(`Expected a JSON string response, found ${typeof val}.
-response: ${val}`)
-  }
-  const parsed = JSON.parse(val)
-  if (parsed == null ? void 0 : parsed.error) {
-    throw new Error(parsed.error)
-  }
-  return parsed
-}
-function parseSignResponse(val) {
-  const parsed = parseJson(val)
-  if (!isSignResponse(parsed)) {
-    throw new Error(`Invalid response when attempting to sign PSBT.
-response: ${val}`)
-  }
-  return parsed
 }
 const validateDescriptor = async () => {
   const { descriptors, network } = getUserInputs()
@@ -709,7 +570,7 @@ function getDeviceName(device) {
       return 'Jade'
     }
     default: {
-      return device.type
+      return sanitize(device.type)
     }
   }
 }
@@ -829,8 +690,18 @@ async function getFeeRate() {
 const addSignatureToSignHistory = (device) => {
   const newSignature = document.createElement('li')
   newSignature.className = 'border rounded-md p-2 bg-success/10 border-success flex group gap-2 text-success'
-  const icon = CircularTickIcon
-  newSignature.innerHTML = `${icon}<div class="flex flex-col"><span class="text-success-content">${getDeviceName(device)}</span><span class="text-sm text-success-content/70">${device.fingerprint}</span></div>`
+  newSignature.innerHTML = CircularTickIcon
+  const deviceInfo = document.createElement('div')
+  deviceInfo.className = 'flex flex-col'
+  const deviceName = document.createElement('span')
+  deviceName.className = 'text-success-content'
+  deviceName.textContent = getDeviceName(device)
+  const fingerprint = document.createElement('span')
+  fingerprint.className = 'text-sm text-success-content/70'
+  fingerprint.textContent = device.fingerprint || ''
+  deviceInfo.appendChild(deviceName)
+  deviceInfo.appendChild(fingerprint)
+  newSignature.appendChild(deviceInfo)
   return newSignature
 }
 const updateSignHistory = (device) => {
@@ -1063,10 +934,12 @@ async function sign({ retryCount = 0 } = {}) {
       ...(device.type === 'jade'
         ? [
             {
-              content: getJadeDevice({ fingerprint: device.fingerprint ?? '' }),
+              // Sanitize fingerprint before passing to getJadeDevice
+              content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
               type: 'image',
             },
             {
+              // getDeviceName already returns sanitized value
               content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
               footer: /* @__PURE__ */ new Date().toLocaleString(),
               type: 'bubble',
@@ -1074,10 +947,12 @@ async function sign({ retryCount = 0 } = {}) {
           ]
         : [
             {
-              content: `Found a ${device.type} with fingerprint ${device.fingerprint}.`,
+              // Sanitize device.type and device.fingerprint to prevent XSS
+              content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
               type: 'bubble',
             },
             {
+              // getDeviceName already returns sanitized value
               content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
               type: 'bubble',
             },
