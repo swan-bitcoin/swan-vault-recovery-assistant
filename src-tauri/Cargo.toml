@@ -27,6 +27,7 @@ specta = "=2.0.0-rc.20"
 specta-typescript = "0.0.7"
 tauri = { version = "2.8.2", features = [] }
 tauri-plugin-clipboard-manager = "2.3.0"
+tauri-plugin-shell = "2"
 tauri-specta = { version = "=2.0.0-rc.20", features = ["derive", "typescript"] }
 tokio = { version = "1.40.0", features = ["full"] }
 
