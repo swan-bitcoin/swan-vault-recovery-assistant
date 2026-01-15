@@ -393,6 +393,8 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
     await sleep(400)
 
     const enumeration = await commands.enumerate(network)
+
+    // the device object comes from HWI, which could be untrusted if using a malicious version, so we should make sure XSS and other exploits are not possible.
     const device = getDevice(enumeration)
 
     hideTempMessage()
