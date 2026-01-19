@@ -61,22 +61,21 @@ function extractor(platform: string, tmpdir: string) {
   })
 }
 
-async function main() {
-  const data = execSync('rustc -vV').toString()
-  const triple = data.match(/host: ([^\s]+)/)[1]
-  const platform = os.platform()
-  const url = makeUrl(platform, triple) // make url ASAP to fail fast on unsupported platform
+async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const hwiFile = path.join('src-tauri', `hwi-${triple}${platform === 'win32' ? '.exe' : ''}`)
   try {
     await fs.access(hwiFile)
-    return // HWI already in the expected place
+    console.log(`HWI for ${triple} already exists, skipping download`)
+    return true // HWI already in the expected place
   } catch {
     // Need to get HWI
   }
+
+  const url = makeUrl(platform, triple)
   // tmpdir in destination so rename is atomic and never cross-device
   const tmpdir = await fs.mkdtemp(path.join('src-tauri', '.tmphwi-'))
   try {
-    console.log(`downloading HWI from ${url} ...`)
+    console.log(`downloading HWI for ${triple} from ${url} ...`)
     const hwiStream = await fetch(url).then((r) => {
       const size = Number(r.headers.get('content-length'))
       return Readable.fromWeb(r.body as any)
@@ -85,8 +84,27 @@ async function main() {
     })
     await new Promise((resolve) => hwiStream.on('finish', resolve))
     await fs.rename(path.join(tmpdir, 'hwi'), hwiFile)
+    return true
   } finally {
     await fs.rm(tmpdir, { recursive: true, force: true })
+  }
+}
+
+async function main() {
+  const data = execSync('rustc -vV').toString()
+  const triple = data.match(/host: ([^\s]+)/)[1]
+  const platform = os.platform()
+
+  // Download HWI for the host architecture
+  await downloadHwi(platform, triple)
+
+  // On macOS, also download HWI for the other architecture to support universal builds
+  // CI builds on Intel (x86_64) but users may run on Apple Silicon (aarch64) or vice versa
+  if (platform === 'darwin') {
+    const otherTriple = triple.startsWith('aarch64')
+      ? triple.replace('aarch64', 'x86_64')
+      : triple.replace('x86_64', 'aarch64')
+    await downloadHwi(platform, otherTriple)
   }
 }
 main()
