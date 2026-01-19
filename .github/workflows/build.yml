@@ -20,7 +20,9 @@ jobs:
     strategy:
       matrix:
         # https://github.com/actions/runner-images
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # Use ubuntu-22.04 for glibc 2.35 compatibility with Debian 12 (glibc 2.36)
+        # Revisit when Debian 12 reaches EOL (~2028) or ubuntu-22.04 is deprecated
+        os: [ubuntu-22.04, windows-latest, macos-latest]
         isPR:
           - ${{github.event_name == 'pull_request'}}
         allBundles:
@@ -28,7 +30,7 @@ jobs:
         exclude:
           - isPR: true
             allBundles: false
-            os: ubuntu-latest
+            os: ubuntu-22.04
           - isPR: true
             allBundles: false
             os: windows-latest
@@ -94,7 +96,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install system dependencies (linux)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install dependencies
@@ -195,7 +197,7 @@ jobs:
 
         # https://jonaskruckenberg.github.io/tauri-docs-wip/building/building-your-application.html#packaging-formats
       - name: Publish artifacts (linux)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         uses: swan-bitcoin/actions/actions/upload-artifact@master
         with:
           name: swan-vault-recovery-assistant-linux
@@ -205,7 +207,7 @@ jobs:
             src-tauri/target/release/bundle/rpm/swan*.rpm
 
       - name: Generate build provenance attestation (linux)
-        if: ${{ matrix.os == 'ubuntu-latest' }}
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
         uses: swan-bitcoin/actions/actions/attest-build-provenance@master
         with:
           subject-path: |
