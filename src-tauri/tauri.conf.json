@@ -38,7 +38,10 @@
     ],
     "externalBin": [
       "./hwi"
-    ]
+    ],
+    "macOS": {
+      "entitlements": "./Entitlements.plist"
+    }
   },
   "plugins": {}
 }
