@@ -44,11 +44,19 @@ jobs:
           
     steps:
     - name: Checkout repository
-      uses: swan-bitcoin/actions/actions/checkout@master
+      uses: actions/checkout@v4
+
+    - name: Checkout private actions
+      uses: actions/checkout@v4
+      with:
+        repository: swan-bitcoin/actions
+        ref: master
+        token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+        path: .github/private-actions
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: swan-bitcoin/actions/github/codeql-action/init@master
+      uses: ./.github/private-actions/github/codeql-action/init
       with:
         languages: ${{ matrix.language }}
         build-mode: ${{ matrix.build-mode }}
@@ -64,6 +72,6 @@ jobs:
         exit 1
 
     - name: Perform CodeQL Analysis
-      uses: swan-bitcoin/actions/github/codeql-action/analyze@master
+      uses: ./.github/private-actions/github/codeql-action/analyze
       with:
         category: "/language:${{matrix.language}}"
