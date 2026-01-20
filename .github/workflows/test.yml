@@ -16,6 +16,26 @@ jobs:
       - name: checkout code
         uses: actions/checkout@v4
 
+      - name: Debug token access
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+        run: |
+          echo "Token length: ${#GH_TOKEN}"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "ERROR: Token is empty!"
+            exit 1
+          fi
+          echo "Testing API access to swan-bitcoin/actions..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/swan-bitcoin/actions)
+          echo "HTTP response code: $HTTP_CODE"
+          case $HTTP_CODE in
+            200) echo "✓ Token has access to the repo" ;;
+            404) echo "✗ 404 - No permission or repo doesn't exist" ;;
+            401) echo "✗ 401 - Token is invalid/expired" ;;
+            403) echo "✗ 403 - Token lacks required scopes" ;;
+            *) echo "✗ Unexpected: $HTTP_CODE" ;;
+          esac
+
       - name: checkout private actions
         uses: actions/checkout@v4
         with:
