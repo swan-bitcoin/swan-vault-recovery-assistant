@@ -2,16 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Allow JIT compilation and unsigned memory (required for PyInstaller) -->
-	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-	<true/>
-
 	<!-- Disable library validation to allow loading unsigned Python framework -->
 	<key>com.apple.security.cs.disable-library-validation</key>
-	<true/>
-
-	<!-- USB access for hardware wallets -->
-	<key>com.apple.security.device.usb</key>
 	<true/>
 </dict>
 </plist>
