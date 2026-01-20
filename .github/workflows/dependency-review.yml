@@ -22,9 +22,18 @@ jobs:
     runs-on: ${{ vars.ACTIVE_RUNNER_LABEL }}
     steps:
       - name: 'Checkout repository'
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4
+
+      - name: 'Checkout private actions'
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
       - name: 'Dependency Review'
-        uses: swan-bitcoin/actions/actions/dependency-review-action@master
+        uses: ./.github/private-actions/actions/dependency-review-action
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
           comment-summary-in-pr: on-failure

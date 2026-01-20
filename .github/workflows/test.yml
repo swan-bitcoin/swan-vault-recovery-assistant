@@ -14,19 +14,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4
+
+      - name: checkout private actions
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
 
       - name: set up rust
-        uses: swan-bitcoin/actions/actions-rs/toolchain@master
+        uses: ./.github/private-actions/actions-rs/toolchain
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/actions/pnpm/action-setup@master
+      - uses: ./.github/private-actions/pnpm/action-setup
         with:
           version: 9
 
-      - uses: swan-bitcoin/actions/actions/setup-node@master
+      - uses: ./.github/private-actions/actions/setup-node
         with:
           node-version: 20
           cache: 'pnpm'
@@ -42,19 +50,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4
+
+      - name: checkout private actions
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
 
       - name: set up rust
-        uses: swan-bitcoin/actions/actions-rs/toolchain@master
+        uses: ./.github/private-actions/actions-rs/toolchain
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/actions/pnpm/action-setup@master
+      - uses: ./.github/private-actions/pnpm/action-setup
         with:
           version: 9
 
-      - uses: swan-bitcoin/actions/actions/setup-node@master
+      - uses: ./.github/private-actions/actions/setup-node
         with:
           node-version: 20
           cache: 'pnpm'
@@ -70,7 +86,7 @@ jobs:
 
       - name: restore cargo cache
         id: restore-cargo-cache
-        uses: swan-bitcoin/actions/actions/cache/restore@master
+        uses: ./.github/private-actions/actions/cache/restore
         with:
           path: |
             ~/.cargo/bin/
@@ -92,7 +108,7 @@ jobs:
         run: pnpm tauri build --no-bundle
 
       - name: save cargo cache
-        uses: swan-bitcoin/actions/actions/cache/save@master
+        uses: ./.github/private-actions/actions/cache/save
         with:
           path: |
             ~/.cargo/bin/
