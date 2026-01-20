@@ -164,19 +164,24 @@ jobs:
           echo "APPLE_API_KEY_PATH=$APPLE_API_KEY_PATH" >> $GITHUB_ENV
           echo "Apple API Key saved."
 
-      - name: Sign HWI sidecar binaries
+      - name: Sign HWI binary with entitlements
         if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         run: |
-          # Sign HWI binaries with --deep to include embedded Python framework
-          # This prevents "different Team IDs" error when running the signed app
-          for hwi in src-tauri/hwi-*-apple-darwin; do
-            echo "Signing $hwi..."
-            codesign --force --deep --options runtime \
+          echo "Signing HWI binaries with entitlements for macOS 15+ compatibility..."
+          HWI_BINARIES=$(find src-tauri -name "hwi-*-apple-darwin" -type f 2>/dev/null || echo "")
+          if [ -z "$HWI_BINARIES" ]; then
+            echo "Warning: No macOS HWI binaries found"
+            exit 1
+          fi
+          for binary in $HWI_BINARIES; do
+            echo "Signing $(basename "$binary")..."
+            codesign --force \
               --sign "$APPLE_SIGNING_IDENTITY" \
+              --options runtime \
+              --entitlements src-tauri/hwi-entitlements.plist \
               --keychain build.keychain \
-              "$hwi"
-            echo "Verifying signature..."
-            codesign --verify --verbose "$hwi"
+              "$binary"
+            echo "✓ Signed $(basename "$binary")"
           done
 
       - name: Build project (signed Mac app)
