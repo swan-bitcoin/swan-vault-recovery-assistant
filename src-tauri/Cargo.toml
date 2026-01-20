@@ -1,6 +1,6 @@
 [package]
 name = "swan_vault_recovery_assistant"
-version = "0.1.6"
+version = "0.1.8"
 description = "The world's simplest graphical bitcoin tool"
 authors = ["turkycat", "moneymanolis"]
 edition = "2021"
