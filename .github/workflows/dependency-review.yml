@@ -19,12 +19,12 @@ permissions:
 
 jobs:
   dependency-review:
-    runs-on: ${{ vars.ACTIVE_RUNNER_LABEL }}
+    runs-on: ubuntu-latest
     steps:
       - name: 'Checkout repository'
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4.2.2
       - name: 'Dependency Review'
-        uses: swan-bitcoin/actions/actions/dependency-review-action@master
+        uses: actions/dependency-review-action@v4.7.1
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
           comment-summary-in-pr: on-failure

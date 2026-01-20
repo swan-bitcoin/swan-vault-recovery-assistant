@@ -14,19 +14,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4.2.2
 
       - name: set up rust
-        uses: swan-bitcoin/actions/actions-rs/toolchain@master
+        uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/actions/pnpm/action-setup@master
+      - uses: pnpm/action-setup@v4.0.0
         with:
           version: 9
 
-      - uses: swan-bitcoin/actions/actions/setup-node@master
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
           cache: 'pnpm'
@@ -42,19 +42,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: swan-bitcoin/actions/actions/checkout@master
+        uses: actions/checkout@v4.2.2
 
       - name: set up rust
-        uses: swan-bitcoin/actions/actions-rs/toolchain@master
+        uses: actions-rs/toolchain@v1.0.6
         with:
           toolchain: stable
           override: true
 
-      - uses: swan-bitcoin/actions/pnpm/action-setup@master
+      - uses: pnpm/action-setup@v4.0.0
         with:
           version: 9
 
-      - uses: swan-bitcoin/actions/actions/setup-node@master
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
           cache: 'pnpm'
@@ -70,7 +70,7 @@ jobs:
 
       - name: restore cargo cache
         id: restore-cargo-cache
-        uses: swan-bitcoin/actions/actions/cache/restore@master
+        uses: actions/cache/restore@v4.2.3
         with:
           path: |
             ~/.cargo/bin/
@@ -92,7 +92,7 @@ jobs:
         run: pnpm tauri build --no-bundle
 
       - name: save cargo cache
-        uses: swan-bitcoin/actions/actions/cache/save@master
+        uses: actions/cache/save@v4.2.3
         with:
           path: |
             ~/.cargo/bin/
