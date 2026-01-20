@@ -132,7 +132,7 @@ jobs:
           fi
 
       - name: Import Apple Developer Certificate
-        if: ${{ matrix.os == 'macos-latest'  }}
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -147,7 +147,7 @@ jobs:
           security find-identity -v -p codesigning build.keychain
 
       - name: Verify Apple Developer Certificate
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         run: |
           CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
           CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
@@ -155,7 +155,7 @@ jobs:
           echo "Apple Developer Certificate imported."
 
       - name: Save Apple API Key
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         env:
           APPLE_API_KEY_B64: ${{ secrets.APPLE_API_KEY_B64 }}
         run: |
@@ -165,14 +165,14 @@ jobs:
           echo "Apple API Key saved."
 
       - name: Build project (signed Mac app)
-        if: ${{ matrix.os == 'macos-latest' }}
+        if: ${{ matrix.os == 'macos-latest' && !matrix.isPR }}
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         run: pnpm tauri:build
 
       - name: Build project (unsigned)
-        if: ${{ matrix.os != 'macos-latest' }}
+        if: ${{ matrix.os != 'macos-latest' || matrix.isPR }}
         run: pnpm tauri:build
 
       - name: Check for git diffs after build
