@@ -144,7 +144,7 @@ rustup update
 
 2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
 
-3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. You may also choose to download the HWI binaries yourself from [swan-bitcoin/HWI-builder](https://github.com/swan-bitcoin/HWI-builder/releases). This repository builds HWI from the official source until a bitcoin-core/HWI release above 3.1.0 is available. See that repository for more details.
+3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. You may also choose to download the HWI binaries yourself from [bitcoin-core/HWI](https://github.com/bitcoin-core/HWI/releases).
 
 4. other system dependencies
 
