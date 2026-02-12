@@ -14,27 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
-
-      - name: checkout private actions
-        uses: actions/checkout@v4
-        with:
-          repository: swan-bitcoin/actions
-          ref: master
-          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
-          path: .github/private-actions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: set up rust
-        uses: ./.github/private-actions/actions-rs/toolchain
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
 
-      - uses: ./.github/private-actions/pnpm/action-setup
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
         with:
           version: 9
 
-      - uses: ./.github/private-actions/actions/setup-node
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: 'pnpm'
@@ -50,27 +39,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: checkout code
-        uses: actions/checkout@v4
-
-      - name: checkout private actions
-        uses: actions/checkout@v4
-        with:
-          repository: swan-bitcoin/actions
-          ref: master
-          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
-          path: .github/private-actions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: set up rust
-        uses: ./.github/private-actions/actions-rs/toolchain
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
 
-      - uses: ./.github/private-actions/pnpm/action-setup
+      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
         with:
           version: 9
 
-      - uses: ./.github/private-actions/actions/setup-node
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: 'pnpm'
@@ -86,7 +64,7 @@ jobs:
 
       - name: restore cargo cache
         id: restore-cargo-cache
-        uses: ./.github/private-actions/actions/cache/restore
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/
@@ -108,7 +86,7 @@ jobs:
         run: pnpm tauri build --no-bundle
 
       - name: save cargo cache
-        uses: ./.github/private-actions/actions/cache/save
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/bin/
