@@ -37,7 +37,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v4
+
+      - name: Checkout private actions
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
 
       - name: Verify Tag is on Master Branch
         if: startsWith(github.ref, 'refs/tags/v')
@@ -82,12 +90,15 @@ jobs:
           echo "Tag version ($TAG_VERSION) matches all configuration files."
 
       - name: Set up Rust
-        uses: dtolnay/rust-toolchain@4be9e76fd7c4901c61fb841f559994984270fce7 # stable
+        uses: ./.github/private-actions/actions-rs/toolchain
+        with:
+          toolchain: stable
+          override: true
 
-      - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
+      - uses: ./.github/private-actions/pnpm/action-setup
         with:
           version: 9
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: ./.github/private-actions/actions/setup-node
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -101,7 +112,7 @@ jobs:
 
       - name: Restore cargo cache
         id: restore-cargo-cache
-        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: ./.github/private-actions/actions/cache/restore
         with:
           path: |
             ~/.cargo/bin/
@@ -176,7 +187,7 @@ jobs:
         run: pnpm ci:gitdiff
 
       - name: Save cargo cache
-        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: ./.github/private-actions/actions/cache/save
         with:
           path: |
             ~/.cargo/bin/
@@ -195,7 +206,7 @@ jobs:
         # https://jonaskruckenberg.github.io/tauri-docs-wip/building/building-your-application.html#packaging-formats
       - name: Publish artifacts (linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: ./.github/private-actions/actions/upload-artifact
         with:
           name: swan-vault-recovery-assistant-linux
           path: |
@@ -205,7 +216,7 @@ jobs:
 
       - name: Generate build provenance attestation (linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: ./.github/private-actions/actions/attest-build-provenance
         with:
           subject-path: |
             src-tauri/target/release/bundle/deb/swan*.deb
@@ -214,7 +225,7 @@ jobs:
 
       - name: Publish artifacts (macos)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: ./.github/private-actions/actions/upload-artifact
         with:
           name: swan-vault-recovery-assistant-macos
           path: |
@@ -223,7 +234,7 @@ jobs:
 
       - name: Generate build provenance attestation (macos)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: ./.github/private-actions/actions/attest-build-provenance
         with:
           subject-path: |
             src-tauri/target/release/bundle/macos/swan*.app
@@ -231,7 +242,7 @@ jobs:
 
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: ./.github/private-actions/actions/upload-artifact
         with:
           name: swan-vault-recovery-assistant-windows
           path: |
@@ -240,7 +251,7 @@ jobs:
 
       - name: Generate build provenance attestation (windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        uses: ./.github/private-actions/actions/attest-build-provenance
         with:
           subject-path: |
             src-tauri/target/release/bundle/msi/swan*.msi
@@ -254,8 +265,16 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout private actions
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
       - name: Download all artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: ./.github/private-actions/actions/download-artifact
         with:
           path: artifacts
 
@@ -316,7 +335,7 @@ jobs:
 
       - name: Create Draft Release
         id: create_release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: ./.github/private-actions/softprops/action-gh-release
         with:
           body_path: release_notes.md
           generate_release_notes: true
@@ -335,7 +354,7 @@ jobs:
 
       - name: Publish Release
         id: publish_release
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
+        uses: ./.github/private-actions/softprops/action-gh-release
         with:
           draft: false
           tag_name: ${{ github.ref_name }}

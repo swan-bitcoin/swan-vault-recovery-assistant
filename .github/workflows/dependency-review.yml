@@ -10,7 +10,7 @@
 name: 'Dependency review'
 on:
   pull_request:
-    branches: ['master']
+    branches: [ "master"]
 
 permissions:
   contents: read
@@ -22,10 +22,18 @@ jobs:
     runs-on: ${{ vars.ACTIVE_RUNNER_LABEL }}
     steps:
       - name: 'Checkout repository'
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v4
+
+      - name: 'Checkout private actions'
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
 
       - name: 'Dependency Review'
-        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4
+        uses: ./.github/private-actions/actions/dependency-review-action
         # Commonly enabled options, see https://github.com/actions/dependency-review-action#configuration-options for all available options.
         with:
           comment-summary-in-pr: on-failure
