@@ -10,7 +10,7 @@
 name: 'Dependency review'
 on:
   pull_request:
-    branches: [ "master"]
+    branches: ['master']
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   dependency-review:
-    runs-on: ${{ vars.ACTIVE_RUNNER_LABEL }}
+    runs-on: ubuntu-latest
     steps:
       - name: 'Checkout repository'
         uses: actions/checkout@v4
