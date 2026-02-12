@@ -214,14 +214,21 @@ jobs:
             src-tauri/target/release/bundle/appimage/swan*.AppImage
             src-tauri/target/release/bundle/rpm/swan*.rpm
 
+      - name: Generate build provenance predicate (linux)
+        if: ${{ matrix.os == 'ubuntu-22.04' }}
+        id: provenance-predicate-linux
+        uses: ./.github/private-actions/actions/attest-build-provenance/predicate
+
       - name: Generate build provenance attestation (linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/deb/swan*.deb
             src-tauri/target/release/bundle/appimage/swan*.AppImage
             src-tauri/target/release/bundle/rpm/swan*.rpm
+          predicate-type: ${{ steps.provenance-predicate-linux.outputs.predicate-type }}
+          predicate: ${{ steps.provenance-predicate-linux.outputs.predicate }}
 
       - name: Publish artifacts (macos)
         if: ${{ matrix.os == 'macos-latest' }}
@@ -232,13 +239,20 @@ jobs:
             src-tauri/target/release/bundle/macos/swan*.app
             src-tauri/target/release/bundle/dmg/swan*.dmg
 
+      - name: Generate build provenance predicate (macos)
+        if: ${{ matrix.os == 'macos-latest' }}
+        id: provenance-predicate-macos
+        uses: ./.github/private-actions/actions/attest-build-provenance/predicate
+
       - name: Generate build provenance attestation (macos)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/macos/swan*.app
             src-tauri/target/release/bundle/dmg/swan*.dmg
+          predicate-type: ${{ steps.provenance-predicate-macos.outputs.predicate-type }}
+          predicate: ${{ steps.provenance-predicate-macos.outputs.predicate }}
 
       - name: Publish artifacts (windows)
         if: ${{ matrix.os == 'windows-latest' }}
@@ -249,13 +263,20 @@ jobs:
             src-tauri/target/release/bundle/msi/swan*.msi
             src-tauri/target/release/bundle/nsis/swan*.exe
 
+      - name: Generate build provenance predicate (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        id: provenance-predicate-windows
+        uses: ./.github/private-actions/actions/attest-build-provenance/predicate
+
       - name: Generate build provenance attestation (windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/msi/swan*.msi
             src-tauri/target/release/bundle/nsis/swan*.exe
+          predicate-type: ${{ steps.provenance-predicate-windows.outputs.predicate-type }}
+          predicate: ${{ steps.provenance-predicate-windows.outputs.predicate }}
 
   release:
     name: Create GitHub Release
