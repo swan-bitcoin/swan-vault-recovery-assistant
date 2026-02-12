@@ -54,13 +54,13 @@
     "semver": "^7.7.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
-    "tar": "^7.4.3",
+    "tar": "^7.5.7",
     "tiny-secp256k1": "^2.2.4",
     "tsx": "^4.20.3",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.0",
     "unzip-stream": "^0.3.4",
-    "vite": "^5.4.19",
+    "vite": "^5.4.21",
     "vitest": "^2.1.9"
   },
   "nano-staged": {
