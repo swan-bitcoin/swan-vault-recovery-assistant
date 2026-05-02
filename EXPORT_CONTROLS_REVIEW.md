@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-The software "Swan Vault Recovery Assistant" (SVRA) is classified as EAR99. It utilizes cryptography exclusively for authentication and digital signatures, which excludes it from Category 5, Part 2 (Information Security) controls.
+The software "Swan Vault Recovery Assistant" (SVRA) is classified as EAR99. Its cryptographic functionality is limited to public key derivation for address validation, performed by the open-source BDK (Bitcoin Development Kit) library. All signing operations are delegated to external hardware devices. The software contains no encryption for data confidentiality, which excludes it from Category 5, Part 2 (Information Security) controls.
 
 ## 2. Technical Description
 
@@ -24,7 +24,7 @@ SVRA is an open-source desktop application designed to verify and recover Bitcoi
 - **Reason for Control:** None (NLR — No License Required).
 - **Justification:** The item was evaluated against Category 5, Part 2. It is excluded from ECCN 5D002 (Information Security Software) based on the following:
   - **Absence of Confidentiality Encryption:** The regulations control "cryptography for data confidentiality." SVRA does not encrypt data-at-rest or data-in-transit at the application layer.
-  - **Limitation to Digital Signatures:** The cryptographic functionality is limited to "Authentication" and "Digital Signatures" (validating Bitcoin transactions), and all such operations are delegated to external hardware devices.
+  - **Limitation to Public Key Operations:** The only cryptographic operations performed by the application are public key derivation and address validation via the open-source BDK library. All digital signature operations (Bitcoin transaction signing) are delegated to external hardware devices — SVRA itself performs no signing, signature verification, or authentication cryptography.
   - **Open Source Status:** The software is published openly under an MIT license, further supporting a decontrolled status (though the functional exclusion takes precedence).
 
 ## 4. Licensing & Reporting Requirements
