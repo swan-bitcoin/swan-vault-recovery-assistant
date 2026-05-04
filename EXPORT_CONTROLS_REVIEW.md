@@ -12,7 +12,7 @@ SVRA is an open-source desktop application designed to verify and recover Bitcoi
 
 **Cryptographic Functionality:**
 
-- **Digital Signatures:** All signing operations are delegated to external Hardware Wallet Interface (HWI) binaries, which in turn delegate to physical hardware devices (Jade, Coldcard, Trezor, etc.). The application itself does not perform signing or signature verification.
+- **Digital Signatures:** All signing operations are delegated to external Hardware Wallet Interface (HWI) binaries, which in turn delegate to physical hardware devices (Jade, Coldcard, Trezor, etc.). The application itself does not perform signing. It does verify signatures during PSBT finalization (via BDK's miniscript library) to confirm that hardware-produced signatures are valid before broadcasting a transaction.
 - **Hashing:** The BDK (Bitcoin Development Kit) library, used for wallet operations, transitively includes SHA-256 and RIPEMD-160 via its `bitcoin_hashes` dependency for standard Bitcoin address derivation and validation. The application does not invoke these hash functions directly.
 - **Elliptic Curve Operations:** BDK transitively includes `libsecp256k1` for descriptor parsing and address derivation (public key operations only). The `tiny-secp256k1` npm package is present as a development dependency used only in the test suite, not in production code.
 - **Key Management:** The software does not generate or store private keys. Private keys remain isolated on external hardware devices. Wallets are constructed from user-supplied public descriptors using an ephemeral, non-persisting in-memory representation.
