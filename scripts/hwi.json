@@ -1,4 +1,5 @@
 {
+  "_note": "signingKey/signingKeyHolder record who signed the SHA256SUMS at pin time. They are informational only — fetch-hwi.ts does not enforce them. The authoritative fingerprint lives in scripts/bump-hwi.sh; the only build-time check is checksums against the downloaded binary.",
   "version": "3.2.0",
   "signingKey": "152812300785C96444D3334D17565732E08E5E41",
   "signingKeyHolder": "Ava Chow <me@achow101.com>",

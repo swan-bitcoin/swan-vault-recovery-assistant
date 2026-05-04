@@ -14,7 +14,8 @@ import progress from 'progress-stream'
 // To update, run: ./scripts/bump-hwi.sh <new-version>
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const HWI_CONFIG = JSON.parse(readFileSync(path.join(__dirname, 'hwi.json'), 'utf8')) as {
+const HWI_CONFIG_PATH = path.join(__dirname, 'hwi.json')
+const HWI_CONFIG = JSON.parse(readFileSync(HWI_CONFIG_PATH, 'utf8')) as {
   version: string
   checksums: Record<string, string>
 }
@@ -76,13 +77,6 @@ async function sha256File(filePath: string): Promise<string> {
 
 async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const hwiFile = path.join('src-tauri', `hwi-${triple}${platform === 'win32' ? '.exe' : ''}`)
-  try {
-    await fs.access(hwiFile)
-    console.log(`HWI for ${triple} already exists, skipping download`)
-    return true // HWI already in the expected place
-  } catch {
-    // Need to get HWI
-  }
 
   const url = makeUrl(platform, triple)
   const archiveFilename = url.split('/').pop()!
@@ -91,9 +85,32 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const expected = HWI_CONFIG.checksums[checksumKey]
   if (!expected) {
     throw new Error(
-      `No checksum found for ${checksumKey} in scripts/hwi.json.\n` +
+      `No checksum found for ${checksumKey} in ${HWI_CONFIG_PATH}.\n` +
         `Run ./scripts/bump-hwi.sh ${HWI_VERSION} --force to regenerate checksums.`
     )
+  }
+
+  // Re-verify the cached binary on every run, not just downloads. A stale cache
+  // (e.g. from a prior version) or a tampered binary would otherwise slip through.
+  let cachedExists = false
+  try {
+    await fs.access(hwiFile)
+    cachedExists = true
+  } catch {
+    // not cached, will download below
+  }
+  if (cachedExists) {
+    const cached = await sha256File(hwiFile)
+    if (cached === expected) {
+      console.log(`HWI for ${triple} already exists and matches pinned SHA-256, skipping download`)
+      return true
+    }
+    console.warn(
+      `Cached HWI for ${triple} does not match pinned SHA-256 — re-downloading.\n` +
+        `  cached:   ${cached}\n` +
+        `  expected: ${expected}`
+    )
+    await fs.unlink(hwiFile)
   }
 
   // tmpdir in destination so rename is atomic and never cross-device

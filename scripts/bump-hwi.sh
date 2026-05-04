@@ -88,13 +88,14 @@ trap 'rm -rf "$TMPDIR"' EXIT
 ASC_URL="https://github.com/bitcoin-core/HWI/releases/download/${VERSION}/SHA256SUMS.txt.asc"
 ASC_FILE="$TMPDIR/SHA256SUMS.txt.asc"
 VERIFIED_FILE="$TMPDIR/SHA256SUMS.txt"
+STATUS_FILE="$TMPDIR/gpg-status.txt"
 
 echo ""
 echo "Downloading $ASC_URL ..."
 curl -fsSL "$ASC_URL" -o "$ASC_FILE"
 
 echo "Verifying GPG signature ..."
-if ! gpg --verify --output "$VERIFIED_FILE" "$ASC_FILE" 2>&1; then
+if ! gpg --status-file "$STATUS_FILE" --output "$VERIFIED_FILE" --verify "$ASC_FILE"; then
   echo ""
   echo "ERROR: GPG signature verification failed!"
   echo "The SHA256SUMS.txt.asc file may have been tampered with,"
@@ -102,15 +103,30 @@ if ! gpg --verify --output "$VERIFIED_FILE" "$ASC_FILE" 2>&1; then
   exit 1
 fi
 
-# Confirm the signature was made by the expected key
-SIG_KEY=$(gpg --verify "$ASC_FILE" 2>&1 | grep "using RSA key" | awk '{print $NF}')
-if [ "$SIG_KEY" != "$SIGNING_KEY" ]; then
+# Confirm the signature was made by the expected key, using GPG's machine-readable
+# status output. VALIDSIG args after "[GNUPG:] VALIDSIG":
+#   $1=signing-key-fpr ... $LAST=primary-key-fpr (or "-" if unavailable)
+# Match against the primary key fingerprint so this stays robust if achow101
+# ever signs from a subkey.
+VALIDSIG_LINE=$(grep '^\[GNUPG:\] VALIDSIG ' "$STATUS_FILE" || true)
+if [ -z "$VALIDSIG_LINE" ]; then
   echo ""
-  echo "ERROR: Signature was made by key $SIG_KEY, expected $SIGNING_KEY"
+  echo "ERROR: GPG produced no VALIDSIG status line — signature not verifiable."
+  exit 1
+fi
+SIG_SIGNING=$(echo "$VALIDSIG_LINE" | awk '{print $3}')
+SIG_PRIMARY=$(echo "$VALIDSIG_LINE" | awk '{print $NF}')
+if [ "$SIG_PRIMARY" = "-" ]; then
+  SIG_PRIMARY="$SIG_SIGNING"
+fi
+if [ "$SIG_PRIMARY" != "$SIGNING_KEY" ]; then
+  echo ""
+  echo "ERROR: Signature primary key is $SIG_PRIMARY (signing key $SIG_SIGNING),"
+  echo "       expected $SIGNING_KEY"
   exit 1
 fi
 
-echo "GPG signature verified (key: $SIGNING_KEY)"
+echo "GPG signature verified (primary key: $SIGNING_KEY)"
 echo ""
 
 # --- parse checksums for extracted binaries ---
@@ -128,12 +144,18 @@ done < <(grep -E '/hwi(\.exe)?$' "$VERIFIED_FILE" | grep -v 'hwi-qt')
 
 # --- write hwi.json ---
 
+# signingKey/signingKeyHolder are informational. The build (fetch-hwi.ts) does
+# not enforce them — the authoritative fingerprint is the SIGNING_KEY constant
+# above. _note documents this in-file for anyone reading hwi.json directly.
+NOTE="signingKey/signingKeyHolder record who signed the SHA256SUMS at pin time. They are informational only — fetch-hwi.ts does not enforce them. The authoritative fingerprint lives in scripts/bump-hwi.sh; the only build-time check is checksums against the downloaded binary."
+
 jq -n \
+  --arg note "$NOTE" \
   --arg version "$VERSION" \
   --arg signingKey "$SIGNING_KEY" \
   --arg signingKeyHolder "$SIGNER" \
   --argjson checksums "$CHECKSUMS_OBJ" \
-  '{version: $version, signingKey: $signingKey, signingKeyHolder: $signingKeyHolder, checksums: $checksums}' \
+  '{_note: $note, version: $version, signingKey: $signingKey, signingKeyHolder: $signingKeyHolder, checksums: $checksums}' \
   > "$HWI_JSON"
 
 echo "Updated $HWI_JSON:"
