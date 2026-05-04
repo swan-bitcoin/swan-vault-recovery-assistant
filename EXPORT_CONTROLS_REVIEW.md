@@ -27,90 +27,106 @@ SVRA is an open-source desktop application designed to verify and recover Bitcoi
   - **Limitation to Public Key Operations:** The only cryptographic operations performed by the application are public key derivation and address validation via the open-source BDK library. All digital signature operations (Bitcoin transaction signing) are delegated to external hardware devices — SVRA itself performs no signing, signature verification, or authentication cryptography.
   - **Open Source Status:** The software is published openly under an MIT license, further supporting a decontrolled status (though the functional exclusion takes precedence).
 
-## 4. Licensing & Reporting Requirements
+## 4. Detailed Technical Audit of Cryptographic Usage
+
+The following is a point-by-point enumeration of every use of cryptography in SVRA, including transitive dependencies, with an assessment of each against Category 5, Part 2 of the Commerce Control List (CCL).
+
+### 4.1 Elliptic Curve Public Key Derivation (secp256k1)
+
+- **What:** SVRA instantiates a `Secp256k1` context (`bdk_wallet::bitcoin::secp256k1::Secp256k1`) at `src-tauri/src/main.rs` lines 305 and 657. This context is passed to BDK's `into_wallet_descriptor()` method to parse user-supplied descriptor strings and derive child public keys from extended public keys (xpubs).
+- **Cryptographic primitive:** Elliptic curve point multiplication (public key derivation only).
+- **What it does NOT do:** No private key operations. No signing. No key generation. The `Secp256k1` context is used exclusively to mathematically derive public keys and validate descriptors against a network.
+- **Classification relevance:** Public key derivation is not "information security" cryptography. It does not provide confidentiality, and the inputs and outputs are non-secret public key material. **Not controlled.**
+
+### 4.2 SHA-256 Hashing (double-SHA-256 for Transaction IDs)
+
+- **What:** SVRA calls `compute_txid()` (`src-tauri/src/main.rs` line 235) which performs a double-SHA-256 hash of a serialized transaction to produce a transaction identifier (TXID). This is used to compare the TXID before and after the external HWI signing process to detect malicious modification of the transaction.
+- **Cryptographic primitive:** SHA-256 (via BDK's `bitcoin` crate, which includes `bitcoin_hashes`).
+- **What it does NOT do:** Not used for encryption, key derivation, or message authentication. Used solely as a deterministic fingerprint for data integrity comparison.
+- **Classification relevance:** Hashing for data integrity verification is not controlled under Category 5, Part 2. SHA-256 used as a checksum/fingerprint does not provide confidentiality. **Not controlled.**
+
+### 4.3 SHA-256 and RIPEMD-160 Hashing (Address Derivation)
+
+- **What:** BDK internally uses SHA-256 and RIPEMD-160 (via the `bitcoin_hashes` crate in `Cargo.lock`) to derive Bitcoin addresses from public keys. This is the standard Bitcoin address derivation process: `RIPEMD-160(SHA-256(public_key))`. SVRA invokes this indirectly through BDK's `Address::from_script()` (line 878) and through wallet address derivation (line 497).
+- **Cryptographic primitive:** SHA-256 and RIPEMD-160 hash functions.
+- **What it does NOT do:** Not used for encryption or key derivation from secret material. Inputs are public keys; outputs are public addresses.
+- **Classification relevance:** One-way hash functions used for address derivation from public key material do not constitute "information security" cryptography. **Not controlled.**
+
+### 4.4 PSBT Finalization (Signature Verification via BDK/miniscript)
+
+- **What:** SVRA calls `wallet.finalize_psbt()` at lines 520 and 697. Internally, BDK uses the `miniscript` library to evaluate whether the spending conditions of each transaction input are satisfied. This process includes verifying that the ECDSA or Schnorr signatures provided by the external hardware device are cryptographically valid against the corresponding public keys.
+- **Cryptographic primitive:** ECDSA and/or Schnorr signature verification (via `libsecp256k1`, transitively through BDK).
+- **What it does NOT do:** SVRA does not create signatures. It only verifies signatures that were produced externally by hardware devices. No private key material is involved.
+- **Classification relevance:** Signature verification (as opposed to signature generation) using public keys is an authentication function. Under the EAR, authentication-only cryptography is excluded from ECCN 5D002. **Not controlled.**
+
+### 4.5 PSBT Construction (Transaction Building)
+
+- **What:** SVRA calls `wallet.build_tx()` (line 825) to construct unsigned Partially Signed Bitcoin Transactions (PSBTs). This involves UTXO selection, fee calculation, output construction, and serialization into the PSBT format (BIP 174).
+- **Cryptographic primitive:** None. PSBT construction is a data serialization operation. The resulting PSBT contains no signatures and no secret material — only public keys, output scripts, and transaction structure.
+- **Classification relevance:** No cryptographic operation is performed. **Not controlled.**
+
+### 4.6 Transaction Signing (Delegated to External Hardware)
+
+- **What:** SVRA's `sign()` function (line 720) invokes the HWI sidecar binary via Tauri's shell API: `hwi --chain <network> --device-type <type> signtx <psbt>`. The HWI binary communicates with a physically connected hardware wallet (Jade, Coldcard, Trezor) over USB. The hardware device performs the actual ECDSA/Schnorr signing using private keys stored on the device. SVRA receives back a PSBT containing the signatures.
+- **Cryptographic primitive:** None performed by SVRA. The signing is performed entirely by the external hardware device. SVRA only passes the unsigned PSBT string as a command-line argument and receives the signed PSBT string as stdout.
+- **What it does NOT do:** SVRA does not access, derive, or process private keys at any point. It does not implement any signing algorithm.
+- **Classification relevance:** SVRA is not the performer of the cryptographic operation. The hardware wallet is the cryptographic end-item. **Not controlled** (as pertains to SVRA).
+
+### 4.7 TLS Transport Encryption (Electrum Server Connection)
+
+- **What:** SVRA connects to Electrum servers using `ssl://` URLs (defaults at line 288-289: `ssl://electrum.blockstream.info:50002`). The `electrum-client` crate (version 0.22.0) depends on `rustls` (version 0.23.21), which in turn depends on `aws-lc-rs` and `ring` (version 0.17.14). These libraries implement full TLS 1.2/1.3, including symmetric encryption (AES-128-GCM, AES-256-GCM, ChaCha20-Poly1305) for the encrypted transport channel.
+- **Cryptographic primitive:** TLS handshake (ECDHE key exchange, X.509 certificate verification) and symmetric encryption of the transport channel (AES-GCM, ChaCha20-Poly1305).
+- **This is the only encryption in the entire dependency tree.**
+- **What it does NOT do:** SVRA does not configure, control, or invoke these ciphers directly. It opens an `ssl://` connection string and the `electrum-client` library handles the TLS session. The data transmitted over this channel consists of public blockchain queries (addresses, transaction lookups) and public transaction data (PSBTs, broadcast transactions). No secret material is transmitted.
+- **Classification relevance:** TLS used for standard network transport is a ubiquitous function equivalent to any application that makes HTTPS requests. Under EAR §740.17(b)(3)(iii)(A), "mass market" encryption software that uses encryption solely for network transport (e.g., TLS/SSL) is eligible for License Exception ENC without review. Furthermore, `rustls` is independently published open-source software (Apache 2.0/ISC/MIT licensed) not developed by or for Swan. SVRA's use of TLS is incidental to its core function and does not constitute the controlled item. **Not controlled as pertains to SVRA's classification.**
+
+### 4.8 Random Number Generation
+
+- **What:** The `rand_chacha` crate (versions 0.2.2 and 0.3.1) appears in `Cargo.lock` as a dependency of the `rand` crate. ChaCha in this context is used as a cryptographically secure pseudorandom number generator (CSPRNG), not as a stream cipher for encryption.
+- **Cryptographic primitive:** ChaCha-based PRNG for randomness generation (used by BDK for UTXO selection randomization and other non-security-critical randomness needs).
+- **What it does NOT do:** Not used for encryption. Not used to protect confidentiality of any data.
+- **Classification relevance:** A CSPRNG used for non-encryption purposes is not "information security" cryptography. **Not controlled.**
+
+### 4.9 Development/Test-Only Dependencies (Not in Production Build)
+
+The following npm packages appear in `devDependencies` in `package.json` and are used exclusively in the test suite (`test/util/bitcoin.ts`). They are not compiled into or shipped with the production application:
+
+- **`tiny-secp256k1` (^2.2.4):** Elliptic curve library used in tests to create BIP32 key hierarchies for generating test wallet data on regtest.
+- **`bip32` (^4.0.0):** BIP32 hierarchical deterministic key derivation, used in tests to derive keypairs for test wallets.
+- **`bip39` (^3.1.0):** BIP39 mnemonic seed phrase generation, used in tests to create random test wallets.
+- **`bitcoinjs-lib` (^6.1.7):** Bitcoin library used in tests for transaction construction and address generation on regtest.
+
+These libraries perform private key derivation and generation, but only in the test environment and only on the Bitcoin regtest (local test) network. They are not included in the Tauri production build.
+
+- **Classification relevance:** Development tools not shipped in the distributed software. **Not applicable to classification.**
+
+### 4.10 Summary Table
+
+| # | Operation | Primitive | Performed by SVRA? | Provides Confidentiality? | Controlled? |
+|---|---|---|---|---|---|
+| 4.1 | Public key derivation | secp256k1 EC point multiplication | Yes (via BDK) | No | No |
+| 4.2 | Transaction ID computation | Double-SHA-256 | Yes (via BDK) | No | No |
+| 4.3 | Address derivation | SHA-256, RIPEMD-160 | Yes (via BDK) | No | No |
+| 4.4 | PSBT finalization | ECDSA/Schnorr signature verification | Yes (via BDK) | No | No |
+| 4.5 | Transaction construction | None (serialization) | Yes | No | No |
+| 4.6 | Transaction signing | ECDSA/Schnorr signing | No (hardware device) | No | No |
+| 4.7 | Network transport | TLS (AES-GCM, ChaCha20-Poly1305) | No (rustls library) | Yes (transport only) | No (standard transport) |
+| 4.8 | Random number generation | ChaCha PRNG | No (rand crate) | No | No |
+| 4.9 | Test key generation | BIP32/BIP39/secp256k1 | No (test only) | No | N/A |
+
+### 4.11 Conclusion
+
+SVRA contains no application-layer encryption for data confidentiality. The only encryption present in the dependency tree is standard TLS for network transport (provided by the independently published open-source `rustls` library), which is incidental to the application's function and is equivalent to any software that makes HTTPS connections. All other cryptographic operations are limited to public key derivation, hashing for address generation and data integrity, and signature verification — none of which constitute "information security" cryptography under the CCL. The software is correctly classified as **EAR99**.
+
+## 5. Licensing & Reporting Requirements
 
 - **License Requirement:** NLR (No License Required).
 - **Destinations:** May be exported to all destinations except those under U.S. embargo (Country Group E:1 — e.g., Cuba, Iran, North Korea, Syria, Russia/Belarus).
 - **Reporting:** No encryption registration, Self-Classification Report, or CCATS review is required.
 
-## 5. Compliance Q&A
-
-### Does SVRA encrypt wallet seed phrases, private keys, or recovery data at rest?
-
-No. All keys remain on client hardware devices. SVRA does not generate, store, or process private key material. Wallets are constructed in-memory from user-supplied public descriptors using BDK's `create_wallet_no_persist()` function, and all data is discarded when the application closes.
-
-### Does SVRA encrypt any data in transit beyond standard TLS/SSL?
-
-No. SVRA uses standard TLS (via `ssl://`) for Electrum server connections, which is a standard transport-layer protocol provided by the `rustls` library. SVRA does not implement any additional application-layer encryption beyond this standard network transport. The data transmitted consists only of public wallet descriptors, addresses, and unsigned/signed transaction data (PSBTs) — no secret material.
-
-### Does SVRA use any encryption to protect the confidentiality of user data or communications?
-
-SVRA uses standard TLS for connections to public Electrum servers, which is a ubiquitous transport-layer protocol (via the `rustls` library). This is not application-layer encryption designed to protect user data confidentiality — it is standard network transport equivalent to any application that makes HTTPS requests. SVRA does not encrypt any data at rest, does not store user data, and implements no custom encryption protocols. All data handled (public wallet descriptors, transaction metadata, PSBTs) is non-secret by nature.
-
-### Was the EAR99 classification supported by a formal written technical review?
-
-Yes, performed by the CTO. This document is that review.
-
-### Was outside export counsel or a licensed export compliance consultant involved?
-
-No. The application contains no novel cryptography and implements no encryption for data confidentiality. It is a user interface wrapper around open-source Bitcoin libraries (BDK, HWI).
-
-### Has the classification been reviewed since the software's last material update?
-
-There have been maintenance updates since the original memo (Dec 3, 2025), including dependency upgrades, build/signing fixes, and a migration to the official upstream HWI binary (bitcoin-core/HWI 3.2.0). None introduced new cryptographic functionality or changed the application's technical classification profile. This review (May 1, 2026) confirms EAR99 remains appropriate.
-
-### Is there a classification memo or legal opinion on file?
-
-Yes. This document.
-
-### Do key derivation functions used in SVRA constitute "information security" cryptography under the CCL?
-
-No. SVRA performs only public key derivation (deriving child public keys from extended public keys via BDK). No private key derivation occurs in the application.
-
-### Is there confidentiality protection on private key material that goes beyond authentication?
-
-SVRA does not ever see or process private key material. Private keys remain isolated on external hardware devices at all times.
-
-### Are any zero-knowledge proofs, multi-party computation, or threshold signature schemes used?
-
-No. SVRA supports standard Bitcoin multisig wallets (P2SH/P2WSH), but standard multisig is not a threshold signature scheme — each signer produces an independent signature, and there is no multi-party computation involved.
-
-### Deemed Export Rule
-
-Even if SVRA is correctly classified as EAR99, the deemed export rule applies. Sharing technical data or source code related to SVRA with foreign nationals inside the United States — including employees, contractors, or investors — may constitute an export.
-
-*This question should be addressed by legal counsel with knowledge of Swan's workforce and contractor composition.*
-
-### Does Swan have a Know Your Customer (KYC) and sanctions screening program that covers software distribution?
-
-We do not cover software distribution under our KYC program because we do not generally distribute software. When clients interact with our hosted services, they are covered by our KYC program. We do not and cannot screen clients that download open source software on public platforms like GitHub, where SVRA is hosted. However, GitHub itself does comply with sanctions (https://docs.github.com/en/site-policy/other-site-policies/github-and-trade-controls).
-
-### Has SVRA ever been distributed to users in sanctioned jurisdictions?
-
-We do not and cannot screen clients that download open source software on public platforms like GitHub, where SVRA is hosted. However, GitHub itself does comply with sanctions (https://docs.github.com/en/site-policy/other-site-policies/github-and-trade-controls).
-
-### Are there any non-US customers who may have received SVRA downloads?
-
-We do not and cannot screen clients that download open source software on public platforms like GitHub, where SVRA is hosted. However, GitHub itself does comply with sanctions (https://docs.github.com/en/site-policy/other-site-policies/github-and-trade-controls).
-
-### OFAC Overlay
-
-Bitcoin wallet recovery software has a separate compliance dimension under OFAC. If SVRA could be used to recover wallets associated with sanctioned individuals or entities, Swan could have OFAC exposure entirely separate from the EAR classification question.
-
-This wallet recovery software is an open source, publicly available application that does not have any novel cryptography of its own. It is primarily a user interface. It is not run as or provided as a Swan hosted service. Swan screens every client for OFAC compliance.
-
-### Has Swan ever sought a formal commodity classification ruling (CCATS) from BIS?
-
-No.
-
-### Are any foreign nationals involved in SVRA development or technical support?
-
-*This question should be addressed with knowledge of the employment and contractor status of all contributors.*
-
----
 
 Yan Pritzker
 CTO
 
 Original memo: December 3, 2025
-Updated review: May 1, 2026
+Updated review: May 4, 2026
