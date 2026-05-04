@@ -1,16 +1,25 @@
 import { Readable } from 'stream'
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 import * as unzip from 'unzip-stream'
 import * as fs from 'fs/promises'
-import { createWriteStream } from 'fs'
+import { createWriteStream, createReadStream, readFileSync } from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as tar from 'tar'
+import { fileURLToPath } from 'url'
 import progress from 'progress-stream'
 
-// HWI binaries are downloaded from bitcoin-core/HWI official releases.
-// See https://github.com/bitcoin-core/HWI/releases
-const HWI_VERSION = '3.2.0'
+// HWI version and checksums are pinned in hwi.json.
+// To update, run: ./scripts/bump-hwi.sh <new-version>
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const HWI_CONFIG_PATH = path.join(__dirname, 'hwi.json')
+const HWI_CONFIG = JSON.parse(readFileSync(HWI_CONFIG_PATH, 'utf8')) as {
+  version: string
+  checksums: Record<string, string>
+}
+const HWI_VERSION = HWI_CONFIG.version
 const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
 const MIB_SIZE = 1024 * 1024
 
@@ -56,17 +65,54 @@ function extractor(platform: string, tmpdir: string) {
   })
 }
 
+async function sha256File(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256')
+    const stream = createReadStream(filePath)
+    stream.on('data', (data) => hash.update(data))
+    stream.on('end', () => resolve(hash.digest('hex')))
+    stream.on('error', reject)
+  })
+}
+
 async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const hwiFile = path.join('src-tauri', `hwi-${triple}${platform === 'win32' ? '.exe' : ''}`)
-  try {
-    await fs.access(hwiFile)
-    console.log(`HWI for ${triple} already exists, skipping download`)
-    return true // HWI already in the expected place
-  } catch {
-    // Need to get HWI
-  }
 
   const url = makeUrl(platform, triple)
+  const archiveFilename = url.split('/').pop()!
+  const binaryName = platform === 'win32' ? 'hwi.exe' : 'hwi'
+  const checksumKey = `${archiveFilename}/${binaryName}`
+  const expected = HWI_CONFIG.checksums[checksumKey]
+  if (!expected) {
+    throw new Error(
+      `No checksum found for ${checksumKey} in ${HWI_CONFIG_PATH}.\n` +
+        `Run ./scripts/bump-hwi.sh ${HWI_VERSION} --force to regenerate checksums.`
+    )
+  }
+
+  // Re-verify the cached binary on every run, not just downloads. A stale cache
+  // (e.g. from a prior version) or a tampered binary would otherwise slip through.
+  let cachedExists = false
+  try {
+    await fs.access(hwiFile)
+    cachedExists = true
+  } catch {
+    // not cached, will download below
+  }
+  if (cachedExists) {
+    const cached = await sha256File(hwiFile)
+    if (cached === expected) {
+      console.log(`HWI for ${triple} already exists and matches pinned SHA-256, skipping download`)
+      return true
+    }
+    console.warn(
+      `Cached HWI for ${triple} does not match pinned SHA-256 — re-downloading.\n` +
+        `  cached:   ${cached}\n` +
+        `  expected: ${expected}`
+    )
+    await fs.unlink(hwiFile)
+  }
+
   // tmpdir in destination so rename is atomic and never cross-device
   const tmpdir = await fs.mkdtemp(path.join('src-tauri', '.tmphwi-'))
   try {
@@ -78,7 +124,20 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
         .pipe(extractor(platform, tmpdir))
     })
     await new Promise((resolve) => hwiStream.on('finish', resolve))
-    await fs.rename(path.join(tmpdir, 'hwi'), hwiFile)
+
+    const hwiPath = path.join(tmpdir, 'hwi')
+    const actual = await sha256File(hwiPath)
+    if (actual !== expected) {
+      throw new Error(
+        `SHA-256 checksum mismatch for ${checksumKey}!\n` +
+          `  expected: ${expected}\n` +
+          `  actual:   ${actual}\n` +
+          `The downloaded binary may be corrupted or tampered with.`
+      )
+    }
+    console.log(`verified SHA-256 for ${checksumKey}: ${actual}`)
+
+    await fs.rename(hwiPath, hwiFile)
     return true
   } finally {
     await fs.rm(tmpdir, { recursive: true, force: true })
@@ -87,8 +146,10 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
 
 async function main() {
   const data = execSync('rustc -vV').toString()
-  const triple = data.match(/host: ([^\s]+)/)[1]
+  const triple = data.match(/host: ([^\s]+)/)![1]
   const platform = os.platform()
+
+  console.log(`HWI version: ${HWI_VERSION} (from scripts/hwi.json)`)
 
   // Download HWI for the host architecture
   await downloadHwi(platform, triple)

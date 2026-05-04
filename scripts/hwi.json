@@ -1,0 +1,13 @@
+{
+  "_note": "signingKey/signingKeyHolder record who signed the SHA256SUMS at pin time. They are informational only — fetch-hwi.ts does not enforce them. The authoritative fingerprint lives in scripts/bump-hwi.sh; the only build-time check is checksums against the downloaded binary.",
+  "version": "3.2.0",
+  "signingKey": "152812300785C96444D3334D17565732E08E5E41",
+  "signingKeyHolder": "Ava Chow <me@achow101.com>",
+  "checksums": {
+    "hwi-3.2.0-linux-aarch64.tar.gz/hwi": "c2117b96d318be0ceac217098933834ef88376c704ca9fadacd83c9471066dcc",
+    "hwi-3.2.0-linux-x86_64.tar.gz/hwi": "d9cc65de95e3cf93fd3c953d589184a00180624ffc5ad17aade97616a8919fa6",
+    "hwi-3.2.0-mac-arm64.tar.gz/hwi": "87a8991848a0216213ddf6497c753cebbda492626afaf5608c30931155c922c3",
+    "hwi-3.2.0-mac-x86_64.tar.gz/hwi": "b3764a530b635e7a7348c9185e09e74b389f5f585094fe316f700eec7c761875",
+    "hwi-3.2.0-windows-x86_64.zip/hwi.exe": "e068d91b664597425a8ead02d7b86a02ad6c4b72746c42961f58a58b08f9fd79"
+  }
+}
