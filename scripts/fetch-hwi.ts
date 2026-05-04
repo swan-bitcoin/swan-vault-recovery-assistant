@@ -7,10 +7,13 @@ import { createWriteStream, createReadStream, readFileSync } from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as tar from 'tar'
+import { fileURLToPath } from 'url'
 import progress from 'progress-stream'
 
 // HWI version and checksums are pinned in hwi.json.
 // To update, run: ./scripts/bump-hwi.sh <new-version>
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const HWI_CONFIG = JSON.parse(readFileSync(path.join(__dirname, 'hwi.json'), 'utf8')) as {
   version: string
   checksums: Record<string, string>
