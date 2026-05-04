@@ -3,23 +3,21 @@ import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 import * as unzip from 'unzip-stream'
 import * as fs from 'fs/promises'
-import { createWriteStream, createReadStream } from 'fs'
+import { createWriteStream, createReadStream, readFileSync } from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as tar from 'tar'
 import progress from 'progress-stream'
 
-// HWI binaries are downloaded from bitcoin-core/HWI official releases.
-// See https://github.com/bitcoin-core/HWI/releases
-const HWI_VERSION = '3.2.0'
+// HWI version and checksums are pinned in hwi.json.
+// To update, run: ./scripts/bump-hwi.sh <new-version>
+const HWI_CONFIG = JSON.parse(readFileSync(path.join(__dirname, 'hwi.json'), 'utf8')) as {
+  version: string
+  checksums: Record<string, string>
+}
+const HWI_VERSION = HWI_CONFIG.version
 const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
-const SHA256SUMS_URL = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/SHA256SUMS.txt.asc`
 const MIB_SIZE = 1024 * 1024
-
-// GPG key fingerprint of achow101 (Ava Chow), Bitcoin Core maintainer and HWI author.
-// This is the trust anchor for verifying the SHA256SUMS.txt.asc signature.
-// Key can be fetched from: gpg --keyserver keys.openpgp.org --recv-keys <fingerprint>
-const HWI_SIGNING_KEY = '152812300785C96444D3334D17565732E08E5E41'
 
 function progressStream(totalSize: number) {
   const progressStream = progress({
@@ -73,71 +71,7 @@ async function sha256File(filePath: string): Promise<string> {
   })
 }
 
-function ensureGpgKey(): void {
-  try {
-    const result = execSync(`gpg --list-keys ${HWI_SIGNING_KEY} 2>&1`, { encoding: 'utf8' })
-    if (result.includes(HWI_SIGNING_KEY)) return
-  } catch {
-    // Key not in keyring, try to import it
-  }
-
-  console.log(`importing HWI signing key ${HWI_SIGNING_KEY} from keys.openpgp.org ...`)
-  try {
-    execSync(`gpg --keyserver keys.openpgp.org --recv-keys ${HWI_SIGNING_KEY}`, {
-      stdio: 'inherit',
-    })
-  } catch {
-    throw new Error(
-      `Failed to import GPG key ${HWI_SIGNING_KEY}.\n` +
-        `You can import it manually: gpg --keyserver keys.openpgp.org --recv-keys ${HWI_SIGNING_KEY}`
-    )
-  }
-}
-
-async function fetchAndVerifyChecksums(tmpdir: string): Promise<Record<string, string>> {
-  console.log(`downloading SHA256SUMS.txt.asc from ${SHA256SUMS_URL} ...`)
-  const response = await fetch(SHA256SUMS_URL)
-  if (!response.ok) {
-    throw new Error(`Failed to download SHA256SUMS.txt.asc: ${response.status} ${response.statusText}`)
-  }
-  const ascContent = await response.text()
-  const ascPath = path.join(tmpdir, 'SHA256SUMS.txt.asc')
-  await fs.writeFile(ascPath, ascContent)
-
-  // Verify GPG signature and extract the signed content
-  ensureGpgKey()
-  let verified: string
-  try {
-    verified = execSync(`gpg --verify --output - "${ascPath}" 2>/dev/null`, { encoding: 'utf8' })
-  } catch {
-    throw new Error(
-      `GPG signature verification failed for SHA256SUMS.txt.asc.\n` +
-        `The file may have been tampered with, or the signing key may have changed.`
-    )
-  }
-  console.log(`verified GPG signature on SHA256SUMS.txt.asc (key: ${HWI_SIGNING_KEY})`)
-
-  // Parse "hash  filename" lines from the verified content
-  const checksums: Record<string, string> = {}
-  for (const line of verified.split('\n')) {
-    const match = line.match(/^([a-f0-9]{64})\s+(.+)$/)
-    if (match) {
-      checksums[match[2]] = match[1]
-    }
-  }
-
-  if (Object.keys(checksums).length === 0) {
-    throw new Error('SHA256SUMS.txt.asc contained no checksums after GPG verification.')
-  }
-
-  return checksums
-}
-
-async function downloadHwi(
-  platform: string,
-  triple: string,
-  checksums: Record<string, string>
-): Promise<boolean> {
+async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const hwiFile = path.join('src-tauri', `hwi-${triple}${platform === 'win32' ? '.exe' : ''}`)
   try {
     await fs.access(hwiFile)
@@ -149,14 +83,13 @@ async function downloadHwi(
 
   const url = makeUrl(platform, triple)
   const archiveFilename = url.split('/').pop()!
-  // Look up the checksum for the extracted binary (e.g., "hwi-3.2.0-mac-arm64.tar.gz/hwi")
   const binaryName = platform === 'win32' ? 'hwi.exe' : 'hwi'
   const checksumKey = `${archiveFilename}/${binaryName}`
-  const expected = checksums[checksumKey]
+  const expected = HWI_CONFIG.checksums[checksumKey]
   if (!expected) {
     throw new Error(
-      `No checksum found for ${checksumKey} in GPG-verified SHA256SUMS.txt.asc.\n` +
-        `Available entries: ${Object.keys(checksums).join(', ')}`
+      `No checksum found for ${checksumKey} in scripts/hwi.json.\n` +
+        `Run ./scripts/bump-hwi.sh ${HWI_VERSION} --force to regenerate checksums.`
     )
   }
 
@@ -196,17 +129,10 @@ async function main() {
   const triple = data.match(/host: ([^\s]+)/)![1]
   const platform = os.platform()
 
-  // Download and GPG-verify the SHA256SUMS.txt.asc, then parse checksums
-  const tmpdir = await fs.mkdtemp(path.join(os.tmpdir(), 'hwi-checksums-'))
-  let checksums: Record<string, string>
-  try {
-    checksums = await fetchAndVerifyChecksums(tmpdir)
-  } finally {
-    await fs.rm(tmpdir, { recursive: true, force: true })
-  }
+  console.log(`HWI version: ${HWI_VERSION} (from scripts/hwi.json)`)
 
   // Download HWI for the host architecture
-  await downloadHwi(platform, triple, checksums)
+  await downloadHwi(platform, triple)
 
   // On macOS, also download HWI for the other architecture to support universal builds
   // CI builds on Intel (x86_64) but users may run on Apple Silicon (aarch64) or vice versa
@@ -214,7 +140,7 @@ async function main() {
     const otherTriple = triple.startsWith('aarch64')
       ? triple.replace('aarch64', 'x86_64')
       : triple.replace('x86_64', 'aarch64')
-    await downloadHwi(platform, otherTriple, checksums)
+    await downloadHwi(platform, otherTriple)
   }
 }
 main()
