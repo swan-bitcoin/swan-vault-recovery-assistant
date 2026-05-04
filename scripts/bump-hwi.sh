@@ -15,8 +15,23 @@
 #   - jq installed
 #   - Internet access to fetch the release and GPG key
 #
-# The signing key fingerprint is hardcoded below. If the HWI project
-# rotates its signing key, update SIGNING_KEY before running this script.
+# Signing key verification:
+#
+# The signing key fingerprint is hardcoded below. HWI releases are signed
+# by achow101 (Ava Chow), a Bitcoin Core maintainer. To verify the key:
+#
+#   1. Check who signed a release:
+#      curl -sL https://github.com/bitcoin-core/HWI/releases/download/<version>/SHA256SUMS.txt.asc | gpg --verify 2>&1
+#
+#   2. Cross-reference the key fingerprint against Bitcoin Core's
+#      trusted-keys list (where achow101's key is registered):
+#      https://github.com/bitcoin-core/guix.sigs/tree/main/builder-keys
+#
+#   3. Or fetch it directly from a keyserver:
+#      gpg --keyserver keys.openpgp.org --recv-keys 152812300785C96444D3334D17565732E08E5E41
+#
+# If the HWI project rotates its signing key, verify the new key against
+# the sources above before updating SIGNING_KEY.
 
 set -euo pipefail
 
