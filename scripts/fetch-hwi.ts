@@ -1,8 +1,9 @@
 import { Readable } from 'stream'
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 import * as unzip from 'unzip-stream'
 import * as fs from 'fs/promises'
-import { createWriteStream } from 'fs'
+import { createWriteStream, createReadStream } from 'fs'
 import * as path from 'path'
 import * as os from 'os'
 import * as tar from 'tar'
@@ -13,6 +14,16 @@ import progress from 'progress-stream'
 const HWI_VERSION = '3.2.0'
 const URL_BASE = `https://github.com/bitcoin-core/HWI/releases/download/${HWI_VERSION}/hwi-${HWI_VERSION}`
 const MIB_SIZE = 1024 * 1024
+
+// SHA-256 checksums of the extracted hwi binaries from the GPG-signed SHA256SUMS.txt.asc
+// published at https://github.com/bitcoin-core/HWI/releases/tag/3.2.0
+const EXPECTED_BINARY_CHECKSUMS: Record<string, string> = {
+  'hwi-3.2.0-linux-aarch64.tar.gz': 'c2117b96d318be0ceac217098933834ef88376c704ca9fadacd83c9471066dcc',
+  'hwi-3.2.0-linux-x86_64.tar.gz': 'd9cc65de95e3cf93fd3c953d589184a00180624ffc5ad17aade97616a8919fa6',
+  'hwi-3.2.0-mac-arm64.tar.gz': '87a8991848a0216213ddf6497c753cebbda492626afaf5608c30931155c922c3',
+  'hwi-3.2.0-mac-x86_64.tar.gz': 'b3764a530b635e7a7348c9185e09e74b389f5f585094fe316f700eec7c761875',
+  'hwi-3.2.0-windows-x86_64.zip': 'e068d91b664597425a8ead02d7b86a02ad6c4b72746c42961f58a58b08f9fd79',
+}
 
 function progressStream(totalSize: number) {
   const progressStream = progress({
@@ -56,6 +67,16 @@ function extractor(platform: string, tmpdir: string) {
   })
 }
 
+async function sha256File(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha256')
+    const stream = createReadStream(filePath)
+    stream.on('data', (data) => hash.update(data))
+    stream.on('end', () => resolve(hash.digest('hex')))
+    stream.on('error', reject)
+  })
+}
+
 async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   const hwiFile = path.join('src-tauri', `hwi-${triple}${platform === 'win32' ? '.exe' : ''}`)
   try {
@@ -67,6 +88,12 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
   }
 
   const url = makeUrl(platform, triple)
+  const archiveFilename = url.split('/').pop()!
+  const expected = EXPECTED_BINARY_CHECKSUMS[archiveFilename]
+  if (!expected) {
+    throw new Error(`No known checksum for ${archiveFilename}. Cannot verify integrity.`)
+  }
+
   // tmpdir in destination so rename is atomic and never cross-device
   const tmpdir = await fs.mkdtemp(path.join('src-tauri', '.tmphwi-'))
   try {
@@ -78,7 +105,20 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
         .pipe(extractor(platform, tmpdir))
     })
     await new Promise((resolve) => hwiStream.on('finish', resolve))
-    await fs.rename(path.join(tmpdir, 'hwi'), hwiFile)
+
+    const hwiPath = path.join(tmpdir, 'hwi')
+    const actual = await sha256File(hwiPath)
+    if (actual !== expected) {
+      throw new Error(
+        `SHA-256 checksum mismatch for ${archiveFilename}!\n` +
+          `  expected: ${expected}\n` +
+          `  actual:   ${actual}\n` +
+          `The downloaded binary may be corrupted or tampered with.`
+      )
+    }
+    console.log(`verified SHA-256 for ${archiveFilename}: ${actual}`)
+
+    await fs.rename(hwiPath, hwiFile)
     return true
   } finally {
     await fs.rm(tmpdir, { recursive: true, force: true })
@@ -87,7 +127,7 @@ async function downloadHwi(platform: string, triple: string): Promise<boolean> {
 
 async function main() {
   const data = execSync('rustc -vV').toString()
-  const triple = data.match(/host: ([^\s]+)/)[1]
+  const triple = data.match(/host: ([^\s]+)/)![1]
   const platform = os.platform()
 
   // Download HWI for the host architecture
