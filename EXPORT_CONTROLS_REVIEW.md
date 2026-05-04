@@ -24,7 +24,7 @@ SVRA is an open-source desktop application designed to verify and recover Bitcoi
 - **Reason for Control:** None (NLR — No License Required).
 - **Justification:** The item was evaluated against Category 5, Part 2. It is excluded from ECCN 5D002 (Information Security Software) based on the following:
   - **Absence of Confidentiality Encryption:** The regulations control "cryptography for data confidentiality." SVRA does not encrypt data-at-rest or data-in-transit at the application layer.
-  - **Limitation to Public Key Operations:** The only cryptographic operations performed by the application are public key derivation and address validation via the open-source BDK library. All digital signature operations (Bitcoin transaction signing) are delegated to external hardware devices — SVRA itself performs no signing, signature verification, or authentication cryptography.
+  - **Limitation to Public Key Operations and Signature Verification:** The only cryptographic operations performed by the application are public key derivation, address validation, and signature verification (during PSBT finalization) via the open-source BDK library. All digital signature creation (Bitcoin transaction signing) is delegated to external hardware devices — SVRA itself performs no signing using private keys. Signature verification is an authentication function excluded from ECCN 5D002.
   - **Open Source Status:** The software is published openly under an MIT license, further supporting a decontrolled status (though the functional exclusion takes precedence).
 
 ## 4. Detailed Technical Audit of Cryptographic Usage
