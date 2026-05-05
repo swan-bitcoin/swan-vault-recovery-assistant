@@ -88,10 +88,9 @@ graph LR
 
 ---
 
-## Private Key Handling: Proof of Absence
+## No Private Key Handling
 
-SVRA makes a strong claim: **it never handles private keys.** This section
-provides the evidence.
+SVRA does not handle private keys.
 
 ### What crosses each trust boundary
 
