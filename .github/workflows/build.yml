@@ -216,7 +216,7 @@ jobs:
 
       - name: Generate build provenance attestation (linux)
         if: ${{ matrix.os == 'ubuntu-22.04' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/deb/swan*.deb
@@ -234,7 +234,7 @@ jobs:
 
       - name: Generate build provenance attestation (macos)
         if: ${{ matrix.os == 'macos-latest' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/macos/swan*.app
@@ -251,7 +251,7 @@ jobs:
 
       - name: Generate build provenance attestation (windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        uses: ./.github/private-actions/actions/attest-build-provenance
+        uses: ./.github/private-actions/actions/attest
         with:
           subject-path: |
             src-tauri/target/release/bundle/msi/swan*.msi
