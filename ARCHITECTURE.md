@@ -77,7 +77,7 @@ graph LR
   end
 
   HW -- "signed PSBT\n(USB/HID)" --> HWI
-  HWI -- "unsigned PSBT\n(CLI arg)" --> HW
+  HWI -- "unsigned PSBT\n(USB/HID)" --> HW
   HWI -- "signed PSBT\n(JSON stdout)" --> BE
   BE -- "unsigned PSBT\n(CLI arg)" --> HWI
   FE -- "descriptor, address,\nfee rate, PSBT\n(Tauri IPC)" --> BE
@@ -167,24 +167,31 @@ sequenceDiagram
     participant HWI as HWI Sidecar
     participant HW as Hardware Device
 
-    note over User, HW: Step 1 — Recover Wallet
+    note over User, HW: Step 1 — Recover Wallet (loadWallet)
 
     User ->> FE: Paste descriptor (xpubs only)
-    FE ->> BE: invoke wallet(descriptor, network)
+    FE ->> BE: invoke wallet(network, descriptors, electrum)
     BE ->> ES: Sync addresses (Electrum protocol)
     ES -->> BE: UTXOs, tx history, balance
     BE -->> FE: Wallet { balance, transactions }
-    FE -->> User: Display balance and history
+    FE ->> BE: invoke address(network, descriptors, electrum)
+    BE -->> FE: AddressInfo { index, address }
+    FE -->> User: Display balance, history, and next unused address
 
-    note over User, HW: Step 2 — Prepare Transaction
+    note over User, HW: Step 2 — Prepare Transaction (sweep)
 
-    User ->> FE: Enter destination address + fee rate
-    FE ->> BE: invoke sweep(address, feeRate, descriptor)
+    User ->> FE: Enter destination address (+ optional fee rate)
+    FE ->> BE: invoke estimateFee(network, electrum, 1)
+    BE ->> ES: Query fee estimate
+    ES -->> BE: Fee rate (sats/vB)
+    BE -->> FE: Estimated fee rate
+    note right of FE: Use user-provided fee rate if given,<br/>otherwise use estimate
+    FE ->> BE: invoke sweep(address, feeRate, network, descriptors, electrum)
     note right of BE: drain_wallet()<br/>drain_to(addr)<br/>finish() -> unsigned PSBT
-    BE -->> FE: PsbtDetails { psbt, txid, fee, amount }
+    BE -->> FE: PsbtDetails { psbt, txid, received, sent, fee, outbound, sent_to_self }
     FE -->> User: Display transaction details for review
 
-    note over User, HW: Step 3 — Sign Transaction
+    note over User, HW: Step 3 — Sign Transaction (sign)
 
     User ->> FE: Click "Sign Transaction"
     FE ->> BE: invoke enumerate(network)
@@ -203,8 +210,8 @@ sequenceDiagram
     HWI -->> BE: Signed PSBT (JSON stdout)
     note right of BE: Verify post-sign TXID matches pre-sign TXID<br/>Reject if tampered
 
-    BE -->> FE: Signed PSBT
-    FE ->> BE: invoke psbt_status(psbt, descriptor)
+    BE -->> FE: Signed PSBT (responsePsbt)
+    FE ->> BE: invoke psbtStatus(responsePsbt, network, descriptors)
     BE -->> FE: FullySigned | PartiallySigned
 
     alt PartiallySigned (multisig needs more signatures)
@@ -212,10 +219,10 @@ sequenceDiagram
         note over User, HW: Repeat sign flow with next device
     end
 
-    note over User, HW: Step 4 — Broadcast
+    note over User, HW: Step 4 — Broadcast (broadcast)
 
     User ->> FE: Click "Broadcast"
-    FE ->> BE: invoke broadcast(psbt, descriptor)
+    FE ->> BE: invoke broadcast(psbt, network, descriptors, electrum)
     note right of BE: finalize_psbt()<br/>extract_tx()<br/>transaction_broadcast()
     BE ->> ES: Broadcast raw transaction
     ES -->> BE: Accepted
@@ -324,11 +331,24 @@ HWI v3.2.0 is downloaded from official `bitcoin-core/HWI` GitHub releases
 during `pnpm install` via `scripts/fetch-hwi.ts`. The binary is bundled as a
 Tauri external sidecar (`tauri.conf.json` `externalBin: ["./hwi"]`).
 
-The current build process verifies HWI integrity through the GPG-signed
-`SHA256SUMS.txt.asc` file published with each HWI release. The SHA-256 checksum
-of the downloaded binary is compared against the pinned expected value in the
-build configuration, and the GPG signature is verified against the HWI signing
-key to ensure the checksums file has not been tampered with.
+HWI integrity is verified through a two-phase process:
+
+**Pin-time** (`scripts/bump-hwi.sh`): When updating the HWI version, the script
+downloads `SHA256SUMS.txt.asc` from the HWI release, verifies its GPG signature
+against achow101's key (fingerprint `152812300785C96444D3334D17565732E08E5E41`,
+cross-referenced against Bitcoin Core's `guix.sigs/builder-keys`), extracts the
+per-binary SHA-256 checksums, and writes them to `scripts/hwi.json`.
+
+**Build-time** (`scripts/fetch-hwi.ts`): Every build (including CI) downloads
+the HWI binary from `github.com/bitcoin-core/HWI/releases`, computes its
+SHA-256 hash via `createHash('sha256')`, and compares it against the pinned
+checksum in `hwi.json`. The build fails on mismatch. Cached binaries are also
+re-verified on every run -- a stale or tampered cached binary is deleted and
+re-downloaded.
+
+This separation means the GPG trust root is established once at pin-time by a
+developer with GPG tooling, while every subsequent build only needs to compare
+a hash -- no GPG dependency in CI.
 
 ### 7. Electrum server privacy
 
@@ -354,6 +374,7 @@ address queries with the client's IP). However:
 |---|---|---|
 | `address()` | Derive next unused receive address from descriptor | No |
 | `broadcast()` | Finalize PSBT and broadcast raw tx via Electrum | No |
+| `create_window()` | Open a secondary Tauri webview window (e.g. About page) | No |
 | `enumerate()` | List USB-connected hardware wallets via HWI | No |
 | `estimate_fee()` | Query Electrum for fee rate estimate | No |
 | `is_address()` | Validate Bitcoin address format | No |
@@ -362,6 +383,7 @@ address queries with the client's IP). However:
 | `is_descriptor()` | Validate descriptor format | No |
 | `is_descriptor_for_network()` | Validate descriptor matches selected network | No |
 | `is_psbt()` | Validate PSBT format | No |
+| `open_github_url()` | Open the project's GitHub URL in the system browser | No |
 | `psbt_status()` | Check if PSBT is Unsigned/PartiallySigned/FullySigned | No |
 | `sign()` | Pass PSBT to HWI for hardware signing, verify TXID | No |
 | `sweep()` | Build unsigned PSBT that drains wallet to destination | No |
@@ -454,4 +476,4 @@ protocol prefix (`ssl://`, `tcp://`, or `localhost:`) and a valid port number.
 | Tampered release binary | GitHub SLSA attestations; macOS code signing and notarization | User must verify attestation (`gh attestation verify`) |
 | Private key exfiltration from application | Keys never enter application memory -- signing is on-device only | None -- keys are physically absent |
 | Address substitution (clipboard attack) | User verifies destination address on hardware device display | User must verify device display |
-| Stale or poisoned HWI in build cache | HWI excluded from cargo cache; re-downloaded every CI build | None |
+| Stale or poisoned HWI in build cache | HWI excluded from cargo cache; SHA-256 verified against GPG-signed checksums on every build | None |
