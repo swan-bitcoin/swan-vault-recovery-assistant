@@ -144,7 +144,19 @@ rustup update
 
 2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
 
-3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. You may also choose to download the HWI binaries yourself from [bitcoin-core/HWI](https://github.com/bitcoin-core/HWI/releases).
+3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. The downloaded binary is verified against a SHA-256 checksum pinned in [`scripts/hwi.json`](./scripts/hwi.json). You may also choose to download the HWI binaries yourself from [bitcoin-core/HWI](https://github.com/bitcoin-core/HWI/releases).
+
+#### Updating the HWI version
+
+To bump the pinned HWI version, run:
+
+```bash
+./scripts/bump-hwi.sh <new-version>
+```
+
+This downloads the `SHA256SUMS.txt.asc` file from the HWI release, verifies its GPG signature against the [HWI signing key](https://github.com/achow101) (`152812300785C96444D3334D17565732E08E5E41`), and writes the verified checksums into `scripts/hwi.json`. The build script (`scripts/fetch-hwi.ts`) reads from this file — it does not need GPG itself.
+
+Prerequisites for the bump script: `gpg`, `jq`, and `curl`.
 
 4. other system dependencies
 
