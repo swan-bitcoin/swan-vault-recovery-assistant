@@ -142,9 +142,15 @@ to update:
 rustup update
 ```
 
-2. this repo uses `pnpm` for managing packages. You may need to [install it](https://pnpm.io/installation)
+2. this repo uses `pnpm` for managing packages. The required version is pinned via `packageManager` in `package.json` and enforced by [corepack](https://nodejs.org/api/corepack.html); enable corepack with `corepack enable` if your Node install doesn't already include it. Otherwise you can [install pnpm manually](https://pnpm.io/installation).
 
-3. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. It will be [downloaded automatically](./scripts/fetch-hwi.ts) when using `pnpm install` for the first time from a copy of this repository. The downloaded binary is verified against a SHA-256 checksum pinned in [`scripts/hwi.json`](./scripts/hwi.json). You may also choose to download the HWI binaries yourself from [bitcoin-core/HWI](https://github.com/bitcoin-core/HWI/releases).
+3. Install git hooks (one-time after clone). The `prepare` script no longer runs automatically — `.npmrc` sets `ignore-scripts=true` to block install-time RCE from compromised dependencies, which also disables this project's own lifecycle scripts. Run:
+
+   ```bash
+   pnpm exec husky
+   ```
+
+4. HWI must be installed on your system to use any of the external device features (device enumeration and PSBT signing). This can be present in your PATH or in the `src-tauri` directory. Fetch it explicitly with `pnpm run fetch:hwi` — this was previously automatic via a `postinstall` script, but is now an explicit step (same supply-chain reason as the hooks above). The [fetch script](./scripts/fetch-hwi.ts) SHA-256 verifies the downloaded binary against a checksum pinned in [`scripts/hwi.json`](./scripts/hwi.json). You may also choose to download the HWI binaries yourself from [bitcoin-core/HWI](https://github.com/bitcoin-core/HWI/releases).
 
 #### Updating the HWI version
 

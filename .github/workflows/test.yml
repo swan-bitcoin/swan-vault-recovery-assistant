@@ -31,8 +31,9 @@ jobs:
           override: true
 
       - uses: ./.github/private-actions/pnpm/action-setup
-        with:
-          version: 9
+        # Version is pinned via package.json `packageManager` (integrity-
+        # hash verified). pnpm/action-setup refuses to start if both
+        # `version:` and `packageManager` are specified.
 
       - uses: ./.github/private-actions/actions/setup-node
         with:
@@ -67,8 +68,9 @@ jobs:
           override: true
 
       - uses: ./.github/private-actions/pnpm/action-setup
-        with:
-          version: 9
+        # Version is pinned via package.json `packageManager` (integrity-
+        # hash verified). pnpm/action-setup refuses to start if both
+        # `version:` and `packageManager` are specified.
 
       - uses: ./.github/private-actions/actions/setup-node
         with:
@@ -82,7 +84,18 @@ jobs:
         run: sudo apt-get install -y webkit2gtk-driver xvfb
 
       - name: install project dependencies
+        # HUSKY=0 keeps husky from trying to install git hooks in CI.
+        # `.npmrc` sets `ignore-scripts=true` so no dependency lifecycle
+        # scripts run during install.
         run: HUSKY=0 pnpm install --frozen-lockfile
+
+      - name: fetch HWI binary
+        # Previously ran implicitly via the package.json `postinstall` script.
+        # Moved to an explicit step because `.npmrc` now sets
+        # `ignore-scripts=true`. The fetch script SHA-256 verifies the
+        # downloaded binary against scripts/hwi.json. Required because
+        # `tauri build` below produces an artifact that bundles HWI.
+        run: pnpm run fetch:hwi
 
       - name: restore cargo cache
         id: restore-cargo-cache
