@@ -1,5 +1,6 @@
 {
   "name": "swan-vault-recovery-assistant",
+  "description": "Desktop application for verifying and restoring Bitcoin wallets from descriptors.",
   "private": true,
   "version": "0.1.9",
   "type": "module",

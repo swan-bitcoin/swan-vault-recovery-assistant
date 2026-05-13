@@ -78,7 +78,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: swan-bitcoin/actions
-          ref: master
+          # SMOKE TEST for PSEC-4881 — pointing at the branch that
+          # SHA-pins the internal self-refs in swan/analyze-dependencies/
+          # action.yml. Revert to `ref: master` before merging this PR.
+          ref: wg/psec-4881-action-yml-relative-paths
           token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
           path: .github/private-actions
 
