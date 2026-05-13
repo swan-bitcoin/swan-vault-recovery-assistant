@@ -32,9 +32,18 @@ RUN apt-get update && apt-get install -y \
 # install rust & pnpm
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="/root/.cargo/bin:${PATH}"
-RUN npm install -g pnpm
+# Pin pnpm to a major to match CI (build.yml/test.yml use pnpm v9 via the
+# private-actions wrapper). Corepack will read package.json `packageManager`
+# and use the integrity-pinned exact version when commands run inside /svra.
+RUN npm install -g pnpm@9
 
 # copy, install dependencies build
 WORKDIR /svra
 COPY . .
-RUN pnpm install -f && pnpm tauri build
+# `--frozen-lockfile` matches CI; install scripts are blocked via .npmrc
+# (`ignore-scripts=true`), so HWI fetch is now an explicit step before
+# `pnpm tauri build`. HUSKY=0 short-circuits the husky prepare hook for
+# containerized builds with no git working tree.
+RUN HUSKY=0 pnpm install --frozen-lockfile \
+  && pnpm run fetch:hwi \
+  && pnpm tauri build

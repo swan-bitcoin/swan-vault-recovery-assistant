@@ -19,11 +19,18 @@
     "test:unit:watch": "vitest --project unit",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "postinstall": "tsx scripts/fetch-hwi.ts",
-    "prepare": "husky",
+    "fetch:hwi": "tsx scripts/fetch-hwi.ts",
     "simnet": "tsx test/scripts/simulate-network.ts",
     "simulate-network": "pnpm simnet",
     "sync-versions": "tsx scripts/sync-versions.ts"
+  },
+  "packageManager": "pnpm@9.15.9+sha512.68046141893c66fad01c079231128e9afb89ef87e2691d69e4d40eee228988295fd4682181bae55b58418c3a253bde65a505ec7c5f9403ece5cc3cd37dcf2531",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": []
   },
   "dependencies": {
     "@tauri-apps/api": "^2.7.0",

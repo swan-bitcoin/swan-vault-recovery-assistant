@@ -108,7 +108,18 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # HUSKY=0 keeps husky from trying to install git hooks in CI (no .git
+        # working tree state needed). `.npmrc` sets `ignore-scripts=true` so
+        # no dependency lifecycle scripts run during install either.
+        run: HUSKY=0 pnpm install --frozen-lockfile
+
+      - name: Fetch HWI binary
+        # Previously ran implicitly via the package.json `postinstall` script.
+        # Moved to an explicit step because `.npmrc` now sets
+        # `ignore-scripts=true` to block install-time RCE from compromised
+        # dependencies. The fetch script SHA-256 verifies the downloaded
+        # binary against scripts/hwi.json.
+        run: pnpm run fetch:hwi
 
       - name: Restore cargo cache
         id: restore-cargo-cache
