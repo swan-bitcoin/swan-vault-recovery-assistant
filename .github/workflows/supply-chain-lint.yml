@@ -1,0 +1,37 @@
+name: Supply chain lint
+
+# Scans GitHub Actions (`action.yml`/`action.yaml` and sibling `.sh` scripts)
+# for runtime supply-chain risks: `npm install` without `npm ci`, `curl | bash`,
+# unpinned `@latest`, `--no-lockfile`, etc. Acts as a tripwire if a composite
+# action is added to this repo later — vault-recovery has no `action.yml`
+# files today, so the linter is a no-op on this first run.
+#
+# Source: https://github.com/swan-bitcoin/actions/blob/master/swan/supply-chain-lint/README.md
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  supply-chain-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout code
+        uses: actions/checkout@v4
+
+      - name: checkout private actions
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
+      - name: supply chain lint
+        uses: ./.github/private-actions/swan/supply-chain-lint
