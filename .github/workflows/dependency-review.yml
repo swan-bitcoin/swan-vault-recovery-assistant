@@ -39,3 +39,52 @@ jobs:
           comment-summary-in-pr: on-failure
           license-check: false
           fail-on-severity: high
+
+  analyze-dependency-changes:
+    # Detects packages published within the last 72h (age-gate) and runs an
+    # optional GuardDog scan over the lockfile diff. AI review is disabled
+    # for now — once an ANTHROPIC_API_KEY secret is configured for this repo,
+    # set `enable_ai_review: 'true'` below to turn on Claude-powered source
+    # analysis. Note: this repo is public, so secrets are not exposed to
+    # PRs from forks.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: 'Check if dependency files changed'
+        id: should_run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGED_FILES=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files --jq '.[].filename')
+          if echo "$CHANGED_FILES" | grep -qE '(^|/)package\.json$|(^|/)pnpm-lock\.yaml$'; then
+            echo "Dependency files changed - will run analysis"
+            echo "run=true" >> $GITHUB_OUTPUT
+          else
+            echo "No dependency changes - skipping analysis"
+            echo "run=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 'Checkout repository'
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+
+      - name: 'Checkout private actions'
+        if: steps.should_run.outputs.run == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
+      - name: 'Analyze Dependency Changes'
+        if: steps.should_run.outputs.run == 'true'
+        uses: ./.github/private-actions/swan/analyze-dependencies
+        with:
+          lockfile_path: pnpm-lock.yaml
+          enable_ai_review: 'false'
