@@ -96,8 +96,9 @@ jobs:
           override: true
 
       - uses: ./.github/private-actions/pnpm/action-setup
-        with:
-          version: 9
+        # Version is pinned via package.json `packageManager` (integrity-
+        # hash verified). pnpm/action-setup refuses to start if both
+        # `version:` and `packageManager` are specified.
       - uses: ./.github/private-actions/actions/setup-node
         with:
           node-version: '20'
