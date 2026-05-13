@@ -112,7 +112,11 @@ jobs:
         # HUSKY=0 keeps husky from trying to install git hooks in CI (no .git
         # working tree state needed). `.npmrc` sets `ignore-scripts=true` so
         # no dependency lifecycle scripts run during install either.
-        run: HUSKY=0 pnpm install --frozen-lockfile
+        # Use step-level `env:` rather than inline assignment so the command
+        # works under PowerShell on windows-latest as well as bash.
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
 
       - name: Fetch HWI binary
         # Previously ran implicitly via the package.json `postinstall` script.

@@ -41,7 +41,9 @@ jobs:
           cache: 'pnpm'
 
       - name: install dependencies
-        run: HUSKY=0 pnpm install --frozen-lockfile
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
 
       - name: run unit tests
         run: pnpm test:unit
@@ -87,7 +89,9 @@ jobs:
         # HUSKY=0 keeps husky from trying to install git hooks in CI.
         # `.npmrc` sets `ignore-scripts=true` so no dependency lifecycle
         # scripts run during install.
-        run: HUSKY=0 pnpm install --frozen-lockfile
+        env:
+          HUSKY: '0'
+        run: pnpm install --frozen-lockfile
 
       - name: fetch HWI binary
         # Previously ran implicitly via the package.json `postinstall` script.
