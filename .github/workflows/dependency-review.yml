@@ -39,3 +39,12 @@ jobs:
           comment-summary-in-pr: on-failure
           license-check: false
           fail-on-severity: high
+
+  # NOTE: An `analyze-dependency-changes` job lived here, added in PR #177 (PSEC-4882)
+  # and reverted in PSEC-4907 because the `swan/analyze-dependencies` composite contains
+  # transitive `uses: swan-bitcoin/actions/...@<sha>` self-refs that this public repo's
+  # GITHUB_TOKEN cannot resolve. The PAT used for the outer `actions/checkout` step does
+  # not propagate to transitive action resolution at workflow-prep time, so the job was
+  # dead-on-arrival. See PSEC-4894 for the systematic fix (Option C′ — teach `sync-actions`
+  # to emit SHA-pinned upstream refs for `public-safe`-tagged composites). PSEC-4912
+  # tracks re-adding this job once that lands.
