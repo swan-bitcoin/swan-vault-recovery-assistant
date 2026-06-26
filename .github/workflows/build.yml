@@ -22,7 +22,13 @@ jobs:
         # https://github.com/actions/runner-images
         # Use ubuntu-22.04 for glibc 2.35 compatibility with Debian 12 (glibc 2.36)
         # Revisit when Debian 12 reaches EOL (~2028) or ubuntu-22.04 is deprecated
-        os: [ubuntu-22.04, windows-latest, macos-latest]
+        #
+        # Pin Windows to windows-2022: windows-latest ships MSVC 14.51 (VS18),
+        # whose <stdatomic.h> requires C11, which breaks aws-lc-sys 0.25.0's
+        # c99 build probe ("C atomics require C11 or later"). windows-2022's
+        # MSVC 14.4x compiles aws-lc-sys cleanly. Revisit when aws-lc-sys is
+        # bumped to an MSVC-14.51-compatible release or windows-2022 is EOL.
+        os: [ubuntu-22.04, windows-2022, macos-latest]
         isPR:
           - ${{github.event_name == 'pull_request'}}
         allBundles:
@@ -33,7 +39,7 @@ jobs:
             os: ubuntu-22.04
           - isPR: true
             allBundles: false
-            os: windows-latest
+            os: windows-2022
 
     steps:
       - name: Checkout code

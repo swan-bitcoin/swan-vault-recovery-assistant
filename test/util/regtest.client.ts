@@ -53,7 +53,39 @@ export default class RegtestClient extends Client {
     super({ ...defaultClientParameters, wallet })
   }
 
+  /*
+   * The docker stack reports its container as "running" as soon as the process
+   * starts, but bitcoind still needs time to load the block index before it
+   * answers RPCs — until then it refuses connections or returns
+   * "Loading block index…" (RPC warm-up). Poll a cheap RPC until it succeeds so
+   * initialize() does not race the node's startup (the cause of flaky
+   * "could not initialize regtest client" failures on cold CI runs).
+   */
+  async waitForNodeReady(timeoutMs: number = 45_000): Promise<void> {
+    const start = Date.now()
+    let attempt = 0
+    for (;;) {
+      try {
+        await this.getBlockchainInfo()
+        log('regtest node is ready')
+        return
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (e: any) {
+        if (Date.now() - start >= timeoutMs) {
+          throw new Error(
+            `regtest node did not become ready within ${timeoutMs / 1000}s. Last error: ${e?.message ?? e}`,
+          )
+        }
+        attempt += 1
+        log(`regtest node not ready yet (attempt ${attempt}), retrying in 1s...`, e?.message ?? e)
+        await new Promise((resolve) => setTimeout(resolve, 1_000))
+      }
+    }
+  }
+
   async initialize(): Promise<void> {
+    await this.waitForNodeReady()
+
     let shouldCreateWallet = true
     try {
       const walletInfo = await this.getWalletInfo()

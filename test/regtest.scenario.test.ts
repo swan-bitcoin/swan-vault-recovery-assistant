@@ -45,7 +45,9 @@ beforeAll(
 
     await new Promise((resolve) => setTimeout(resolve, 2000))
   },
-  60 * 1000 // 60 seconds
+  // Allow headroom for the regtest node readiness poll (up to 45s on a cold
+  // start) plus wallet creation and the initial 101-block funding.
+  120 * 1000 // 120 seconds
 )
 
 describe('sanity checks. scenario test setup', function () {
