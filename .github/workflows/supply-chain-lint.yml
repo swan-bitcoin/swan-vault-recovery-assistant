@@ -2,17 +2,20 @@ name: Supply chain lint
 
 # Scans GitHub Actions (`action.yml`/`action.yaml` and sibling `.sh` scripts)
 # for runtime supply-chain risks: `npm install` without `npm ci`, `curl | bash`,
-# unpinned `@latest`, `--no-lockfile`, etc. Acts as a tripwire if a composite
-# action is added to this repo later — vault-recovery has no `action.yml`
-# files today, so the linter is a no-op on this first run.
+# unpinned `@latest`, `--no-lockfile`, etc. The scan covers this repo's own
+# composite actions under `.github/actions/` (currently `check-linear-link`).
+#
+# Triggers only on `.github/**` changes — everything the lint scans lives there.
 #
 # Source: https://github.com/swan-bitcoin/actions/blob/master/swan/supply-chain-lint/README.md
 
 on:
   push:
     branches: [master]
+    paths: ['.github/**']
   pull_request:
     types: [opened, synchronize]
+    paths: ['.github/**']
   workflow_dispatch:
 
 permissions:
