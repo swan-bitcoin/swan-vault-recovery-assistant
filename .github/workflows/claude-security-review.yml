@@ -1,0 +1,43 @@
+name: Security Review
+
+permissions:
+  pull-requests: write # Needed for leaving PR comments
+  contents: read
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Checkout private actions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
+      - name: Run Claude Code Security Review
+        uses: ./.github/private-actions/swan/claude-code-security-review
+        with:
+          comment-pr: true
+          claude-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude-model: claude-opus-4-6
+          claudecode-timeout: 30
