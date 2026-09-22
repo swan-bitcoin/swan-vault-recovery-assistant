@@ -12,6 +12,7 @@
 name: 'CodeQL Advanced'
 
 on:
+  workflow_dispatch:
   push:
     branches: ['master']
   pull_request:
@@ -41,6 +42,8 @@ jobs:
         include:
           - language: javascript-typescript
             build-mode: none
+          - language: rust
+            build-mode: none
 
     steps:
       - name: Checkout repository
@@ -60,6 +63,7 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
           config: |
             paths-ignore:
               - .github/private-actions
