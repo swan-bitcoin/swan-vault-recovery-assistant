@@ -37,7 +37,7 @@ jobs:
 
       - uses: ./.github/private-actions/actions/setup-node
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: install dependencies
@@ -76,7 +76,7 @@ jobs:
 
       - uses: ./.github/private-actions/actions/setup-node
         with:
-          node-version: 20
+          node-version: 22
           cache: 'pnpm'
 
       - name: install system dependencies (linux)
