@@ -42,8 +42,8 @@ importers:
         specifier: ^4.2.0
         version: 4.2.0
       bitcoinjs-lib:
-        specifier: ^6.1.7
-        version: 6.1.7
+        specifier: ^6.1.10
+        version: 6.1.10
       clipboardy:
         specifier: ^4.0.0
         version: 4.0.0
@@ -1075,9 +1075,9 @@ packages:
       { integrity: sha512-QFmer//rZhyuYm0mBOVAmMhIG/EFmXDahC3a1LvNTwM8/KszxUGEAjvAT4tzm1FaDj4c7pQWMG/vOWtoKjeR3Q== }
     engines: { node: '>=7' }
 
-  bitcoinjs-lib@6.1.7:
+  bitcoinjs-lib@6.1.10:
     resolution:
-      { integrity: sha512-tlf/r2DGMbF7ky1MgUqXHzypYHakkEnm0SZP23CJKIqNY/5uNAnMbFhMJdhjrL/7anfb/U8+AlpdjPWjPnAalg== }
+      { integrity: sha512-9KpnS5JKVP0j0yfTsBNFIsNA6+JdBDb7VtL35F20I/pJYobosi3TmZFGtu6qxhJCfb0vubJixr5Zv61/lUYETw== }
     engines: { node: '>=8.0.0' }
 
   brace-expansion@1.1.11:
@@ -3281,7 +3281,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  bitcoinjs-lib@6.1.7:
+  bitcoinjs-lib@6.1.10:
     dependencies:
       '@noble/hashes': 1.5.0
       bech32: 2.0.0
