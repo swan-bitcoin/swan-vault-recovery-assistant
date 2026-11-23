@@ -1,0 +1,13 @@
+[package]
+name = "svra_vault"
+version = "0.1.0"
+description = "Swan vault descriptor parsing and PSBT checks shared by the device crates"
+edition = "2021"
+publish = false
+
+[dependencies]
+bitcoin = "0.32"
+miniscript = "12"
+
+[dev-dependencies]
+bdk_wallet = "1.0.0"

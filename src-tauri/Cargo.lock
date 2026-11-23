@@ -4069,7 +4069,17 @@ dependencies = [
  "hidapi",
  "miniscript",
  "semver",
+ "svra_vault",
  "tokio",
+]
+
+[[package]]
+name = "svra_vault"
+version = "0.1.0"
+dependencies = [
+ "bdk_wallet",
+ "bitcoin",
+ "miniscript",
 ]
 
 [[package]]

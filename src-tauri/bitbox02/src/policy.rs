@@ -1,16 +1,11 @@
-use crate::error::{Error, ErrorKind};
+use crate::error::Error;
 use bitbox_api::btc::KeyOriginInfo;
 use bitbox_api::Keypath;
-use bitcoin::bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub};
-use miniscript::descriptor::{DescriptorPublicKey, Wildcard, WshInner};
-use miniscript::{Descriptor, Terminal};
-use std::str::FromStr;
+use bitcoin::bip32::Fingerprint;
+use svra_vault::{parse_vault, Vault};
 
-const RECEIVE: ChildNumber = ChildNumber::Normal { index: 0 };
-const CHANGE: ChildNumber = ChildNumber::Normal { index: 1 };
-
-/// The last sentences of the messages about a wallet configuration that SVRA refuses.
-const SUPPORTED: &str = "With a BitBox02, SVRA can sign only for a Swan vault. Paste the wallet configuration from your Swan Vault Recovery Sheet.";
+/// How the messages of the shared vault code name this device.
+pub(crate) const DEVICE_NAME: &str = "BitBox02";
 
 /// The BIP-388 wallet policy for a Swan vault, as one connected device sees it.
 pub struct PolicyArtifact {
@@ -24,226 +19,10 @@ pub struct PolicyArtifact {
   pub our_account_keypath: Keypath,
 }
 
-/// A policy artifact with the threshold, which the session needs to rebuild the witness script.
-pub(crate) struct Vault {
-  pub artifact: PolicyArtifact,
-  pub threshold: usize,
-}
-
-/// One key of a vault descriptor.
-#[derive(Clone, PartialEq)]
-struct VaultKey {
-  /// The origin as the descriptor writes it. A bare `[fingerprint]` has an empty path.
-  origin: Option<(Fingerprint, DerivationPath)>,
-  xpub: Xpub,
-}
-
-/// How the keys of a descriptor end.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Keychain {
-  Receive,
-  Change,
-  Multipath,
-}
-
-struct ParsedDescriptor {
-  threshold: usize,
-  keys: Vec<VaultKey>,
-  keychain: Keychain,
-}
-
-/// The vault descriptors, read and checked without a device.
-pub(crate) struct ParsedVault {
-  threshold: usize,
-  keys: Vec<VaultKey>,
-}
-
-fn unsupported(message: impl Into<String>) -> Error {
-  Error::new(ErrorKind::UnsupportedDescriptor, message)
-}
-
-/// Reads one descriptor. `label` names it in the messages, for example "wallet configuration".
-fn parse_descriptor(text: &str, label: &str) -> Result<ParsedDescriptor, Error> {
-  // The parse error is not shown, because it can repeat what the user pasted.
-  let descriptor = Descriptor::<DescriptorPublicKey>::from_str(text.trim()).map_err(|_| {
-    unsupported(format!(
-      "The {label} is not valid. Check that you copied all of it, including the checksum after the # sign. {SUPPORTED}"
-    ))
-  })?;
-
-  let Descriptor::Wsh(wsh) = &descriptor else {
-    return Err(unsupported(format!(
-      "The {label} does not start with wsh(. {SUPPORTED}"
-    )));
-  };
-  let miniscript = match wsh.as_inner() {
-    WshInner::Ms(miniscript) => miniscript,
-    WshInner::SortedMulti(_) => {
-      return Err(unsupported(format!(
-        "The {label} uses sortedmulti(). A Swan vault does not sort its keys, so SVRA cannot sign it. {SUPPORTED}"
-      )))
-    }
-  };
-  let Terminal::Multi(threshold) = &miniscript.node else {
-    return Err(unsupported(format!(
-      "The {label} does not use multi(). {SUPPORTED}"
-    )));
-  };
-  if threshold.n() < 2 {
-    return Err(unsupported(format!(
-      "The {label} has only one key. A vault needs at least two keys."
-    )));
-  }
-
-  let mut keychain = None;
-  let mut keys = Vec::with_capacity(threshold.n());
-  for (index, key) in threshold.iter().enumerate() {
-    let (this_keychain, key) = parse_key(key).ok_or_else(|| {
-      unsupported(format!(
-        "Key {} of the {label} is not an extended public key that ends in /0/*, /1/* or /<0;1>/*. {SUPPORTED}",
-        index + 1
-      ))
-    })?;
-    match keychain {
-      None => keychain = Some(this_keychain),
-      Some(first) if first == this_keychain => {}
-      Some(_) => {
-        return Err(unsupported(format!(
-          "The keys of the {label} do not all end in the same path. {SUPPORTED}"
-        )))
-      }
-    }
-    keys.push(key);
-  }
-  let keychain = keychain.ok_or_else(|| unsupported(format!("The {label} has no keys.")))?;
-
-  Ok(ParsedDescriptor {
-    threshold: threshold.k(),
-    keys,
-    keychain,
-  })
-}
-
-/// Reads one key expression. Returns `None` when the key is not an extended public key with an
-/// unhardened wildcard after exactly `/0`, `/1` or `/<0;1>`.
-fn parse_key(key: &DescriptorPublicKey) -> Option<(Keychain, VaultKey)> {
-  let (keychain, origin, xpub, wildcard) = match key {
-    DescriptorPublicKey::XPub(key) => {
-      let keychain = match key.derivation_path.as_ref() {
-        [step] if *step == RECEIVE => Keychain::Receive,
-        [step] if *step == CHANGE => Keychain::Change,
-        _ => return None,
-      };
-      (keychain, &key.origin, key.xkey, key.wildcard)
-    }
-    DescriptorPublicKey::MultiXPub(key) => {
-      let paths = key.derivation_paths.paths();
-      let is_receive_and_change =
-        paths.len() == 2 && paths[0].as_ref() == [RECEIVE] && paths[1].as_ref() == [CHANGE];
-      if !is_receive_and_change {
-        return None;
-      }
-      (Keychain::Multipath, &key.origin, key.xkey, key.wildcard)
-    }
-    DescriptorPublicKey::Single(_) => return None,
-  };
-  if wildcard != Wildcard::Unhardened {
-    return None;
-  }
-  Some((
-    keychain,
-    VaultKey {
-      origin: origin.clone(),
-      xpub,
-    },
-  ))
-}
-
-/// Reads the wallet configuration, and the change configuration when there is one, and checks
-/// that they describe one vault.
-pub(crate) fn parse_vault(
-  receive_descriptor: &str,
-  change_descriptor: Option<&str>,
-) -> Result<ParsedVault, Error> {
-  let receive = parse_descriptor(receive_descriptor, "wallet configuration")?;
-  if receive.keychain == Keychain::Change {
-    return Err(unsupported(
-      "The wallet configuration ends in /1/*, which is the path of the change configuration. Paste the wallet configuration from your Swan Vault Recovery Sheet. It ends in /0/*.",
-    ));
-  }
-
-  if let Some(change_descriptor) = change_descriptor {
-    if receive.keychain == Keychain::Multipath {
-      return Err(unsupported(
-        "The wallet configuration is a multipath configuration, so it already holds the change path. Leave the change configuration empty.",
-      ));
-    }
-    let change = parse_descriptor(change_descriptor, "change configuration")?;
-    if change.keychain != Keychain::Change {
-      return Err(unsupported(
-        "The change configuration must end in /1/*. Paste the change configuration from your Swan Vault Recovery Sheet.",
-      ));
-    }
-    if change.threshold != receive.threshold || change.keys != receive.keys {
-      return Err(unsupported(
-        "The change configuration is not from the same vault as the wallet configuration. Leave it empty, or paste the one from the same Recovery Sheet.",
-      ));
-    }
-  }
-
-  let mut seen = Vec::new();
-  for key in &receive.keys {
-    let identity = (key.xpub.public_key, key.xpub.chain_code);
-    if seen.contains(&identity) {
-      return Err(unsupported(
-        "Two keys of the wallet configuration are the same key. A vault needs different keys.",
-      ));
-    }
-    seen.push(identity);
-  }
-
-  Ok(ParsedVault {
-    threshold: receive.threshold,
-    keys: receive.keys,
-  })
-}
-
-impl ParsedVault {
-  /// Finds the connected device's key and builds the policy for it.
-  pub(crate) fn for_device(self, our_root_fingerprint: Fingerprint) -> Result<Vault, Error> {
-    // The cloud key has a fingerprint and no path, so it never matches, even when its fingerprint
-    // equals the device's.
-    let ours: Vec<usize> = self
-      .keys
-      .iter()
-      .enumerate()
-      .filter(|(_, key)| {
-        matches!(
-          &key.origin,
-          Some((fingerprint, path))
-            if *fingerprint == our_root_fingerprint && !path.as_ref().is_empty()
-        )
-      })
-      .map(|(index, _)| index)
-      .collect();
-    let our_key_index = match ours.as_slice() {
-      [index] => *index,
-      [] => {
-        return Err(Error::new(
-          ErrorKind::KeyNotInVault,
-          format!(
-            "The connected BitBox02 (fingerprint {our_root_fingerprint}) does not hold a key of this vault. Connect the BitBox02 that holds one of the vault keys. A BitBox02 with the optional passphrase has a different key for each passphrase, so check the passphrase. To sign with another device, unplug this BitBox02."
-          ),
-        ))
-      }
-      _ => {
-        return Err(unsupported(
-          "More than one key of this vault belongs to the connected BitBox02. SVRA cannot sign this vault with one device.",
-        ))
-      }
-    };
-
-    let keys: Vec<KeyOriginInfo> = self
+impl PolicyArtifact {
+  /// The policy for the device that `vault` was read for.
+  pub(crate) fn for_vault(vault: &Vault) -> PolicyArtifact {
+    let keys: Vec<KeyOriginInfo> = vault
       .keys
       .iter()
       .map(|key| match &key.origin {
@@ -264,20 +43,12 @@ impl ParsedVault {
     let placeholders: Vec<String> = (0..keys.len())
       .map(|index| format!("@{index}/**"))
       .collect();
-    let policy = format!("wsh(multi({},{}))", self.threshold, placeholders.join(","));
-    let our_account_keypath = keys[our_key_index].keypath.clone().ok_or_else(|| {
-      unsupported("The key of the connected BitBox02 has no key path in the wallet configuration.")
-    })?;
-
-    Ok(Vault {
-      artifact: PolicyArtifact {
-        policy,
-        keys,
-        our_key_index,
-        our_account_keypath,
-      },
-      threshold: self.threshold,
-    })
+    PolicyArtifact {
+      policy: format!("wsh(multi({},{}))", vault.threshold, placeholders.join(",")),
+      keys,
+      our_key_index: vault.our_key_index,
+      our_account_keypath: Keypath::from(&vault.our_account_path),
+    }
   }
 }
 
@@ -291,22 +62,25 @@ pub fn build_policy(
   change_descriptor: Option<&str>,
   our_root_fingerprint: Fingerprint,
 ) -> Result<PolicyArtifact, Error> {
-  parse_vault(receive_descriptor, change_descriptor)?
-    .for_device(our_root_fingerprint)
-    .map(|vault| vault.artifact)
+  let vault = parse_vault(DEVICE_NAME, receive_descriptor, change_descriptor)?
+    .for_device(our_root_fingerprint)?;
+  Ok(PolicyArtifact::for_vault(&vault))
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::error::ErrorKind;
   use crate::test_support::{
-    descriptor, fingerprint_of, simulator_xprv, webapp_keys, VaultKeys, CLOUD_FINGERPRINT, ORDERS,
+    descriptor, fingerprint_of, simulator_xprv, webapp_keys, VaultKeys, ORDERS,
     WEBAPP_CLOUD_XPUB as CLOUD_XPUB, WEBAPP_GHOST_MACHINE_XPUB as GHOST_MACHINE_XPUB,
     WEBAPP_KEEN_JOIN_XPUB as KEEN_JOIN_XPUB,
   };
   use bitbox_api::btc::make_script_config_policy;
   use bitbox_api::pb;
+  use bitcoin::bip32::Xpub;
   use bitcoin::NetworkKind;
+  use std::str::FromStr;
 
   fn webapp_descriptor(tail: &str) -> String {
     let [cloud, ghost, keen] = webapp_keys(tail);
@@ -364,11 +138,6 @@ mod tests {
     assert_eq!(artifact.our_account_keypath.to_vec(), TESTNET_ACCOUNT);
   }
 
-  // Contract with the webapp (apps/webapp/src/islands/Bitbox02/helpers/buildBitboxPolicy.ts). The
-  // device finds a registration by a hash of the coin, the policy string and the xpubs in order.
-  // If this test fails, fix the code, not the expected value: a mismatch makes every customer that
-  // the webapp registered confirm a second registration. The firmware simulator accepts a wrong
-  // cloud-key origin or a differently written policy, so this unit test is the only guard.
   #[test]
   fn the_policy_config_is_the_one_the_webapp_registers() {
     let artifact =
@@ -472,17 +241,6 @@ mod tests {
   }
 
   #[test]
-  fn refuses_a_wrong_checksum() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let body = descriptor(&keys.expressions(), "/0/*");
-    let body = body.split('#').next().expect("a body");
-    expect_error(
-      build(&format!("{body}#aaaaaaaa"), None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
   fn accepts_a_multipath_descriptor() {
     let artifact = build(&webapp_descriptor("/<0;1>/*"), None, "dcbf0caf").expect("multipath");
     assert_eq!(artifact.policy, "wsh(multi(2,@0/**,@1/**,@2/**))");
@@ -552,230 +310,6 @@ mod tests {
   }
 
   #[test]
-  fn refuses_a_single_key() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let one = format!("wsh(multi(1,{}/0/*))", keys.device);
-    expect_error(
-      build_policy(&one, None, fingerprint_of(&simulator_xprv())),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
-  fn refuses_sortedmulti_and_says_so() {
-    let sorted = webapp_descriptor("/0/*").replace("multi(", "sortedmulti(");
-    let error = expect_error(
-      build(&sorted, None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-    assert!(error.message.contains("sortedmulti"), "{}", error.message);
-  }
-
-  #[test]
-  fn refuses_other_descriptor_types() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let [device, software, cloud] = keys.expressions();
-    for text in [
-      format!("wsh(pk({device}/0/*))"),
-      format!("sh(wsh(multi(2,{device}/0/*,{software}/0/*,{cloud}/0/*)))"),
-      format!("wpkh({device}/0/*)"),
-      format!("wsh(or_d(pk({device}/0/*),and_v(v:pk({software}/0/*),older(144))))"),
-      format!("sh(multi(2,{device}/0/*,{software}/0/*,{cloud}/0/*))"),
-    ] {
-      expect_error(
-        build_policy(&text, None, fingerprint_of(&simulator_xprv())),
-        ErrorKind::UnsupportedDescriptor,
-      );
-    }
-  }
-
-  #[test]
-  fn refuses_a_threshold_above_the_key_count() {
-    let seven = webapp_descriptor("/0/*").replace("multi(2,", "multi(7,");
-    expect_error(
-      build(&seven, None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
-  fn refuses_keys_on_the_change_path_in_the_receive_descriptor() {
-    let error = expect_error(
-      build(&webapp_descriptor("/1/*"), None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-    assert!(error.message.contains("/1/*"), "{}", error.message);
-  }
-
-  #[test]
-  fn refuses_paths_it_does_not_understand() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let device = fingerprint_of(&simulator_xprv()).to_string();
-    for tail in [
-      "/0/*h",
-      "/0/*'",
-      "/0/0/*",
-      "/2/*",
-      "/0",
-      "/*",
-      "/<0;2>/*",
-      "/<1;0>/*",
-      "/<0;1;2>/*",
-      "",
-    ] {
-      expect_error(
-        build(&descriptor(&keys.expressions(), tail), None, &device),
-        ErrorKind::UnsupportedDescriptor,
-      );
-    }
-  }
-
-  #[test]
-  fn refuses_keys_that_are_not_extended_keys() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let device = fingerprint_of(&simulator_xprv()).to_string();
-    let single = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
-    let text = format!(
-      "wsh(multi(2,{single},{}/0/*,{}/0/*))",
-      keys.device, keys.cloud
-    );
-    expect_error(
-      build(&text, None, &device),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
-  fn refuses_keys_that_end_in_different_paths() {
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    let device = fingerprint_of(&simulator_xprv()).to_string();
-    let mixed_keychains = format!(
-      "wsh(multi(2,{}/0/*,{}/1/*,{}/0/*))",
-      keys.device, keys.software, keys.cloud
-    );
-    expect_error(
-      build(&mixed_keychains, None, &device),
-      ErrorKind::UnsupportedDescriptor,
-    );
-    let mixed_forms = format!(
-      "wsh(multi(2,{}/0/*,{}/<0;1>/*,{}/0/*))",
-      keys.device, keys.software, keys.cloud
-    );
-    expect_error(
-      build(&mixed_forms, None, &device),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
-  fn refuses_a_device_that_holds_no_key_of_the_vault() {
-    let error = expect_error(
-      build(&webapp_descriptor("/0/*"), None, "deadbeef"),
-      ErrorKind::KeyNotInVault,
-    );
-    assert!(error.message.contains("deadbeef"), "{}", error.message);
-    assert!(error.message.contains("passphrase"), "{}", error.message);
-    assert!(error.message.contains("unplug"), "{}", error.message);
-  }
-
-  #[test]
-  fn the_fingerprint_of_the_cloud_key_does_not_match_the_device() {
-    // The cloud key has a fingerprint but no path, so it is not a key that a device holds.
-    let error = expect_error(
-      build(&webapp_descriptor("/0/*"), None, "7737acb8"),
-      ErrorKind::KeyNotInVault,
-    );
-    assert!(error.message.contains("7737acb8"));
-
-    let keys = VaultKeys::new(&simulator_xprv(), NetworkKind::Test);
-    expect_error(
-      build(
-        &descriptor(&keys.expressions(), "/0/*"),
-        None,
-        CLOUD_FINGERPRINT,
-      ),
-      ErrorKind::KeyNotInVault,
-    );
-  }
-
-  #[test]
-  fn refuses_a_vault_with_two_keys_of_the_device() {
-    let same_device = webapp_descriptor("/0/*").replace("8c24a510/", "dcbf0caf/");
-    expect_error(
-      build(&same_device, None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
-  fn refuses_duplicate_keys() {
-    let duplicated = webapp_descriptor("/0/*").replace(GHOST_MACHINE_XPUB, KEEN_JOIN_XPUB);
-    let error = expect_error(
-      build(&duplicated, None, "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-    assert!(error.message.contains("same key"), "{}", error.message);
-  }
-
-  #[test]
-  fn refuses_a_change_descriptor_that_is_not_the_twin() {
-    let receive = webapp_descriptor("/0/*");
-    let device = "dcbf0caf";
-
-    // A different key.
-    let other_key = webapp_descriptor("/1/*").replace(GHOST_MACHINE_XPUB, "tpubDDEWE3Rrqmo5JU3whaGqRG63r9qy7jDRaRhz4Hm7SwHUMqWf6RUPFNm2Mqh6JBS7M1wVqY94uJKtBe5jovdJF7mrRsBVjA3MPtS6iy7LkuC");
-    // A different threshold.
-    let other_threshold = webapp_descriptor("/1/*").replace("multi(2,", "multi(3,");
-    // A different order.
-    let swapped = format!(
-      "wsh(multi(2,[8c24a510/48h/1h/0h/2h]{GHOST_MACHINE_XPUB}/1/*,[7737acb8]{CLOUD_XPUB}/1/*,[dcbf0caf/48h/1h/0h/2h]{KEEN_JOIN_XPUB}/1/*))"
-    );
-    // A different origin.
-    let other_origin =
-      webapp_descriptor("/1/*").replace("[8c24a510/48h/1h/0h/2h]", "[8c24a510/48h/1h/1h/2h]");
-    // A different fingerprint.
-    let other_fingerprint = webapp_descriptor("/1/*").replace("[7737acb8]", "[7737acb9]");
-    // Not on the change path.
-    let receive_path = webapp_descriptor("/0/*");
-
-    for change in [
-      other_key,
-      other_threshold,
-      swapped,
-      other_origin,
-      other_fingerprint,
-      receive_path,
-    ] {
-      expect_error(
-        build(&receive, Some(&change), device),
-        ErrorKind::UnsupportedDescriptor,
-      );
-    }
-  }
-
-  #[test]
-  fn refuses_a_change_descriptor_with_a_multipath_receive_descriptor() {
-    let error = expect_error(
-      build(
-        &webapp_descriptor("/<0;1>/*"),
-        Some(&webapp_descriptor("/1/*")),
-        "dcbf0caf",
-      ),
-      ErrorKind::UnsupportedDescriptor,
-    );
-    assert!(error.message.contains("multipath"), "{}", error.message);
-  }
-
-  #[test]
-  fn refuses_a_change_descriptor_that_is_not_a_vault_descriptor() {
-    let sorted = webapp_descriptor("/1/*").replace("multi(", "sortedmulti(");
-    expect_error(
-      build(&webapp_descriptor("/0/*"), Some(&sorted), "dcbf0caf"),
-      ErrorKind::UnsupportedDescriptor,
-    );
-  }
-
-  #[test]
   fn a_key_with_a_bare_fingerprint_origin_is_sent_without_an_origin() {
     let artifact = build(&webapp_descriptor("/0/*"), None, "dcbf0caf").expect("built");
     assert_eq!(artifact.keys[0].root_fingerprint, None);
@@ -783,6 +317,36 @@ mod tests {
     assert_eq!(
       artifact.keys[2].root_fingerprint,
       Some(fingerprint("dcbf0caf"))
+    );
+  }
+
+  // The shared vault code builds its messages from the device name. These tests pin the sentences
+  // that a BitBox02 user reads.
+  #[test]
+  fn a_refused_descriptor_names_the_bitbox02() {
+    let sorted = webapp_descriptor("/0/*").replace("multi(", "sortedmulti(");
+    let error = expect_error(
+      build(&sorted, None, "dcbf0caf"),
+      ErrorKind::UnsupportedDescriptor,
+    );
+    assert!(
+      error.message.ends_with(
+        "With a BitBox02, SVRA can sign only for a Swan vault. Paste the wallet configuration from your Swan Vault Recovery Sheet."
+      ),
+      "{}",
+      error.message
+    );
+  }
+
+  #[test]
+  fn a_device_without_a_key_of_the_vault_is_called_a_bitbox02() {
+    let error = expect_error(
+      build(&webapp_descriptor("/0/*"), None, "deadbeef"),
+      ErrorKind::KeyNotInVault,
+    );
+    assert_eq!(
+      error.message,
+      "The connected BitBox02 (fingerprint deadbeef) does not hold a key of this vault. Connect the BitBox02 that holds one of the vault keys. A BitBox02 with the optional passphrase has a different key for each passphrase, so check the passphrase. To sign with another device, unplug this BitBox02."
     );
   }
 }

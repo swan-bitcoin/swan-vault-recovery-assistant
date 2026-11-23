@@ -14,9 +14,9 @@ edition = "2021"
 name = "swan_vault_recovery_assistant_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-# The BitBox02 device code is its own crate so that it builds and tests without the Tauri shell.
+# The device code is in its own crates so that it builds and tests without the Tauri shell.
 [workspace]
-members = ["bitbox02"]
+members = ["bitbox02", "vault"]
 
 [build-dependencies]
 tauri-build = { version = "2.4.0", features = [] }

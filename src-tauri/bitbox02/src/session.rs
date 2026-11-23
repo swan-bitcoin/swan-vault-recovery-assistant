@@ -15,8 +15,7 @@
 
 use crate::device_error::{map_device_error, Step};
 use crate::error::{Error, ErrorKind};
-use crate::policy::{parse_vault, PolicyArtifact};
-use crate::psbt_checks::{already_signed, precheck, verify_signed};
+use crate::policy::{PolicyArtifact, DEVICE_NAME};
 use bitbox_api::btc::make_script_config_policy;
 use bitbox_api::error::{BitBoxError, Error as DeviceError};
 use bitbox_api::pb::{
@@ -30,6 +29,7 @@ use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::psbt::Psbt;
 use bitcoin::Network;
 use std::str::FromStr;
+use svra_vault::{already_signed, parse_vault, precheck, verify_signed};
 
 /// Name the vault policy is registered under on the device. The webapp uses the same name.
 pub const POLICY_NAME: &str = "swan_vault";
@@ -163,7 +163,11 @@ pub async fn sign_psbt<R: Runtime>(
   let coin = coin_for_network(request.network)?;
   // Read the descriptors first, so that a descriptor the app cannot use fails before the user
   // has to unlock the device.
-  let parsed_vault = parse_vault(request.receive_descriptor, request.change_descriptor)?;
+  let parsed_vault = parse_vault(
+    DEVICE_NAME,
+    request.receive_descriptor,
+    request.change_descriptor,
+  )?;
 
   on_progress(Progress::Unlock);
   let pairing = device
@@ -210,7 +214,7 @@ pub async fn sign_psbt<R: Runtime>(
   // Return before the registration check, so that the user does not confirm anything on the device
   // for a transaction that needs no signature from it. `signed: false` is what the HWI path
   // reports for the same case.
-  if already_signed(&request.psbt, &our_keys) {
+  if already_signed(&request.psbt, &our_keys, &vault) {
     return Ok(SignOutcome {
       psbt: request.psbt,
       signed: false,
@@ -219,7 +223,7 @@ pub async fn sign_psbt<R: Runtime>(
     });
   }
 
-  let artifact = &vault.artifact;
+  let artifact = &PolicyArtifact::for_vault(&vault);
   let config = make_script_config_policy(&artifact.policy, &artifact.keys);
 
   on_progress(Progress::CheckingRegistration);
@@ -246,7 +250,7 @@ pub async fn sign_psbt<R: Runtime>(
     .await
     .map_err(|error| map_device_error(error, Step::Sign))?;
 
-  verify_signed(&request.psbt, &signed_psbt, &our_keys)?;
+  verify_signed(&request.psbt, &signed_psbt, &our_keys, &vault)?;
 
   Ok(SignOutcome {
     psbt: signed_psbt,
@@ -259,7 +263,10 @@ pub async fn sign_psbt<R: Runtime>(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::test_support::webapp_keys;
+  use crate::test_support::{
+    fingerprint_of, master_key, simulator_xprv, webapp_keys, Vault as Fixture,
+  };
+  use bitcoin::{Amount, NetworkKind};
 
   fn version(text: &str) -> semver::Version {
     semver::Version::parse(text).expect("test version is valid")
@@ -335,5 +342,44 @@ mod tests {
     let name = fallback_policy_name(&artifact(2, [0, 1, 2]));
     assert_ne!(name, fallback_policy_name(&artifact(3, [0, 1, 2])));
     assert_ne!(name, fallback_policy_name(&artifact(2, [1, 0, 2])));
+  }
+
+  // The checks of the shared vault code build their messages from the device name that this crate
+  // gives. These are the sentences that a BitBox02 user reads.
+  #[test]
+  fn the_psbt_refusals_name_the_bitbox02() {
+    let mut fixture = Fixture::new(&simulator_xprv(), Network::Testnet);
+    let psbt = fixture.sweep_psbt();
+    let device = fingerprint_of(&simulator_xprv());
+    let vault = parse_vault(
+      DEVICE_NAME,
+      &fixture.receive_descriptor,
+      Some(&fixture.change_descriptor),
+    )
+    .expect("the descriptors are valid")
+    .for_device(device)
+    .expect("the device is in the vault");
+
+    let other = fingerprint_of(&master_key(0x77, NetworkKind::Test));
+    let error = precheck(&psbt, other, &vault).expect_err("the device has no key in the PSBT");
+    assert_eq!(
+      error.message,
+      format!("This transaction was not made by SVRA for this vault, or it was changed. Input 1 has no key path for the connected BitBox02 (fingerprint {other}). Check that this BitBox02 holds a key of your vault.")
+    );
+
+    let keys = precheck(&psbt, device, &vault).expect("the pre-check passes");
+    let error = verify_signed(&psbt, &psbt, &keys, &vault).expect_err("no signature");
+    assert_eq!(
+      error.message,
+      "The BitBox02 returned no signature for input 1. Do not use the result. Contact Swan support."
+    );
+
+    let mut tampered = psbt.clone();
+    tampered.unsigned_tx.output[0].value -= Amount::from_sat(1);
+    let error = verify_signed(&psbt, &tampered, &keys, &vault).expect_err("another transaction");
+    assert_eq!(
+      error.message,
+      "The BitBox02 returned a different transaction than the one SVRA sent. Do not use the result. Someone may have changed the transaction."
+    );
   }
 }
