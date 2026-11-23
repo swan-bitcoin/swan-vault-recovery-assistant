@@ -5,6 +5,9 @@ export function getDeviceName(device: Device) {
     case 'jade': {
       return 'Jade'
     }
+    case 'bitbox02': {
+      return 'BitBox02'
+    }
     default: {
       // Sanitize unknown device types to prevent XSS
       return sanitize(device.type)

@@ -39,6 +39,13 @@
     "externalBin": [
       "./hwi"
     ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "libudev1"
+        ]
+      }
+    },
     "macOS": {
       "entitlements": "./Entitlements.plist"
     }

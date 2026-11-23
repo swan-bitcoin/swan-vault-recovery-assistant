@@ -236,6 +236,23 @@ const setThemeBasedOnSystemPreference = () => {
     document.documentElement.setAttribute('data-theme', 'cupcake')
   }
 }
+const MODEL_NAMES = {
+  bitbox02_nova_btconly: 'BitBox02 Nova Bitcoin-only',
+  bitbox02_nova_multi: 'BitBox02 Nova Multi',
+  bitbox02_btconly: 'BitBox02 Bitcoin-only',
+  bitbox02_multi: 'BitBox02 Multi',
+}
+function getBitbox02ModelName(model) {
+  return Object.hasOwn(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
+}
+class DeviceError extends Error {
+  constructor(deviceType, message) {
+    super(message)
+    this.deviceType = deviceType
+    this.name = 'DeviceError'
+  }
+}
+const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -246,7 +263,7 @@ function getDevice(val) {
   }
   const device = devices[0]
   if (device.error) {
-    throw new Error(`Device error: ${device.error}`)
+    throw new DeviceError(device.type, `Device error: ${device.error}`)
   }
   return device
 }
@@ -257,11 +274,14 @@ function getDeviceMessage(val) {
   }
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
   devices.forEach((device, index, arr) => {
-    message = message.concat(`${sanitize(device.model)} device `)
+    const isBitbox02 = device.type === 'bitbox02'
+    message = message.concat(`${isBitbox02 ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
     if (device.error) {
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
+    } else if (isBitbox02) {
+      message = message.concat('(the fingerprint shows after the device is unlocked)')
     } else {
       message = message.concat('with no fingerprint')
     }
@@ -308,7 +328,13 @@ function getSignResultAndPsbt(val) {
   const message = signResponse.signed
     ? Success('Great! Added a signature to the transaction.')
     : 'A signature was not added, have you already signed with this device?'
-  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
+  const fingerprint = signResponse.fingerprint
+  return {
+    message,
+    psbt: signResponse.psbt,
+    signed: signResponse.signed,
+    ...(typeof fingerprint === 'string' && FINGERPRINT.test(fingerprint) ? { fingerprint } : {}),
+  }
 }
 function sanitize(input) {
   const map = /* @__PURE__ */ new Map([
@@ -410,5 +436,6 @@ export {
   getDevice as j,
   getSignResultAndPsbt as k,
   getPsbtStatusMessage as l,
+  DeviceError as m,
   scrollToLastMessage as s,
 }

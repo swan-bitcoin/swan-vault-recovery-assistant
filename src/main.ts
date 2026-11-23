@@ -1,9 +1,11 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { commands } from './bindings'
+import { Channel } from '@tauri-apps/api/core'
+import { Bitbox02Progress, commands, Descriptors } from './bindings'
 import { Transactions } from './components'
 import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM, initializeMode } from './dom'
 import {
   Device,
+  DeviceError,
   getDevice,
   getDeviceMessage,
   getDevicePrompt,
@@ -24,7 +26,14 @@ import {
 import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 import { createConversationActions } from './utilities/createConversationActions'
 import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
-import { getJadeDevice, getDeviceName } from './utilities/devices'
+import {
+  getBitbox02Device,
+  getBitbox02ErrorText,
+  getBitbox02StepMessage,
+  getJadeDevice,
+  getDeviceName,
+  parseBitbox02Error,
+} from './utilities/devices'
 import { createConversationImage } from './utilities/createConversationImage'
 import { CircularTickIcon } from './icons/circularTick'
 
@@ -99,8 +108,8 @@ const addSignatureToSignHistory = (device: Device) => {
   return newSignature
 }
 
-const updateSignHistory = (device: Device) => {
-  const newSignature = addSignatureToSignHistory(device)
+const updateSignHistory = (device: Device, fingerprint?: string) => {
+  const newSignature = addSignatureToSignHistory(fingerprint ? { ...device, fingerprint } : device)
   const stepsList = DOM.outputs.psbtSignHistory
 
   const missingSignature = stepsList.querySelector('#missing-signature')
@@ -382,6 +391,52 @@ const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidd
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
 
+function showBitbox02Step(progress: Bitbox02Progress) {
+  const { loading, bubble, code } = getBitbox02StepMessage(progress)
+
+  if (bubble) {
+    const content = document.createElement('div')
+    const text = document.createElement('p')
+    text.textContent = bubble
+    content.appendChild(text)
+
+    if (code) {
+      // the code has line breaks that the user compares with the device screen; textContent keeps it inert.
+      const codeBlock = document.createElement('pre')
+      codeBlock.className = 'mt-2 font-mono whitespace-pre'
+      codeBlock.textContent = code
+      content.appendChild(codeBlock)
+    }
+
+    addToConversation(createConversationBubble({ content, dangerouslySetInnerHTML: true }))
+  }
+
+  showTempLoadingMessage(loading)
+}
+
+function signWithBitbox02(psbt: string, network: string, descriptors: Descriptors) {
+  const shownSteps = new Set<Bitbox02Progress['step']>()
+  const onProgress = new Channel<Bitbox02Progress>()
+  onProgress.onmessage = (progress) => {
+    if (shownSteps.has(progress.step)) return
+    shownSteps.add(progress.step)
+    showBitbox02Step(progress)
+  }
+
+  return commands.signBitbox02(psbt, network, descriptors, onProgress)
+}
+
+const createTryAgainActions = (retryCount: number) =>
+  createConversationActions({
+    content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
+    dangerouslySetInnerHTML: true,
+    onAppended: (parent) => {
+      parent.querySelector('#get-device-and-sign-again-btn')?.addEventListener('click', () => {
+        sign({ retryCount: retryCount + 1 })
+      })
+    },
+  })
+
 async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
   const { psbt, descriptors, network } = getUserInputs()
   require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
@@ -399,33 +454,47 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
 
     hideTempMessage()
 
+    const isBitbox02 = device.type === 'bitbox02'
+
     const deviceInstructionBubbles: Array<ConversationBubbleProps & { type: 'bubble' | 'image' }> = [
-      ...(device.type === 'jade'
+      ...(isBitbox02
         ? [
             {
-              // Sanitize fingerprint before passing to getJadeDevice
-              content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
+              content: getBitbox02Device(),
               type: 'image' as const,
             },
             {
-              // getDeviceName already returns sanitized value
-              content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+              content: `Found your ${getDeviceName(device)}. We tell you here when to check the device.`,
               footer: new Date().toLocaleString(),
               type: 'bubble' as const,
             },
           ]
-        : [
-            {
-              // Sanitize device.type and device.fingerprint to prevent XSS
-              content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
-              type: 'bubble' as const,
-            },
-            {
-              // getDeviceName already returns sanitized value
-              content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
-              type: 'bubble' as const,
-            },
-          ]),
+        : device.type === 'jade'
+          ? [
+              {
+                // Sanitize fingerprint before passing to getJadeDevice
+                content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
+                type: 'image' as const,
+              },
+              {
+                // getDeviceName already returns sanitized value
+                content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+                footer: new Date().toLocaleString(),
+                type: 'bubble' as const,
+              },
+            ]
+          : [
+              {
+                // Sanitize device.type and device.fingerprint to prevent XSS
+                content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
+                type: 'bubble' as const,
+              },
+              {
+                // getDeviceName already returns sanitized value
+                content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
+                type: 'bubble' as const,
+              },
+            ]),
     ]
 
     for (const { type, ...bubble } of deviceInstructionBubbles) {
@@ -434,28 +503,34 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
       await sleep(400)
     }
 
-    // let them read past messages first.
-    // give the device some time to receive the psbt.
-    // then notify that we're waiting
-    await sleep(9000)
+    let response: string
+    if (isBitbox02) {
+      // the device reports its own progress, so there is no fixed wait
+      response = await signWithBitbox02(psbt, network, descriptors)
+    } else {
+      // let them read past messages first.
+      // give the device some time to receive the psbt.
+      // then notify that we're waiting
+      await sleep(9000)
 
-    showTempLoadingMessage('Waiting for you to sign the transaction')
+      showTempLoadingMessage('Waiting for you to sign the transaction')
 
-    const response = await commands.sign(psbt, network, device.type)
+      response = await commands.sign(psbt, network, device.type)
+    }
 
     hideTempMessage()
 
-    const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
+    const { psbt: responsePsbt, message, signed, fingerprint } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
-      content: message,
+      content: isBitbox02 && !signed ? `${message} Unplug the BitBox02 and connect the other device.` : message,
       //footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      updateSignHistory(device)
+      updateSignHistory(device, fingerprint)
     }
 
     // Give feedback via shrimpy
@@ -474,7 +549,9 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
       await sleep(4000)
       addToConversation(
         createConversationBubble({
-          content: 'Connect another device to continue signing the transaction.',
+          content: isBitbox02
+            ? 'Unplug the BitBox02 first, because SVRA lists only the BitBox02 while it is connected. Then connect another device to continue signing the transaction.'
+            : 'Connect another device to continue signing the transaction.',
         })
       )
       const actions = createConversationActions({
@@ -492,16 +569,33 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
       }
     }
   } catch (e: unknown) {
-    if (e instanceof Error) {
-      const tryAgainActions = createConversationActions({
-        content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
-        dangerouslySetInnerHTML: true,
-        onAppended: (parent) => {
-          parent.querySelector('#get-device-and-sign-again-btn')?.addEventListener('click', () => {
-            sign({ retryCount: retryCount + 1 })
-          })
-        },
+    // BitBox02 errors arrive as plain objects, and its bootloader error is thrown by getDevice. Both carry text written for users.
+    const bitbox02Error = parseBitbox02Error(e)
+    const bitbox02Text = bitbox02Error
+      ? getBitbox02ErrorText(bitbox02Error)
+      : e instanceof DeviceError && e.deviceType === 'bitbox02'
+        ? e.message
+        : null
+    if (bitbox02Text) {
+      const tryAgainActions = createTryAgainActions(retryCount)
+
+      hideTempMessage()
+      addToConversation(createConversationBubble({ content: bitbox02Text, footer: new Date().toLocaleString() }), {
+        shouldScrollToLastMessage: !tryAgainActions,
       })
+
+      await sleep(400)
+
+      if (tryAgainActions) {
+        addToConversation(tryAgainActions, {
+          shouldScrollToLastMessage: true,
+        })
+      }
+      return
+    }
+
+    if (e instanceof Error) {
+      const tryAgainActions = createTryAgainActions(retryCount)
 
       if (e.message.toLowerCase() === 'no devices found') {
         hideTempMessage()

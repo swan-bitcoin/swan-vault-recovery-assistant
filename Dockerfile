@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y \
   libgtk-3-dev \
   libayatana-appindicator3-dev \ 
   librsvg2-dev \
+  libudev-dev \
   npm
 
 # install rust & pnpm

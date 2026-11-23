@@ -1,0 +1,25 @@
+[package]
+name = "svra_bitbox02"
+version = "0.1.0"
+description = "BitBox02 wallet-policy registration and PSBT signing for Swan vault recovery"
+edition = "2021"
+publish = false
+
+[dependencies]
+bitbox-api = { version = "0.13.0", default-features = false, features = ["tokio"] }
+bitcoin = "0.32"
+hidapi = { version = "2.6", optional = true }
+miniscript = "12"
+semver = "1"
+tokio = { version = "1.40.0", features = ["rt", "time"] }
+
+[dev-dependencies]
+bdk_wallet = "1.0.0"
+# The same consensus code Bitcoin Core runs, to check that a signed vault spend is valid.
+bitcoinconsensus = { version = "0.106.0", default-features = false }
+
+[features]
+# USB HID transport for a physical device. The app enables this.
+usb = ["bitbox-api/usb", "dep:hidapi"]
+# TCP transport to the vendor's firmware simulator. Tests only.
+simulator = ["bitbox-api/simulator"]

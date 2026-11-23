@@ -48,6 +48,63 @@ jobs:
       - name: run unit tests
         run: pnpm test:unit
 
+  rust-test:
+    name: rust tests
+    runs-on: ubuntu-latest
+    env:
+      # Firmware simulator for the BitBox02 tests. This is the newest entry of
+      # tests/simulators.json in https://github.com/BitBoxSwiss/bitbox-api-rs
+      # (the multi edition of firmware v9.26.5). Take the URL and the hash from the
+      # same entry when you update it.
+      BITBOX02_SIMULATOR_URL: https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.26.5/bitbox02-multi-v9.26.5-simulator1.0.0-linux-amd64
+      BITBOX02_SIMULATOR_SHA256: 21a394c3d7642e0a251b340fba9b601742ae98c3790e439b6258b55e1a4585bf
+    steps:
+      - name: checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: checkout private actions
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: swan-bitcoin/actions
+          ref: master
+          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
+          path: .github/private-actions
+
+      - name: set up rust
+        uses: ./.github/private-actions/actions-rs/toolchain
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: install system dependencies (linux)
+        # hidapi links libudev, so the USB build needs its headers.
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+
+      - name: download the BitBox02 firmware simulator
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/bitbox02-simulator" "$BITBOX02_SIMULATOR_URL"
+          echo "$BITBOX02_SIMULATOR_SHA256  $RUNNER_TEMP/bitbox02-simulator" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bitbox02-simulator"
+
+      - name: check formatting
+        # The app code in src-tauri/src was never formatted with rustfmt, so only
+        # the BitBox02 crate and the BitBox02 module of the app are checked.
+        working-directory: src-tauri
+        run: |
+          cargo fmt -p svra_bitbox02 -- --check
+          rustfmt --check --edition 2021 src/bitbox02.rs
+
+      - name: lint the BitBox02 crate
+        working-directory: src-tauri
+        run: cargo clippy -p svra_bitbox02 --all-targets --features usb,simulator -- -D warnings
+
+      - name: test the BitBox02 crate
+        working-directory: src-tauri
+        env:
+          BITBOX02_SIMULATOR: ${{ runner.temp }}/bitbox02-simulator
+        run: cargo test -p svra_bitbox02 --features usb,simulator
+
   scenario-test:
     name: scenario tests
     runs-on: ubuntu-latest
@@ -80,7 +137,7 @@ jobs:
           cache: 'pnpm'
 
       - name: install system dependencies (linux)
-        run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
 
       - name: install addl dependencies for scenario tests
         run: sudo apt-get install -y webkit2gtk-driver xvfb

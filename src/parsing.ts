@@ -1,5 +1,6 @@
 import { PsbtSigningStatus } from './bindings'
 import { Success } from './components'
+import { getBitbox02ModelName } from './utilities/devices/bitbox02Model'
 
 export type Device = {
   type: string
@@ -16,8 +17,22 @@ type DeviceResponse = Device[]
 type SignResponse = {
   psbt: string
   signed: boolean
+  fingerprint?: unknown
   error: string | null | undefined
 }
+
+// Lets the sign flow tell a device problem from other errors without matching on message text.
+export class DeviceError extends Error {
+  constructor(
+    readonly deviceType: string,
+    message: string
+  ) {
+    super(message)
+    this.name = 'DeviceError'
+  }
+}
+
+const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 
 export function getDevice(val: unknown): Device {
   const devices = parseDeviceResponse(val)
@@ -29,7 +44,7 @@ export function getDevice(val: unknown): Device {
   }
   const device = devices[0]
   if (device.error) {
-    throw new Error(`Device error: ${device.error}`)
+    throw new DeviceError(device.type, `Device error: ${device.error}`)
   }
   return device
 }
@@ -43,14 +58,18 @@ export function getDeviceMessage(val: unknown): string {
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
 
   devices.forEach((device, index, arr) => {
+    const isBitbox02 = device.type === 'bitbox02'
     // Sanitize device.model to prevent XSS
-    message = message.concat(`${sanitize(device.model)} device `)
+    message = message.concat(`${isBitbox02 ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
     if (device.error) {
       // Sanitize device.error to prevent XSS
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       // Sanitize device.fingerprint to prevent XSS
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
+    } else if (isBitbox02) {
+      // a BitBox02 gives its fingerprint only after it is paired and unlocked
+      message = message.concat('(the fingerprint shows after the device is unlocked)')
     } else {
       message = message.concat('with no fingerprint')
     }
@@ -100,13 +119,20 @@ export function getSignResultAndPsbt(val: unknown): {
   message: string
   psbt: string
   signed: boolean
+  fingerprint?: string
 } {
   const signResponse = parseSignResponse(val)
 
   const message = signResponse.signed
     ? Success('Great! Added a signature to the transaction.')
     : 'A signature was not added, have you already signed with this device?'
-  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
+  const fingerprint = signResponse.fingerprint
+  return {
+    message,
+    psbt: signResponse.psbt,
+    signed: signResponse.signed,
+    ...(typeof fingerprint === 'string' && FINGERPRINT.test(fingerprint) ? { fingerprint } : {}),
+  }
 }
 
 export function sanitize(input: string): string {

@@ -13,7 +13,9 @@ use std::sync::Arc;
 
 #[macro_use]
 mod errors;
+mod bitbox02;
 use bdk_wallet::psbt::PsbtUtils;
+use bitbox02::Bitbox02Progress;
 use errors::{DescriptorType, SvraError, SvraErrorType};
 mod network;
 use network::{HwiNetwork, Network};
@@ -569,6 +571,14 @@ async fn estimate_fee(
 #[specta::specta]
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
+
+  // HWI is skipped when a BitBox02 is connected. HWI opens the BitBox02 during its own listing,
+  // starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the only
+  // program that talks to the device.
+  if let Some(response) = bitbox02::enumerate().await {
+    return response;
+  }
+
   let network: HwiNetwork = network.into();
 
   let output = app
@@ -723,6 +733,15 @@ async fn sign(
   network: String,
   device_type: String,
 ) -> Result<String, SvraError> {
+  // HWI signs a BitBox02 multisig input with the sorted legacy format, which never matches a
+  // Swan vault. The BitBox02 must go through `sign_bitbox02`.
+  if device_type.eq_ignore_ascii_case("bitbox02") {
+    return Err(SvraError::new(
+      SvraErrorType::DeviceError,
+      "A BitBox02 cannot sign through HWI. SVRA signs with the BitBox02 directly.",
+    ));
+  }
+
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
 
@@ -774,6 +793,25 @@ async fn sign(
   }
 
   Ok(response)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn sign_bitbox02(
+  psbt: String,
+  network: String,
+  descriptors: Descriptors,
+  on_progress: tauri::ipc::Channel<Bitbox02Progress>,
+) -> Result<String, SvraError> {
+  let network = Network::from_str(&network)?;
+  bitbox02::sign(
+    psbt,
+    network,
+    descriptors.receive,
+    descriptors.change,
+    on_progress,
+  )
+  .await
 }
 
 #[tauri::command]
@@ -968,6 +1006,7 @@ fn main() {
       open_github_url,
       psbt_status,
       sign,
+      sign_bitbox02,
       sweep,
       wallet,
     ]);
