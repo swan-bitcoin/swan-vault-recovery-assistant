@@ -1,17 +1,9 @@
-export type Bitbox02ErrorInfo = {
-  code: string
-  message: string
-}
-
-const ERROR_TYPE = /^Bitbox02Error\((.+)\)$/
-
 // The backend rejects with a plain object, not an Error, so this checks the shape.
-export function parseBitbox02Error(e: unknown): Bitbox02ErrorInfo | null {
+export function parseBitbox02Error(e: unknown): { message: string } | null {
   if (typeof e !== 'object' || e === null) return null
 
   const { error_type: errorType, message } = e as Record<string, unknown>
-  if (typeof errorType !== 'string' || typeof message !== 'string' || message === '') return null
+  if (errorType !== 'Bitbox02Error' || typeof message !== 'string' || message === '') return null
 
-  const match = ERROR_TYPE.exec(errorType)
-  return match ? { code: match[1], message } : null
+  return { message }
 }

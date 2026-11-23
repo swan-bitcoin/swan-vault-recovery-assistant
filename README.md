@@ -30,11 +30,40 @@ No. While XPUBs are necessary and included in the wallet configuration (or descr
 
 > What wallets and signing devices does Swan Vault Recovery Assistant support?
 
-Swan Vault Recovery Assistant can import any wallet that supports exporting its configuration as output descriptors, including Swan Vault and many modern Bitcoin wallets. For signing transactions, Blockstream Jade and BitBox02 Nova Bitcoin-only are officially supported for use with Swan Vault Recovery Assistant. A BitBox02 asks you to confirm each key of the wallet on its screen the first time. See [Device Support](#device-support) for how it differs from Jade.
+Swan Vault Recovery Assistant can import any wallet that supports exporting its configuration as output descriptors, including Swan Vault and many modern Bitcoin wallets. For signing transactions, Blockstream Jade is officially supported for use with Swan Vault Recovery Assistant. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery. If the BitBox02 does not know your vault yet, for example after a reset, it shows each key for you to confirm. See [Using a BitBox02](#using-a-bitbox02) for how to use it, and [Device Support](#device-support) for how it differs from Jade.
 
 > Does Swan Vault Recovery Assistant collect any data?
 
 Swan Vault Recovery Assistant does not collect any data. However, to display your balance and transaction history, it scans the blockchain through a server. As a result, this server will learn which Bitcoin addresses are associated with your IP address. While this affects privacy, it does not compromise security, since the server cannot access your keys or authorize transactions. By default, Swan Vault Recovery Assistant connects to Blockstream’s server due to its strong reputation, but advanced users can choose a different server or run their own to improve privacy.
+
+# Using a BitBox02
+
+You can sign a transaction for your Swan vault with a BitBox02 Nova Bitcoin-only. Follow these steps.
+
+- **Close the BitBoxApp first.** If the BitBoxApp and SVRA use the BitBox02 at the same time, signing can fail midway.
+- **Connect one signing device at a time.** While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug the BitBox02 before you connect the next device.
+- **Compare the pairing code.** On every run, SVRA shows a pairing code and the BitBox02 shows one too. If the two codes are the same, confirm on the BitBox02. If they are different, do not confirm. Unplug the BitBox02. SVRA stores no pairing data, so you do this on every run.
+- **Check each key if the BitBox02 does not know your vault yet.** This is normal after a reset, or on a new BitBox02. The BitBox02 then shows each key of your vault. Check each key against the wallet configuration on your Swan Vault Recovery Sheet, then confirm on the BitBox02.
+- **Stop if the BitBox02 should know your vault.** If your BitBox02 was not reset and you signed with it before, it already knows your vault. If it asks you to check keys anyway, the wallet configuration you pasted may not be your vault. Unplug the BitBox02 and check the wallet configuration against your Swan Vault Recovery Sheet.
+- **Check the address and the amount** on the BitBox02 before you confirm the transaction.
+- **To stop a session that waits for the BitBox02, unplug the BitBox02.** You cannot cancel the password prompt on the device. Plug the BitBox02 in again when you want to try again.
+
+If your BitBox02 already holds a different wallet named `swan_vault`, SVRA adds your vault under the name `swan_vault_` followed by 8 characters, and tells you. This is normal only if you used this BitBox02 for another Swan vault. If you did not, stop and check the wallet configuration against your Swan Vault Recovery Sheet.
+
+## Linux: allow access to the BitBox02
+
+On Linux, a normal user cannot open the BitBox02 until you add a udev rule. (udev is the part of Linux that decides who may use a USB device.) If SVRA says that it found your BitBox02 but cannot open it, add this rule. BitBox publishes it in the [bitbox-bridge repository](https://github.com/BitBoxSwiss/bitbox-bridge/blob/63385207a0fb37f9bd7f0ff351214981a9b76d75/bitbox-bridge/release/linux/hid-digitalbitbox.rules). The two lines below apply to the BitBox02 (USB ID `03eb:2403`). The vendor's file also holds rules for the older BitBox01. You do not need them.
+
+Save the rule, reload udev, then unplug the BitBox02 and plug it in again:
+
+```bash
+sudo tee /etc/udev/rules.d/50-bitbox02.rules > /dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-%n"
+KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-f%n"
+EOF
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
 
 # Verifying Your Download
 
@@ -109,7 +138,7 @@ In order to best protect the user's privacy and security, SVRA is designed with 
 
 SVRA uses [bitcoin-core's open-source HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs), with one exception: the BitBox02 (see below).
 
-HWI provides broad device support. However, only Jade devices and the BitBox02 Nova Bitcoin-only are officially supported for Swan Vault recovery.
+HWI provides broad device support. However, only Jade devices are officially supported. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery.
 
 SVRA has been tested with:
 
@@ -121,38 +150,15 @@ SVRA has been tested with:
 
 ### BitBox02
 
-SVRA can sign a Swan Vault recovery with a BitBox02 Nova Bitcoin-only. BitBox02 signing is tested against the vendor's firmware simulator (firmware 9.26.5 and 9.27.0). A run on a physical BitBox02 Nova is still to be done. It differs from Jade in these ways:
+SVRA can sign a Swan Vault recovery with a BitBox02 Nova Bitcoin-only. The automated tests sign against the vendor's firmware simulator (GitHub Actions: firmware 9.26.5, Multi edition; also run locally on 9.27.0). A run on a physical BitBox02 Nova is still to be done. For how to use it, see [Using a BitBox02](#using-a-bitbox02). It differs from Jade in these ways:
 
-- SVRA talks to the BitBox02 directly with the vendor's open-source [`bitbox-api`](https://github.com/BitBoxSwiss/bitbox-api-rs) library. It does not use HWI, because HWI cannot sign the key order of a Swan Vault.
-- The first time, and after a device reset, SVRA asks the BitBox02 to register the wallet. The name is normally `swan_vault`. If the device already holds another wallet named `swan_vault`, SVRA registers this wallet as `swan_vault_` followed by 8 characters, and tells you. This is expected only if you used the device for another Swan vault. The device shows each key. Compare each key with your recovery kit and confirm it on the device. If the BitBox02 was not reset and has signed for this vault before, it already knows the wallet. A registration prompt then means that the descriptor may not be your vault: stop and check the descriptor against your recovery kit.
-- With a BitBox02, SVRA signs only Swan Vault descriptors (unsorted `wsh(multi(...))`). Other wallets on a BitBox02, such as single-key wallets or `sortedmulti`, are not supported, because SVRA no longer sends a BitBox02 to HWI.
-- SVRA shows a pairing code on every run. Check that it is the same as the code on the BitBox02, then confirm on the device. SVRA stores no pairing data on your computer.
-- Close the BitBoxApp first. If two programs use the device at the same time, the session can fail midway. SVRA also runs one BitBox02 session at a time. To stop a session that waits on the device, for example for your password, unplug the BitBox02.
+- SVRA talks to the BitBox02 directly with the vendor's open-source [`bitbox-api`](https://github.com/BitBoxSwiss/bitbox-api-rs) library. It does not use HWI for a BitBox02, because HWI cannot sign the key order of a Swan Vault. While a BitBox02 is on USB, SVRA does not call HWI `enumerate`, because HWI would open the device and start its own session.
+- BitBox02 support adds the vendor's `bitbox-api` library and what it needs: USB HID access, the Noise encrypted channel and protobuf messages.
+- A BitBox02 signs only for a wallet policy that it has registered. SVRA sends the policy `wsh(multi(2,@0/**,@1/**,@2/**))` with the keys in the order of the descriptor, as the Swan webapp does. It checks whether the BitBox02 holds that registration and registers it when it does not, for example after a reset. The BitBox02 identifies a registration by a hash of the coin, the policy and the keys, not by its name. The name is normally `swan_vault`. If the BitBox02 already holds another wallet named `swan_vault`, SVRA registers this wallet as `swan_vault_` followed by 8 characters, and tells you.
+- With a BitBox02, SVRA signs only Swan Vault descriptors (unsorted `wsh(multi(...))`). Other wallets, such as single-key wallets or `sortedmulti`, are not supported.
+- SVRA stores no pairing data, because it must not write to disk. The user confirms the pairing code on every run.
 - The BitBox02 needs firmware 9.15.0 or newer. SVRA does not block other BitBox02 models, but it has not been tested with them.
-- On a test network (testnet, signet or regtest), the BitBox02 shows testnet-format addresses. This includes regtest.
-- Connect one device at a time. While a BitBox02 is connected, SVRA lists only the BitBox02. To sign with another device, unplug the BitBox02 first.
-
-#### Linux: allow your user to open the BitBox02
-
-Without a udev rule, a normal user cannot open the device. BitBox publishes a rule file in the [bitbox-bridge repository](https://github.com/BitBoxSwiss/bitbox-bridge/blob/63385207a0fb37f9bd7f0ff351214981a9b76d75/bitbox-bridge/release/linux/hid-digitalbitbox.rules). These two lines apply to the BitBox02 (USB ID `03eb:2403`):
-
-```
-SUBSYSTEM=="usb", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-%n"
-KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-f%n"
-```
-
-Save the rule, reload udev, then unplug the BitBox02 and plug it in again:
-
-```bash
-sudo tee /etc/udev/rules.d/50-bitbox02.rules > /dev/null <<'EOF'
-SUBSYSTEM=="usb", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-%n"
-KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-f%n"
-EOF
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-```
-
-The vendor's file also holds rules for the older BitBox01. You do not need them.
+- On a test network (testnet, signet or regtest), the BitBox02 shows testnet-format addresses.
 
 ## Setup Instructions
 
@@ -254,16 +260,21 @@ cargo install tauri-driver
 
 #### BitBox02 tests
 
-The BitBox02 device code is the crate `src-tauri/bitbox02` (`svra_bitbox02`). It has no Tauri dependency. Run its tests from `src-tauri`:
+The BitBox02 device code is the crate `src-tauri/bitbox02` (`svra_bitbox02`). It has no Tauri dependency. Run its tests from `src-tauri`.
+
+Plain `cargo test -p svra_bitbox02` runs neither the USB tests nor the simulator tests. The USB tests need `--features usb`, which needs `libudev-dev` on Linux. The simulator tests sign against the vendor's firmware simulator. They need `--features simulator` and the `BITBOX02_SIMULATOR` variable, set to the path of the simulator binary.
+
+The simulator is a Linux x86-64 binary that the vendor publishes with each firmware release. The pinned download URL and SHA-256 are the `BITBOX02_SIMULATOR_URL` and `BITBOX02_SIMULATOR_SHA256` values in [`.github/workflows/test.yml`](.github/workflows/test.yml). That file is the place that is kept up to date. The snippet below repeats the current values:
 
 ```bash
-cargo test -p svra_bitbox02
-```
+BITBOX02_SIMULATOR_URL=https://github.com/BitBoxSwiss/bitbox02-firmware/releases/download/firmware%2Fv9.26.5/bitbox02-multi-v9.26.5-simulator1.0.0-linux-amd64
+BITBOX02_SIMULATOR_SHA256=21a394c3d7642e0a251b340fba9b601742ae98c3790e439b6258b55e1a4585bf
 
-The simulator tests sign against the vendor's firmware simulator. They need the `simulator` feature and the `BITBOX02_SIMULATOR` variable set to the path of the simulator binary:
+curl -fsSL -o bitbox02-simulator "$BITBOX02_SIMULATOR_URL"
+echo "$BITBOX02_SIMULATOR_SHA256  bitbox02-simulator" | sha256sum -c -
+chmod +x bitbox02-simulator
 
-```bash
-BITBOX02_SIMULATOR=/path/to/simulator cargo test -p svra_bitbox02 --features simulator
+BITBOX02_SIMULATOR="$PWD/bitbox02-simulator" cargo test -p svra_bitbox02 --features usb,simulator
 ```
 
 ### Manual testing with a simulated 'regtest' bitcoin network

@@ -281,7 +281,7 @@ function getDeviceMessage(val) {
     } else if (device.fingerprint) {
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
     } else if (isBitbox02(device)) {
-      message = message.concat('(the fingerprint shows after the device is unlocked)')
+      message = message.concat('(SVRA reads its fingerprint when you sign)')
     } else {
       message = message.concat('with no fingerprint')
     }

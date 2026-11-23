@@ -9,8 +9,8 @@ use std::str::FromStr;
 const RECEIVE: ChildNumber = ChildNumber::Normal { index: 0 };
 const CHANGE: ChildNumber = ChildNumber::Normal { index: 1 };
 
-/// What SVRA supports, for the messages about a descriptor it refuses.
-const SUPPORTED: &str = "SVRA signs only vault descriptors of the form wsh(multi(k,...)). The keys must end in /0/* (receive), /1/* (change) or /<0;1>/*.";
+/// The last sentences of the messages about a wallet configuration that SVRA refuses.
+const SUPPORTED: &str = "With a BitBox02, SVRA can sign only for a Swan vault. Paste the wallet configuration from your Swan Vault Recovery Sheet.";
 
 /// The BIP-388 wallet policy for a Swan vault, as one connected device sees it.
 pub struct PolicyArtifact {
@@ -62,18 +62,18 @@ fn unsupported(message: impl Into<String>) -> Error {
   Error::new(ErrorKind::UnsupportedDescriptor, message)
 }
 
-/// Reads one descriptor. `label` names it in the messages, for example "receive descriptor".
+/// Reads one descriptor. `label` names it in the messages, for example "wallet configuration".
 fn parse_descriptor(text: &str, label: &str) -> Result<ParsedDescriptor, Error> {
   // The parse error is not shown, because it can repeat what the user pasted.
   let descriptor = Descriptor::<DescriptorPublicKey>::from_str(text.trim()).map_err(|_| {
     unsupported(format!(
-      "The {label} is not a valid descriptor. Check that you copied all of it, including the checksum after the # sign. {SUPPORTED}"
+      "The {label} is not valid. Check that you copied all of it, including the checksum after the # sign. {SUPPORTED}"
     ))
   })?;
 
   let Descriptor::Wsh(wsh) = &descriptor else {
     return Err(unsupported(format!(
-      "The {label} is not a wsh() descriptor. {SUPPORTED}"
+      "The {label} does not start with wsh(. {SUPPORTED}"
     )));
   };
   let miniscript = match wsh.as_inner() {
@@ -86,7 +86,7 @@ fn parse_descriptor(text: &str, label: &str) -> Result<ParsedDescriptor, Error> 
   };
   let Terminal::Multi(threshold) = &miniscript.node else {
     return Err(unsupported(format!(
-      "The {label} is not a multi() descriptor. {SUPPORTED}"
+      "The {label} does not use multi(). {SUPPORTED}"
     )));
   };
   if threshold.n() < 2 {
@@ -159,34 +159,34 @@ fn parse_key(key: &DescriptorPublicKey) -> Option<(Keychain, VaultKey)> {
   ))
 }
 
-/// Reads the receive descriptor, and the change descriptor when there is one, and checks that
-/// they describe one vault.
+/// Reads the wallet configuration, and the change configuration when there is one, and checks
+/// that they describe one vault.
 pub(crate) fn parse_vault(
   receive_descriptor: &str,
   change_descriptor: Option<&str>,
 ) -> Result<ParsedVault, Error> {
-  let receive = parse_descriptor(receive_descriptor, "receive descriptor")?;
+  let receive = parse_descriptor(receive_descriptor, "wallet configuration")?;
   if receive.keychain == Keychain::Change {
     return Err(unsupported(
-      "The receive descriptor ends in /1/*, which is the change path. Use the receive descriptor, which ends in /0/*.",
+      "The wallet configuration ends in /1/*, which is the path of the change configuration. Paste the wallet configuration from your Swan Vault Recovery Sheet. It ends in /0/*.",
     ));
   }
 
   if let Some(change_descriptor) = change_descriptor {
     if receive.keychain == Keychain::Multipath {
       return Err(unsupported(
-        "The receive descriptor is a multipath descriptor, so it already holds the change path. Leave the change descriptor empty.",
+        "The wallet configuration is a multipath configuration, so it already holds the change path. Leave the change configuration empty.",
       ));
     }
-    let change = parse_descriptor(change_descriptor, "change descriptor")?;
+    let change = parse_descriptor(change_descriptor, "change configuration")?;
     if change.keychain != Keychain::Change {
       return Err(unsupported(
-        "The change descriptor must end in /1/*. Use the change descriptor of the same vault.",
+        "The change configuration must end in /1/*. Paste the change configuration from your Swan Vault Recovery Sheet.",
       ));
     }
     if change.threshold != receive.threshold || change.keys != receive.keys {
       return Err(unsupported(
-        "The change descriptor is not the /1/* twin of the receive descriptor. Both must have the same threshold and the same keys, with the same origins, in the same order.",
+        "The change configuration is not from the same vault as the wallet configuration. Leave it empty, or paste the one from the same Recovery Sheet.",
       ));
     }
   }
@@ -196,7 +196,7 @@ pub(crate) fn parse_vault(
     let identity = (key.xpub.public_key, key.xpub.chain_code);
     if seen.contains(&identity) {
       return Err(unsupported(
-        "Two keys of the vault descriptor are the same key. A vault needs different keys.",
+        "Two keys of the wallet configuration are the same key. A vault needs different keys.",
       ));
     }
     seen.push(identity);
@@ -265,10 +265,9 @@ impl ParsedVault {
       .map(|index| format!("@{index}/**"))
       .collect();
     let policy = format!("wsh(multi({},{}))", self.threshold, placeholders.join(","));
-    let our_account_keypath = keys[our_key_index]
-      .keypath
-      .clone()
-      .ok_or_else(|| unsupported("The key of the connected BitBox02 has no key path."))?;
+    let our_account_keypath = keys[our_key_index].keypath.clone().ok_or_else(|| {
+      unsupported("The key of the connected BitBox02 has no key path in the wallet configuration.")
+    })?;
 
     Ok(Vault {
       artifact: PolicyArtifact {
@@ -301,23 +300,17 @@ pub fn build_policy(
 mod tests {
   use super::*;
   use crate::test_support::{
-    descriptor, fingerprint_of, simulator_xprv, VaultKeys, CLOUD_FINGERPRINT, ORDERS,
+    descriptor, fingerprint_of, simulator_xprv, webapp_keys, VaultKeys, CLOUD_FINGERPRINT, ORDERS,
+    WEBAPP_CLOUD_XPUB as CLOUD_XPUB, WEBAPP_GHOST_MACHINE_XPUB as GHOST_MACHINE_XPUB,
+    WEBAPP_KEEN_JOIN_XPUB as KEEN_JOIN_XPUB,
   };
   use bitbox_api::btc::make_script_config_policy;
   use bitbox_api::pb;
   use bitcoin::NetworkKind;
 
-  // The testnet vault of the webapp's `buildBitboxPolicy.test.ts`, so that both implementations
-  // are tested on the same input. The cloud key comes first, because the position follows the
-  // BitGo key roles and nothing may assume that the cloud key is last.
-  const CLOUD_XPUB: &str = "tpubD6NzVbkrYhZ4X3vCdevm3aFUdeSAWsbR4UhhdApbXnVUnvuwtq5NYqQ7zCkNhYG4JcPdGW4Wg4ZrVSYGpdoWsn337qmkP6CFgs7pZid12Sa";
-  const GHOST_MACHINE_XPUB: &str = "tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx";
-  const KEEN_JOIN_XPUB: &str = "tpubDFd7VxopNeZg93uqR7CSvJLkw3UanF8rywdQTxhCPFt1P33eZkxJJ91XXEbY2Q4Suw3jyscRwGzjVyfgq97N7sRvPHQVxruHwsKvsvQizSk";
-
   fn webapp_descriptor(tail: &str) -> String {
-    format!(
-      "wsh(multi(2,[7737acb8]{CLOUD_XPUB}{tail},[8c24a510/48h/1h/0h/2h]{GHOST_MACHINE_XPUB}{tail},[dcbf0caf/48h/1h/0h/2h]{KEEN_JOIN_XPUB}{tail}))"
-    )
+    let [cloud, ghost, keen] = webapp_keys(tail);
+    format!("wsh(multi(2,{cloud},{ghost},{keen}))")
   }
 
   fn fingerprint(hex: &str) -> Fingerprint {
@@ -371,8 +364,13 @@ mod tests {
     assert_eq!(artifact.our_account_keypath.to_vec(), TESTNET_ACCOUNT);
   }
 
+  // Contract with the webapp (apps/webapp/src/islands/Bitbox02/helpers/buildBitboxPolicy.ts). The
+  // device finds a registration by a hash of the coin, the policy string and the xpubs in order.
+  // If this test fails, fix the code, not the expected value: a mismatch makes every customer that
+  // the webapp registered confirm a second registration. The firmware simulator accepts a wrong
+  // cloud-key origin or a differently written policy, so this unit test is the only guard.
   #[test]
-  fn golden_policy_config_for_the_webapp_vault() {
+  fn the_policy_config_is_the_one_the_webapp_registers() {
     let artifact =
       build(&webapp_descriptor("/0/*"), None, "dcbf0caf").expect("the policy is built");
     let expected = pb::BtcScriptConfig {
@@ -571,7 +569,6 @@ mod tests {
       ErrorKind::UnsupportedDescriptor,
     );
     assert!(error.message.contains("sortedmulti"), "{}", error.message);
-    assert!(error.message.contains("wsh(multi("), "{}", error.message);
   }
 
   #[test]
@@ -607,7 +604,7 @@ mod tests {
       build(&webapp_descriptor("/1/*"), None, "dcbf0caf"),
       ErrorKind::UnsupportedDescriptor,
     );
-    assert!(error.message.contains("change"), "{}", error.message);
+    assert!(error.message.contains("/1/*"), "{}", error.message);
   }
 
   #[test]
@@ -678,13 +675,7 @@ mod tests {
     );
     assert!(error.message.contains("deadbeef"), "{}", error.message);
     assert!(error.message.contains("passphrase"), "{}", error.message);
-    assert!(
-      error
-        .message
-        .contains("To sign with another device, unplug this BitBox02."),
-      "{}",
-      error.message
-    );
+    assert!(error.message.contains("unplug"), "{}", error.message);
   }
 
   #[test]

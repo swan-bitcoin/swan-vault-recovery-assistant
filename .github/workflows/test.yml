@@ -81,7 +81,10 @@ jobs:
       - name: set up rust
         uses: ./.github/private-actions/actions-rs/toolchain
         with:
-          toolchain: stable
+          # The job runs clippy with warnings as errors, and a new Rust release adds lints, so a
+          # floating toolchain would turn the job red on unrelated pull requests. Bump the version
+          # on purpose.
+          toolchain: 1.100.0
           override: true
           components: rustfmt, clippy
 
@@ -116,8 +119,7 @@ jobs:
   scenario-test:
     name: scenario tests
     # `ubuntu-latest` is now Ubuntu 26.04, which has no `webkit2gtk-driver` package (it was
-    # renamed), so the dependency install fails. This failure exists on master too. The pin keeps
-    # the job on the image where it last passed.
+    # renamed), so the dependency install fails. The pin keeps the job on the image that has it.
     runs-on: ubuntu-24.04
     steps:
       - name: checkout code

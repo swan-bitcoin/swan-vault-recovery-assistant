@@ -1,8 +1,9 @@
 import { Channel } from '@tauri-apps/api/core'
 import type { Bitbox02Progress } from '../../bindings'
 
+// the backend's busy error uses the same sentence
 export const BITBOX02_BUSY_MESSAGE =
-  'A BitBox02 session is still open. Finish it on the BitBox02, or unplug the BitBox02 to stop it.'
+  'SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.'
 
 export type SignRun = {
   // a device that is not a BitBox02 gives the guard back at once

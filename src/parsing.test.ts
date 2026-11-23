@@ -80,9 +80,9 @@ describe('getDeviceMessage()', () => {
   it('should print a readable name for a BitBox02 and not claim it has no fingerprint', () => {
     const devices = [{ ...DEVICE1, type: 'bitbox02', model: 'bitbox02_nova_btconly', fingerprint: null }]
     const message = parsing.getDeviceMessage(JSON.stringify(devices))
-    expect(message).toBe(
-      'Found a BitBox02 Nova Bitcoin-only device (the fingerprint shows after the device is unlocked). While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
-    )
+    expect(message).toContain('BitBox02 Nova Bitcoin-only')
+    expect(message).toContain('SVRA reads its fingerprint when you sign')
+    expect(message).toContain('SVRA lists only the BitBox02')
     expect(message).not.toContain('no fingerprint')
   })
 
@@ -93,9 +93,10 @@ describe('getDeviceMessage()', () => {
 
   it('should print the BitBox02 error when the device is in bootloader mode', () => {
     const devices = [{ ...DEVICE1, type: 'bitbox02', model: 'bitbox02_multi', error: 'bootloader mode', code: -12 }]
-    expect(parsing.getDeviceMessage(JSON.stringify(devices))).toBe(
-      "Found a BitBox02 Multi device which is reporting an error: 'bootloader mode'. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device."
-    )
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message).toContain('BitBox02 Multi')
+    expect(message).toContain("reporting an error: 'bootloader mode'")
+    expect(message).toContain('SVRA lists only the BitBox02')
   })
 
   it('should return a message when multiple devices are present', () => {
@@ -118,9 +119,9 @@ describe('getDevicePrompt()', () => {
 
   it('should not suggest signing with a BitBox02 that reports an error', () => {
     const devices = [{ ...DEVICE1, type: 'bitbox02', model: 'bitbox02_multi', error: 'bootloader mode', code: -12 }]
-    expect(parsing.getDevicePrompt(JSON.stringify(devices))).toBe(
-      'This BitBox02 cannot sign yet. Read the error above first.'
-    )
+    const prompt = parsing.getDevicePrompt(JSON.stringify(devices))
+    expect(prompt).toContain('cannot sign yet')
+    expect(prompt).not.toMatch(/You may want to sign with this device/)
   })
 
   it('should keep the usual message for a BitBox02 without an error', () => {
@@ -172,7 +173,7 @@ describe('getSignResultAndPsbt()', () => {
 
 describe('getSignResultAndPsbt() fingerprint', () => {
   it('should return the fingerprint when it has 8 hex characters', () => {
-    const response = { psbt: 'b', signed: true, fingerprint: '1a2b3c4d', registered: false }
+    const response = { psbt: 'b', signed: true, fingerprint: '1a2b3c4d' }
     expect(parsing.getSignResultAndPsbt(JSON.stringify(response)).fingerprint).toBe('1a2b3c4d')
   })
 

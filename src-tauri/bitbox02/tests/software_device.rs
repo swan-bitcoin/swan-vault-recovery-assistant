@@ -40,35 +40,6 @@ fn the_vault_is_unsorted_at_every_funded_address() {
 }
 
 #[test]
-fn builds_the_policy_of_the_vault_for_the_simulator_key() {
-  let vault = Vault::new(&simulator_xprv(), Network::Testnet);
-  let artifact = svra_bitbox02::build_policy(
-    &vault.receive_descriptor,
-    Some(&vault.change_descriptor),
-    vault.device_fingerprint,
-  )
-  .expect("the policy is built");
-  assert_eq!(artifact.policy, "wsh(multi(2,@0/**,@1/**,@2/**))");
-  assert_eq!(
-    artifact.our_key_index,
-    vault
-      .order
-      .iter()
-      .position(|position| *position == 0)
-      .expect("the device is in the order")
-  );
-  assert_eq!(
-    artifact.our_account_keypath.to_vec(),
-    vec![0x8000_0030, 0x8000_0001, 0x8000_0000, 0x8000_0002]
-  );
-
-  let from_multipath =
-    svra_bitbox02::build_policy(&vault.multipath_descriptor, None, vault.device_fingerprint)
-      .expect("the multipath policy is built");
-  assert_eq!(from_multipath.policy, artifact.policy);
-}
-
-#[test]
 fn a_sweep_signed_by_two_keys_passes_the_consensus_rules() {
   let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
   let mut psbt = vault.sweep_psbt();

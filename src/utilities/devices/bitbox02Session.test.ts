@@ -127,9 +127,9 @@ describe('runBitbox02Session()', () => {
     run.deviceFound('bitbox02')
     const command = deferred<string>()
     const session = runBitbox02Session(run, () => command.promise, vi.fn())
-    command.reject({ error_type: 'Bitbox02Error(busy)', message: 'x' })
+    command.reject({ error_type: 'Bitbox02Error', message: 'x' })
 
-    await expect(session).rejects.toStrictEqual({ error_type: 'Bitbox02Error(busy)', message: 'x' })
+    await expect(session).rejects.toStrictEqual({ error_type: 'Bitbox02Error', message: 'x' })
     expect(isBitbox02SessionPending()).toBe(false)
   })
 

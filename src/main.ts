@@ -185,6 +185,9 @@ async function broadcast() {
 }
 
 async function enumerate() {
+  // a second USB scan while the session thread reads the BitBox02 is not safe
+  if (refuseWhileBitbox02SessionPending()) return
+
   const { network } = getUserInputs()
 
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
@@ -478,7 +481,7 @@ async function signWithDevice(run: SignRun, retryCount: number) {
               type: 'image' as const,
             },
             {
-              content: `Found your ${getDeviceName(device)}. We tell you here when to check the device.`,
+              content: 'Found your BitBox02. Keep this window open: it tells you when to look at the BitBox02.',
               footer: new Date().toLocaleString(),
               type: 'bubble' as const,
             },

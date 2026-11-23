@@ -11,7 +11,7 @@ mod session;
 #[cfg(feature = "usb")]
 mod usb;
 
-pub use error::{Error, ErrorKind};
+pub use error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
 pub use policy::{build_policy, PolicyArtifact};
 pub use session::{
   fallback_policy_name, sign_psbt, Progress, SignOutcome, SignRequest, MIN_FIRMWARE_VERSION,

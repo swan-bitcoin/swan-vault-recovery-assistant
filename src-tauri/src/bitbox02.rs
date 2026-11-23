@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::json;
 use specta::Type;
 use std::str::FromStr;
-use svra_bitbox02::{DetectedDevice, Progress, SignRequest};
+use svra_bitbox02::{DetectedDevice, Progress, SignRequest, BOOTLOADER_MESSAGE};
 use tauri::ipc::Channel;
 
 use crate::errors::{SvraError, SvraErrorType};
@@ -68,9 +68,7 @@ fn devices_json(devices: &[DetectedDevice]) -> Result<String, SvraError> {
         "fingerprint": null,
       });
       if device.bootloader {
-        entry["error"] = json!(
-          "The BitBox02 is in bootloader mode. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp. To sign with another device, unplug this BitBox02."
-        );
+        entry["error"] = json!(BOOTLOADER_MESSAGE);
         entry["code"] = json!(HWI_DEVICE_NOT_READY);
       }
       entry
@@ -108,7 +106,7 @@ pub async fn sign(
   .await
   .map_err(|_| {
     SvraError::new(
-      SvraErrorType::Bitbox02Error("other"),
+      SvraErrorType::Bitbox02Error,
       "The BitBox02 session ended unexpectedly. Unplug the BitBox02, plug it in again and retry.",
     )
   })?
@@ -127,7 +125,6 @@ pub async fn sign(
       "psbt": signed_psbt,
       "signed": outcome.signed,
       "fingerprint": outcome.fingerprint.to_string(),
-      "registered": outcome.registered,
     })
     .to_string(),
   )

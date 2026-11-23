@@ -1,5 +1,5 @@
 use crate::device_error::{map_device_error, Step};
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
 use crate::session::{sign_psbt, Progress, SignOutcome, SignRequest};
 use bitbox_api::runtime::TokioRuntime;
 use bitbox_api::{BitBox, NoiseConfigNoCache};
@@ -10,18 +10,18 @@ use std::sync::{Mutex, MutexGuard, TryLockError};
 /// USB vendor id of every BitBox02 (Microchip, the maker of its microcontroller).
 const VENDOR_ID: u16 = 0x03eb;
 
-/// USB product ids of a bootloader. Production devices use 0x2403, and the vendor's Python
-/// library also accepts 0x2402 for some development devices.
-/// Source: `py/bitbox02/bitbox02/communication/devices.py` in the vendor's firmware repository,
-/// `get_devices()` (lines 52-55).
+/// USB product ids that a device in bootloader mode can have. Production devices use 0x2403, which
+/// the firmware shares, and the vendor's Python library also accepts 0x2402 for some development
+/// devices. The product string tells firmware and bootloader apart.
+/// Source: `get_devices()` in `py/bitbox02/bitbox02/communication/devices.py` of the
+/// `bitbox02-firmware` repository, tag `firmware/v9.27.0`.
 const BOOTLOADER_PRODUCT_IDS: [u16; 2] = [0x2402, 0x2403];
 
 /// Model names that HWI reports, with the USB product strings of the firmware and of the
-/// bootloader. The firmware strings are the ones of `bitbox_api::usb::is_bitbox02`.
-/// The bootloader strings come from the same file as above, `devices.py` lines 13-19
-/// (`BB02MULTI_BOOTLOADER`, `BB02BTC_BOOTLOADER`, `BITBOX02PLUS_MULTI_BOOTLOADER`,
-/// `BITBOX02PLUS_BTC_BOOTLOADER`), and from `PRODUCT_STRING_BITBOX02_*` in `src/bootloader.rs`
-/// (lines 55-59) of the Swan `bitbox-api-rs` checkout.
+/// bootloader. The firmware strings are the ones of `is_bitbox02` in `src/usb.rs` of `bitbox-api`
+/// 0.13.0. The bootloader strings are the `BB02*_BOOTLOADER` and `BITBOX02PLUS_*_BOOTLOADER`
+/// names in `py/bitbox02/bitbox02/communication/devices.py` of the `bitbox02-firmware`
+/// repository, tag `firmware/v9.27.0`.
 const MODELS: [(&str, &str, &str); 4] = [
   ("bitbox02_multi", "BitBox02", "bb02-bootloader"),
   ("bitbox02_btconly", "BitBox02BTC", "bb02btc-bootloader"),
@@ -51,7 +51,7 @@ fn try_begin_session(lock: &Mutex<()>) -> Result<MutexGuard<'_, ()>, Error> {
     Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
     Err(TryLockError::WouldBlock) => Err(Error::new(
       ErrorKind::Busy,
-      "A BitBox02 session is already running in SVRA. Finish it on the BitBox02, or unplug the BitBox02 to end it, then try again.",
+      "SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.",
     )),
   }
 }
@@ -61,9 +61,10 @@ fn open_error() -> Error {
   let mut message = String::from(
     "SVRA found the BitBox02 but cannot open it. Close the BitBoxApp, because only one program can use the BitBox02 at a time, then try again.",
   );
+  // The packaged app has no README file, so the message carries the link.
   if cfg!(target_os = "linux") {
     message.push_str(
-      " If the BitBoxApp is closed, your user may lack the right to open the device. See the Linux part of the SVRA README for the udev rule.",
+      " If the BitBoxApp is closed, your user may lack the right to open the device. Add the udev rule, then plug the BitBox02 in again. The steps are at https://github.com/swan-bitcoin/swan-vault-recovery-assistant#linux-allow-access-to-the-bitbox02",
     );
   }
   Error::new(ErrorKind::Communication, message)
@@ -176,10 +177,7 @@ fn select_device(devices: &[DetectedDevice]) -> Result<usize, Error> {
     return Err(Error::new(ErrorKind::DeviceNotFound, NOT_FOUND_MESSAGE));
   }
   if devices.iter().any(|device| device.bootloader) {
-    return Err(Error::new(
-      ErrorKind::Bootloader,
-      "The BitBox02 is in bootloader mode and has no firmware running. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp. To sign with another device, unplug this BitBox02.",
-    ));
+    return Err(Error::new(ErrorKind::Bootloader, BOOTLOADER_MESSAGE));
   }
   if devices.len() > 1 {
     return Err(Error::new(
@@ -220,6 +218,8 @@ pub fn sign_psbt_usb(
       )
     })?;
   runtime.block_on(async move {
+    // SVRA must not write to disk (README, "Core Design Principles"), so there is no pairing cache
+    // and the user confirms the pairing code on every run.
     let bitbox =
       BitBox::<TokioRuntime>::from_hid_device(hid_device, Box::new(NoiseConfigNoCache {}))
         .await
@@ -291,8 +291,7 @@ mod tests {
   fn no_device_is_not_found() {
     let error = select_device(&[]).expect_err("no device");
     assert_eq!(error.kind, ErrorKind::DeviceNotFound);
-    assert!(error.message.contains("BitBoxApp"));
-    assert!(error.message.contains("Connect the BitBox02."));
+    assert!(error.message.contains("BitBoxApp"), "{}", error.message);
     assert!(!error.message.contains("unlock"), "{}", error.message);
   }
 
@@ -300,20 +299,18 @@ mod tests {
   fn a_bootloader_device_is_reported_as_a_bootloader() {
     let error = select_device(&[device(true)]).expect_err("bootloader");
     assert_eq!(error.kind, ErrorKind::Bootloader);
-    assert!(
-      error
-        .message
-        .contains("To sign with another device, unplug this BitBox02."),
-      "{}",
-      error.message
-    );
+    assert!(error.message.contains("bootloader"), "{}", error.message);
   }
 
   #[test]
   fn two_devices_are_refused() {
     let error = select_device(&[device(false), device(false)]).expect_err("two devices");
     assert_eq!(error.kind, ErrorKind::Other);
-    assert!(error.message.contains("only"), "{}", error.message);
+    assert!(
+      error.message.contains("More than one BitBox02"),
+      "{}",
+      error.message
+    );
   }
 
   #[test]
@@ -327,11 +324,7 @@ mod tests {
     let first = try_begin_session(&lock).expect("the first session starts");
     let error = try_begin_session(&lock).expect_err("the second session is refused");
     assert_eq!(error.kind, ErrorKind::Busy);
-    assert!(
-      error.message.contains("already running"),
-      "{}",
-      error.message
-    );
+    assert!(error.message.contains("unplug"), "{}", error.message);
     drop(first);
     assert!(try_begin_session(&lock).is_ok());
   }
@@ -389,10 +382,18 @@ mod tests {
       Err(error) => error,
     };
     assert_eq!(error.kind, ErrorKind::Communication);
-    assert!(error.message.contains("found"), "{}", error.message);
     assert!(error.message.contains("BitBoxApp"), "{}", error.message);
     assert_eq!(
       error.message.contains("udev"),
+      cfg!(target_os = "linux"),
+      "{}",
+      error.message
+    );
+    // The frontend and the README agree on this anchor.
+    assert_eq!(
+      error
+        .message
+        .contains("#linux-allow-access-to-the-bitbox02"),
       cfg!(target_os = "linux"),
       "{}",
       error.message

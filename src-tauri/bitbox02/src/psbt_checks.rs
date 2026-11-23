@@ -15,8 +15,17 @@ use std::collections::BTreeMap;
 /// The first child number of a hardened key.
 const HARDENED: u32 = 0x8000_0000;
 
-fn invalid_psbt(message: impl Into<String>) -> Error {
-  Error::new(ErrorKind::InvalidPsbt, message)
+/// The first sentence of every refusal in this file. SVRA builds the transaction with all the data
+/// that these checks look for, so a failed check means that the transaction came from somewhere
+/// else or that someone edited it.
+const NOT_FROM_SVRA: &str =
+  "This transaction was not made by SVRA for this vault, or it was changed.";
+
+fn invalid_psbt(reason: impl AsRef<str>) -> Error {
+  Error::new(
+    ErrorKind::InvalidPsbt,
+    format!("{NOT_FROM_SVRA} {}", reason.as_ref()),
+  )
 }
 
 /// The output that an input spends, after the checks that the previous transaction is the one
@@ -24,12 +33,12 @@ fn invalid_psbt(message: impl Into<String>) -> Error {
 fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<&'a TxOut, Error> {
   let previous_transaction = input.non_witness_utxo.as_ref().ok_or_else(|| {
     invalid_psbt(format!(
-      "Input {number} lacks the full previous transaction. The BitBox02 needs it to check the amount. Create the transaction again with SVRA."
+      "Input {number} lacks the full previous transaction. The BitBox02 needs it to check the amount."
     ))
   })?;
   if previous_transaction.compute_txid() != tx_input.previous_output.txid {
     return Err(invalid_psbt(format!(
-      "The previous transaction of input {number} is not the transaction that the input spends. The PSBT is damaged."
+      "The previous transaction of input {number} is not the transaction that the input spends."
     )));
   }
   let spent = previous_transaction
@@ -37,7 +46,7 @@ fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<
     .get(tx_input.previous_output.vout as usize)
     .ok_or_else(|| {
       invalid_psbt(format!(
-        "Input {number} spends an output that its previous transaction does not have. The PSBT is damaged."
+        "Input {number} spends an output that its previous transaction does not have."
       ))
     })?;
   // The amount that the device signs comes from `witness_utxo` when it is there, but the device
@@ -48,7 +57,7 @@ fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<
     .is_some_and(|witness_utxo| witness_utxo != spent)
   {
     return Err(invalid_psbt(format!(
-      "Input {number} holds two different versions of the output it spends. The PSBT is damaged."
+      "Input {number} holds two different versions of the output it spends."
     )));
   }
   Ok(spent)
@@ -152,7 +161,7 @@ pub(crate) fn precheck(
   }
   if psbt.inputs.len() != psbt.unsigned_tx.input.len() {
     return Err(invalid_psbt(
-      "The PSBT does not have one input record for each transaction input. The PSBT is damaged.",
+      "It does not have one input record for each input.",
     ));
   }
 
@@ -161,19 +170,18 @@ pub(crate) fn precheck(
     let number = index + 1;
     if input_has_taproot_fields(input) {
       return Err(invalid_psbt(format!(
-        "Input {number} has taproot fields, but a Swan vault is not a taproot wallet. The PSBT is damaged, or it comes from another wallet."
+        "Input {number} has taproot fields, but a Swan vault does not use taproot."
       )));
     }
     let spent = spent_output(number, tx_input, input)?;
 
-    let witness_script = input.witness_script.as_ref().ok_or_else(|| {
-      invalid_psbt(format!(
-        "Input {number} lacks the witness script. Create the transaction again with SVRA."
-      ))
-    })?;
+    let witness_script = input
+      .witness_script
+      .as_ref()
+      .ok_or_else(|| invalid_psbt(format!("Input {number} lacks the witness script.")))?;
     if ScriptBuf::new_p2wsh(&witness_script.wscript_hash()) != spent.script_pubkey {
       return Err(invalid_psbt(format!(
-        "The witness script of input {number} does not match the output that the input spends. The PSBT is damaged."
+        "The witness script of input {number} does not match the output that the input spends."
       )));
     }
 
@@ -188,7 +196,7 @@ pub(crate) fn precheck(
 
     let (public_key, path) = our_key(input, fingerprint).ok_or_else(|| {
       invalid_psbt(format!(
-        "Input {number} has no key path for the connected BitBox02 (fingerprint {fingerprint}). Check that this BitBox02 holds a key of the vault, and that the PSBT comes from the same vault."
+        "Input {number} has no key path for the connected BitBox02 (fingerprint {fingerprint}). Check that this BitBox02 holds a key of your vault."
       ))
     })?;
     let steps = address_steps(vault, path);
@@ -199,7 +207,7 @@ pub(crate) fn precheck(
       != Some(witness_script)
     {
       return Err(invalid_psbt(format!(
-        "Input {number} does not belong to the vault of the descriptors. Check that the transaction and the descriptors come from the same vault."
+        "Input {number} does not belong to the vault of the wallet configuration."
       )));
     }
     // The fingerprint in the PSBT is only a label. The key under it must be the key that the
@@ -210,7 +218,7 @@ pub(crate) fn precheck(
       .and_then(|steps| vault_public_key(vault, vault.artifact.our_key_index, steps));
     if device_key != Some(public_key) {
       return Err(invalid_psbt(format!(
-        "Input {number} lists a key for the connected BitBox02 (fingerprint {fingerprint}) that is not the key of the BitBox02 in the vault. The PSBT is damaged, or it comes from another vault."
+        "Input {number} lists a key for the connected BitBox02 (fingerprint {fingerprint}) that is not the key of the BitBox02 in the vault."
       )));
     }
     keys.push(public_key);
@@ -224,7 +232,7 @@ pub(crate) fn precheck(
 fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result<(), Error> {
   if psbt.outputs.len() != psbt.unsigned_tx.output.len() {
     return Err(invalid_psbt(
-      "The PSBT does not have one output record for each transaction output. The PSBT is damaged.",
+      "It does not have one output record for each output.",
     ));
   }
   for (index, (tx_output, output)) in psbt
@@ -237,7 +245,7 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
     let number = index + 1;
     if output_has_taproot_fields(output) {
       return Err(invalid_psbt(format!(
-        "Output {number} has taproot fields, but a Swan vault is not a taproot wallet. The PSBT is damaged, or it comes from another wallet."
+        "Output {number} has taproot fields, but a Swan vault does not use taproot."
       )));
     }
     let Some((_, path)) = key_of_device(&output.bip32_derivation, fingerprint) else {
@@ -248,7 +256,7 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
       .map(|witness_script| ScriptBuf::new_p2wsh(&witness_script.wscript_hash()));
     if vault_script.as_ref() != Some(&tx_output.script_pubkey) {
       return Err(invalid_psbt(format!(
-        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path. The BitBox02 would not show it as a payment. The PSBT is damaged, or someone changed it."
+        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path. The BitBox02 would not show it as a payment."
       )));
     }
   }
@@ -294,6 +302,7 @@ fn check_signature(psbt: &Psbt, index: usize, key: &SecpPublicKey) -> Result<(),
 
 /// True when every input already holds a valid signature of the device's key.
 pub(crate) fn already_signed(psbt: &Psbt, keys: &[SecpPublicKey]) -> bool {
+  // `all()` is true for an empty list, and an empty list of keys must not count as signed.
   !keys.is_empty()
     && keys.len() == psbt.inputs.len()
     && keys
@@ -305,7 +314,7 @@ pub(crate) fn already_signed(psbt: &Psbt, keys: &[SecpPublicKey]) -> bool {
 fn unexpected_change() -> Error {
   Error::new(
     ErrorKind::Other,
-    "Signing changed the PSBT in an unexpected way. Do not use the result.",
+    "Signing changed the transaction in an unexpected way. Do not use the result.",
   )
 }
 
@@ -360,7 +369,7 @@ pub(crate) fn verify_signed(
     check_signature(signed, index, key).map_err(|message| {
       Error::new(
         ErrorKind::InvalidSignature,
-        format!("{message} Do not use the result."),
+        format!("{message} Do not use the result. Contact Swan support."),
       )
     })?;
   }
@@ -410,6 +419,11 @@ mod tests {
       Ok(_) => panic!("the pre-check passed, but it should fail"),
       Err(error) => {
         assert_eq!(error.kind, ErrorKind::InvalidPsbt, "{}", error.message);
+        assert!(
+          error.message.starts_with(NOT_FROM_SVRA),
+          "{}",
+          error.message
+        );
         error
       }
     }
@@ -492,7 +506,13 @@ mod tests {
     case.psbt.inputs[0].non_witness_utxo = Some(other);
     let error = precheck_error(&case, &case.psbt);
     assert!(error.message.contains("input 1"), "{}", error.message);
-    assert!(error.message.contains("damaged"), "{}", error.message);
+    assert!(
+      error
+        .message
+        .contains("is not the transaction that the input spends"),
+      "{}",
+      error.message
+    );
   }
 
   #[test]

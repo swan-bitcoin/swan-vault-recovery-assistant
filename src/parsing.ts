@@ -69,8 +69,8 @@ export function getDeviceMessage(val: unknown): string {
       // Sanitize device.fingerprint to prevent XSS
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
     } else if (isBitbox02(device)) {
-      // a BitBox02 gives its fingerprint only after it is paired and unlocked
-      message = message.concat('(the fingerprint shows after the device is unlocked)')
+      // enumeration does not open a BitBox02, so its fingerprint is known only after it has signed
+      message = message.concat('(SVRA reads its fingerprint when you sign)')
     } else {
       message = message.concat('with no fingerprint')
     }

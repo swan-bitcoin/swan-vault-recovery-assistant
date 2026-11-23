@@ -1,7 +1,7 @@
-/// What went wrong, in a form the app can branch on.
+/// What went wrong. Tests and callers can branch on it. The app shows the message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
-  /// No BitBox02 is connected, or another program (the BitBoxApp) holds it.
+  /// No BitBox02 is connected.
   DeviceNotFound,
   /// The device is in bootloader mode and has no running firmware.
   Bootloader,
@@ -34,28 +34,9 @@ pub enum ErrorKind {
   Other,
 }
 
-impl ErrorKind {
-  /// A stable kebab-case code for the app, for example `user-abort`.
-  pub fn code(&self) -> &'static str {
-    match self {
-      ErrorKind::DeviceNotFound => "device-not-found",
-      ErrorKind::Bootloader => "bootloader",
-      ErrorKind::NotInitialized => "not-initialized",
-      ErrorKind::PairingRejected => "pairing-rejected",
-      ErrorKind::UserAbort => "user-abort",
-      ErrorKind::FirmwareTooOld => "firmware-too-old",
-      ErrorKind::UnsupportedDescriptor => "unsupported-descriptor",
-      ErrorKind::KeyNotInVault => "key-not-in-vault",
-      ErrorKind::PolicyNameTaken => "policy-name-taken",
-      ErrorKind::InvalidPsbt => "invalid-psbt",
-      ErrorKind::TransactionMismatch => "transaction-mismatch",
-      ErrorKind::InvalidSignature => "invalid-signature",
-      ErrorKind::Communication => "communication",
-      ErrorKind::Busy => "busy",
-      ErrorKind::Other => "other",
-    }
-  }
-}
+/// The message that tells the user about a BitBox02 in bootloader mode. The app shows the same
+/// sentence when it lists devices.
+pub const BOOTLOADER_MESSAGE: &str = "The BitBox02 is in bootloader mode, which is only for firmware updates, so it cannot sign. Unplug it and plug it in again. If it stays in this mode, install the firmware with the BitBoxApp. To sign with another device, unplug this BitBox02.";
 
 /// An error with a message that is safe to show to the user as it is.
 #[derive(Debug, Clone, PartialEq, Eq)]

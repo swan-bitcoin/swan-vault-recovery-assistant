@@ -45,6 +45,23 @@ pub fn fingerprint_of(xprv: &Xpriv) -> Fingerprint {
   xprv.fingerprint(&Secp256k1::new())
 }
 
+/// The testnet vault of the webapp's `buildBitboxPolicy.test.ts`, so that both implementations are
+/// tested on the same input. The cloud key comes first, because the position follows the BitGo
+/// key roles and nothing may assume that the cloud key is last.
+pub const WEBAPP_CLOUD_XPUB: &str = "tpubD6NzVbkrYhZ4X3vCdevm3aFUdeSAWsbR4UhhdApbXnVUnvuwtq5NYqQ7zCkNhYG4JcPdGW4Wg4ZrVSYGpdoWsn337qmkP6CFgs7pZid12Sa";
+pub const WEBAPP_GHOST_MACHINE_XPUB: &str = "tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx";
+pub const WEBAPP_KEEN_JOIN_XPUB: &str = "tpubDFd7VxopNeZg93uqR7CSvJLkw3UanF8rywdQTxhCPFt1P33eZkxJJ91XXEbY2Q4Suw3jyscRwGzjVyfgq97N7sRvPHQVxruHwsKvsvQizSk";
+
+/// The three keys of that vault as `[cloud, ghost machine, keen join]` key expressions with `tail`
+/// after each. The cloud key has no path, and the two customer keys are on `m/48'/1'/0'/2'`.
+pub fn webapp_keys(tail: &str) -> [String; 3] {
+  [
+    format!("[7737acb8]{WEBAPP_CLOUD_XPUB}{tail}"),
+    format!("[8c24a510/48h/1h/0h/2h]{WEBAPP_GHOST_MACHINE_XPUB}{tail}"),
+    format!("[dcbf0caf/48h/1h/0h/2h]{WEBAPP_KEEN_JOIN_XPUB}{tail}"),
+  ]
+}
+
 /// The path of the account key of a Swan vault device: `m/48'/<coin>'/0'/2'`.
 pub fn account_path(kind: NetworkKind) -> DerivationPath {
   let coin = if kind == NetworkKind::Main { 0 } else { 1 };
@@ -262,8 +279,8 @@ impl Vault {
     builder.finish().expect("the sweep is built")
   }
 
-  /// Signs with the software key, finalizes with the wallet, and checks every input against
-  /// the consensus rules. Returns the transaction.
+  /// Finalizes with the wallet, and checks every input against the consensus rules. Returns the
+  /// transaction.
   pub fn finalize_and_verify(&self, mut psbt: Psbt) -> Transaction {
     let finalized = self
       .wallet

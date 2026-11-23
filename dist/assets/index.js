@@ -677,13 +677,11 @@ function getBitbox02Device() {
 </svg>
 `
 }
-const ERROR_TYPE = /^Bitbox02Error\((.+)\)$/
 function parseBitbox02Error(e) {
   if (typeof e !== 'object' || e === null) return null
   const { error_type: errorType, message } = e
-  if (typeof errorType !== 'string' || typeof message !== 'string' || message === '') return null
-  const match = ERROR_TYPE.exec(errorType)
-  return match ? { code: match[1], message } : null
+  if (errorType !== 'Bitbox02Error' || typeof message !== 'string' || message === '') return null
+  return { message }
 }
 const WAITING = 'Waiting for your BitBox02…'
 const WALLET_NAME = 'swan_vault'
@@ -699,26 +697,27 @@ function getBitbox02StepMessage(update) {
     case 'confirm-pairing':
       return {
         loading: WAITING,
-        bubble: 'Check that the code below is the same as the code on your BitBox02. Then confirm on the device.',
+        bubble:
+          'Check that the code below is the same as the code on your BitBox02. If the codes are different, do not confirm. Unplug the BitBox02. If they are the same, confirm on the device.',
         code: update.code,
       }
     case 'checking-registration':
-      return { loading: 'Checking that your BitBox02 knows this wallet…' }
+      return { loading: 'Checking that your BitBox02 knows this vault…' }
     case 'register':
       return {
         loading: WAITING,
-        // an unexpected registration can mean that the pasted descriptor is not the customer's vault, so both texts say when to stop
+        // an unexpected registration can mean that the pasted wallet configuration is not the customer's vault, so both texts say when to stop
         bubble:
           update.name === WALLET_NAME
-            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device. If this BitBox02 was not reset and has signed for this vault before, stop and check the descriptor against your recovery kit.`
-            : `This BitBox02 already holds a different wallet named ${WALLET_NAME}. This is expected only if you used this device for another Swan vault. If not, stop and check the descriptor against your recovery kit. To continue, compare each key with your recovery kit again, then confirm on the device, where the wallet shows as ${update.name}.`,
+            ? 'Your BitBox02 does not know this vault yet. This is normal if the BitBox02 was reset or is new. The BitBox02 now shows each key of the vault. Check each key against the wallet configuration on your Swan Vault Recovery Sheet, then confirm on the BitBox02. If your BitBox02 was not reset and you signed with it before, stop and unplug it: the wallet configuration you pasted may not be your vault.'
+            : `Your BitBox02 already has a different wallet named ${WALLET_NAME}. This is normal only if you used this BitBox02 for another Swan vault. If you did not, stop: unplug the BitBox02 and check the wallet configuration against your Swan Vault Recovery Sheet. To continue, check each key again, then confirm on the BitBox02. It shows this vault as ${update.name}.`,
       }
     case 'sign':
       return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
   }
 }
 const BITBOX02_BUSY_MESSAGE =
-  'A BitBox02 session is still open. Finish it on the BitBox02, or unplug the BitBox02 to stop it.'
+  'SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.'
 let current = null
 const isBitbox02SessionPending = () => (current == null ? void 0 : current.bitbox02Pending) === true
 function startSignRun() {
@@ -953,6 +952,7 @@ async function broadcast() {
   }
 }
 async function enumerate() {
+  if (refuseWhileBitbox02SessionPending()) return
   const { network } = getUserInputs()
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
@@ -1183,7 +1183,7 @@ async function signWithDevice(run, retryCount) {
               type: 'image',
             },
             {
-              content: `Found your ${getDeviceName(device)}. We tell you here when to check the device.`,
+              content: 'Found your BitBox02. Keep this window open: it tells you when to look at the BitBox02.',
               footer: /* @__PURE__ */ new Date().toLocaleString(),
               type: 'bubble',
             },
