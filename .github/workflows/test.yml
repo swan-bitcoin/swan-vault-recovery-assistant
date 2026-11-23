@@ -202,14 +202,17 @@ jobs:
       - name: fetch the emulator libraries into /nix/store
         # The binary has /nix/store/... as its ELF interpreter, so the libraries must sit at
         # exactly these paths. The container fetches them from cache.nixos.org (Nix checks the
-        # signatures). Then it compares the set of paths and every NAR hash with the pinned list in
-        # nix-closure-x86_64.txt. The five roots are the store paths that `readelf` shows in the
-        # RUNPATH and the interpreter of the emulator.
+        # signatures) and writes the closure as a list in the format of nix-closure-x86_64.txt. The
+        # five roots are the store paths that `readelf` shows in the RUNPATH and the interpreter of
+        # the emulator. The container has only Nix and coreutils, so the runner compares the list
+        # with the pinned one (the set of paths and every NAR hash). It does this before anything
+        # goes into /nix/store.
         run: |
-          mkdir -p "$RUNNER_TEMP/nix-out"
+          pinned=src-tauri/trezor/tests/emulator-rig/nix-closure-x86_64.txt
+          mkdir -p "$RUNNER_TEMP/nix-out" "$RUNNER_TEMP/nix-meta"
           docker run --rm \
-            -v "$PWD/src-tauri/trezor/tests/emulator-rig/nix-closure-x86_64.txt:/closure.txt:ro" \
             -v "$RUNNER_TEMP/nix-out:/out" \
+            -v "$RUNNER_TEMP/nix-meta:/meta" \
             "$NIX_IMAGE" sh -eu -c '
               roots="
                 /nix/store/dkmjavf5yaj6hdcf2ggc6hsj1lp7lwsx-libjpeg-turbo-3.1.4.1
@@ -218,17 +221,34 @@ jobs:
                 /nix/store/cxd8d2vg70c3pa31v2473hphaa1v0j44-openssl-3.5.8
                 /nix/store/h4wfwic161kxrr74jlzla5lsm28hgary-glibc-2.44-25"
               nix-store --realise $roots > /dev/null
-              nix-store --query --requisites $roots | sort > /tmp/got
-              awk "{print \$3}" /closure.txt | sort > /tmp/want
-              test -z "$(comm -3 /tmp/got /tmp/want)" || { echo "the closure differs from the pinned list"; comm -3 /tmp/got /tmp/want; exit 1; }
-              while read -r hash size path; do
-                test "$(nix-store --query --hash "$path")" = "$hash" || { echo "NAR hash mismatch: $path"; exit 1; }
-              done < /closure.txt
-              cp -a $(cat /tmp/want) /out/
+              # Each step writes a file, so that `set -e` sees a failure. In a pipe it would not.
+              nix-store --query --requisites $roots > /tmp/requisites
+              LC_ALL=C sort /tmp/requisites > /tmp/paths
+              test -s /tmp/paths
+              # One line per path: "sha256:<NAR hash> <NAR size> <path>", sorted by path. A plain
+              # assignment stops the script when its command fails.
+              while read -r path; do
+                hash=$(nix-store --query --hash "$path")
+                size=$(nix-store --query --size "$path")
+                printf "%s %s %s\n" "$hash" "$size" "$path"
+              done < /tmp/paths > /meta/closure.txt
+              cp -a $(cat /tmp/paths) /out/
             '
+          # The check runs on the runner. The first lines of both lists are in the output, so that
+          # one run shows the real format of `nix-store --query --hash` if it is not the pinned one.
+          if ! diff -u "$pinned" "$RUNNER_TEMP/nix-meta/closure.txt" > "$RUNNER_TEMP/nix-meta/closure.diff"; then
+            echo "::error::The closure from cache.nixos.org differs from $pinned (paths or NAR hashes)."
+            echo "Pinned list: $(wc -l < "$pinned") lines. First lines:"
+            head -n 3 "$pinned"
+            echo "Produced list: $(wc -l < "$RUNNER_TEMP/nix-meta/closure.txt") lines. First lines:"
+            head -n 3 "$RUNNER_TEMP/nix-meta/closure.txt"
+            echo "Diff (- pinned, + produced), first 60 lines:"
+            head -n 60 "$RUNNER_TEMP/nix-meta/closure.diff"
+            exit 1
+          fi
           sudo mkdir -p /nix/store
           sudo cp -a "$RUNNER_TEMP/nix-out/." /nix/store/
-          sudo rm -rf "$RUNNER_TEMP/nix-out"
+          sudo rm -rf "$RUNNER_TEMP/nix-out" "$RUNNER_TEMP/nix-meta"
           # Smoke test: the loader and the libraries resolve. This needs no model server.
           mkdir -p "$RUNNER_TEMP/smoke"
           cd "$RUNNER_TEMP/smoke"

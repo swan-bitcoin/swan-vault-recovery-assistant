@@ -28,8 +28,11 @@ emulator is a Nix build. Its ELF interpreter and its libraries are at fixed `/ni
 so the job puts exactly these paths there.
 
 Each line is `sha256:<NAR hash in Nix base 32> <NAR size> /nix/store/<path>`, sorted by path. The job
-fetches the paths with `nix-store --realise` (Nix checks the signature of `cache.nixos.org`), and
-then it fails if the set of paths differs from this file or if one NAR hash differs.
+fetches the paths with `nix-store --realise` (Nix checks the signature of `cache.nixos.org`) and
+writes the closure as a list in this same format (`nix-store --query --requisites`, `--hash` and
+`--size`). The `nixos/nix` image has only Nix and coreutils, so the runner compares that list with
+this file using `diff`, before anything goes into `/nix/store`. The job fails if the set of paths
+differs or if one NAR hash differs, and it prints the first lines of both lists and the diff.
 
 How it was made: the closure of five root paths. The binary names them. `readelf -d <emulator>`
 shows the `RUNPATH`, and `readelf -l <emulator>` shows the interpreter. Walk the `References:` of the
