@@ -14,11 +14,14 @@ use std::sync::Arc;
 #[macro_use]
 mod errors;
 mod bitbox02;
+mod trezor;
+mod trezor_pairing;
 use bdk_wallet::psbt::PsbtUtils;
 use bitbox02::Bitbox02Progress;
 use errors::{DescriptorType, SvraError, SvraErrorType};
 mod network;
 use network::{HwiNetwork, Network};
+use trezor::TrezorProgress;
 
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
@@ -572,11 +575,17 @@ async fn estimate_fee(
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
 
-  // HWI is skipped when a BitBox02 is connected. HWI opens the BitBox02 during its own listing,
-  // starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the only
-  // program that talks to the device.
-  if let Some(response) = bitbox02::enumerate().await {
-    return response;
+  // HWI is skipped when a BitBox02 or a Trezor Safe 7 is connected. HWI opens a BitBox02 during
+  // its own listing, starts an encrypted session and reads the BitBoxApp pairing file, and it
+  // sends the old Trezor protocol to a Safe 7. SVRA must be the only program that talks to these
+  // devices. Both scans run, and a device of each kind shows in the list.
+  let (bitbox02_devices, trezor_devices) =
+    tokio::join!(bitbox02::enumerate(), trezor::enumerate());
+  let devices: Vec<serde_json::Value> =
+    bitbox02_devices.into_iter().chain(trezor_devices).collect();
+  if !devices.is_empty() {
+    return serde_json::to_string(&devices)
+      .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
   }
 
   let network: HwiNetwork = network.into();
@@ -742,6 +751,15 @@ async fn sign(
     ));
   }
 
+  // The same holds for a Trezor Safe 7: HWI cannot speak its protocol. It must go through
+  // `sign_trezor`.
+  if device_type.eq_ignore_ascii_case("trezor_safe7") {
+    return Err(SvraError::new(
+      SvraErrorType::DeviceError,
+      "A Trezor Safe 7 cannot sign through HWI. SVRA signs with the Trezor Safe 7 directly.",
+    ));
+  }
+
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
 
@@ -812,6 +830,39 @@ async fn sign_bitbox02(
     on_progress,
   )
   .await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn sign_trezor(
+  window: tauri::Window,
+  psbt: String,
+  network: String,
+  descriptors: Descriptors,
+  on_progress: tauri::ipc::Channel<TrezorProgress>,
+) -> Result<String, SvraError> {
+  let network = Network::from_str(&network)?;
+  trezor::sign(
+    psbt,
+    network,
+    descriptors.receive,
+    descriptors.change,
+    on_progress,
+    window.label().to_string(),
+  )
+  .await
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn submit_trezor_pairing_code(code: String) -> Result<(), SvraError> {
+  trezor::submit_pairing_code(code)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn cancel_trezor_pairing() -> Result<(), SvraError> {
+  trezor::cancel_pairing()
 }
 
 #[tauri::command]
@@ -994,6 +1045,7 @@ fn main() {
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
       broadcast,
+      cancel_trezor_pairing,
       create_window,
       enumerate,
       estimate_fee,
@@ -1007,6 +1059,8 @@ fn main() {
       psbt_status,
       sign,
       sign_bitbox02,
+      sign_trezor,
+      submit_trezor_pairing_code,
       sweep,
       wallet,
     ]);
@@ -1025,6 +1079,12 @@ fn main() {
   tauri::Builder::default()
     .plugin(tauri_plugin_clipboard_manager::init())
     .plugin(tauri_plugin_shell::init())
+    .on_window_event(|window, event| {
+      // A session that waits for a pairing code in a closed window would wait forever.
+      if let tauri::WindowEvent::Destroyed = event {
+        trezor::window_closed(window.label());
+      }
+    })
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
       specta_builder.mount_events(app);

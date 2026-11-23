@@ -42,21 +42,18 @@ impl From<Progress> for Bitbox02Progress {
   }
 }
 
-/// Lists the BitBox02 devices on USB, in the JSON shape of `hwi enumerate`. Returns `None` when
-/// there is no device or the scan fails, so the caller falls back to HWI.
-pub async fn enumerate() -> Option<Result<String, SvraError>> {
-  let devices = tokio::task::spawn_blocking(svra_bitbox02::scan)
-    .await
-    .ok()?
-    .ok()?;
-  if devices.is_empty() {
-    return None;
+/// Lists the BitBox02 devices on USB, in the JSON shape of `hwi enumerate`. Returns no entries
+/// when there is no device or the scan fails, so that a failed scan hides neither a Trezor Safe 7
+/// nor the devices that HWI finds.
+pub async fn enumerate() -> Vec<serde_json::Value> {
+  match tokio::task::spawn_blocking(svra_bitbox02::scan).await {
+    Ok(Ok(devices)) => device_entries(&devices),
+    _ => Vec::new(),
   }
-  Some(devices_json(&devices))
 }
 
-fn devices_json(devices: &[DetectedDevice]) -> Result<String, SvraError> {
-  let entries: Vec<serde_json::Value> = devices
+fn device_entries(devices: &[DetectedDevice]) -> Vec<serde_json::Value> {
+  devices
     .iter()
     .map(|device| {
       let mut entry = json!({
@@ -73,9 +70,7 @@ fn devices_json(devices: &[DetectedDevice]) -> Result<String, SvraError> {
       }
       entry
     })
-    .collect();
-  serde_json::to_string(&entries)
-    .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()))
+    .collect()
 }
 
 pub async fn sign(

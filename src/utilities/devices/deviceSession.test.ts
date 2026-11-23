@@ -1,14 +1,22 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
-import type { Bitbox02Progress } from '../../bindings'
-import { isBitbox02SessionPending, runBitbox02Session, startSignRun, type SignRun } from './bitbox02Session'
+import type { Bitbox02Progress, TrezorProgress } from '../../bindings'
+import {
+  getBusyMessage,
+  getPendingDevice,
+  runBitbox02Session,
+  runTrezorSession,
+  startSignRun,
+  type SignRun,
+} from './deviceSession'
 
 vi.mock('@tauri-apps/api/core', () => ({
   Channel: class {
-    onmessage: (update: Bitbox02Progress) => void = () => {}
+    onmessage: (update: Bitbox02Progress | TrezorProgress) => void = () => {}
   },
 }))
 
 type Channel = Parameters<Parameters<typeof runBitbox02Session>[1]>[0]
+type TrezorChannel = Parameters<Parameters<typeof runTrezorSession>[1]>[0]
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -53,12 +61,12 @@ describe('startSignRun()', () => {
   it('should keep the guard for a run whose device is not known yet', () => {
     start()
     expect(tryStart()).toBeNull()
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
   })
 
   it('should release the guard at once when the device is not a BitBox02', () => {
     start().deviceFound('jade')
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
     expect(tryStart()).not.toBeNull()
   })
 
@@ -71,11 +79,11 @@ describe('startSignRun()', () => {
     const run = start()
     run.deviceFound('bitbox02')
 
-    expect(isBitbox02SessionPending()).toBe(true)
+    expect(getPendingDevice()).toBe('bitbox02')
     expect(tryStart()).toBeNull()
 
     run.release()
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
     expect(tryStart()).not.toBeNull()
   })
 
@@ -84,7 +92,7 @@ describe('startSignRun()', () => {
     run.deviceFound('bitbox02')
     run.sessionEnded()
 
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
     expect(tryStart()).toBeNull()
   })
 
@@ -96,8 +104,35 @@ describe('startSignRun()', () => {
 
     first.release()
 
-    expect(isBitbox02SessionPending()).toBe(true)
+    expect(getPendingDevice()).toBe('bitbox02')
     expect(tryStart()).toBeNull()
+  })
+
+  it('should hold the guard for a Safe 7 until the run ends', () => {
+    const run = start()
+    run.deviceFound('trezor_safe7')
+
+    expect(getPendingDevice()).toBe('trezor_safe7')
+    expect(tryStart()).toBeNull()
+
+    run.release()
+    expect(getPendingDevice()).toBeNull()
+    expect(tryStart()).not.toBeNull()
+  })
+
+  it('should keep the guard of a Safe 7 after the session ended, so the run can show its result alone', () => {
+    const run = start()
+    run.deviceFound('trezor_safe7')
+    run.sessionEnded()
+
+    expect(getPendingDevice()).toBeNull()
+    expect(tryStart()).toBeNull()
+  })
+
+  it('should not hold the guard for the other Trezor models, which HWI drives', () => {
+    start().deviceFound('trezor')
+    expect(getPendingDevice()).toBeNull()
+    expect(tryStart()).not.toBeNull()
   })
 
   it('should allow release to be called twice', () => {
@@ -115,11 +150,11 @@ describe('runBitbox02Session()', () => {
     const command = deferred<string>()
     const session = runBitbox02Session(run, () => command.promise, vi.fn())
 
-    expect(isBitbox02SessionPending()).toBe(true)
+    expect(getPendingDevice()).toBe('bitbox02')
     command.resolve('done')
 
     await expect(session).resolves.toBe('done')
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
   })
 
   it('should end the session when the command rejects, and pass the rejection on', async () => {
@@ -130,7 +165,7 @@ describe('runBitbox02Session()', () => {
     command.reject({ error_type: 'Bitbox02Error', message: 'x' })
 
     await expect(session).rejects.toStrictEqual({ error_type: 'Bitbox02Error', message: 'x' })
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
   })
 
   it('should end the session when the command throws at once', async () => {
@@ -145,7 +180,7 @@ describe('runBitbox02Session()', () => {
         vi.fn()
       )
     ).rejects.toThrow('boom')
-    expect(isBitbox02SessionPending()).toBe(false)
+    expect(getPendingDevice()).toBeNull()
   })
 
   it('should show each update once, and the register update once per name', async () => {
@@ -210,6 +245,110 @@ describe('runBitbox02Session()', () => {
     ).rejects.toThrow('x')
 
     channel.onmessage({ step: 'unlock' })
+    expect(show).not.toHaveBeenCalled()
+  })
+})
+
+describe('getBusyMessage()', () => {
+  it('should name the BitBox02 with the sentence that the backend uses', () => {
+    expect(getBusyMessage('bitbox02')).toBe(
+      'SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.'
+    )
+  })
+
+  it('should name the Safe 7', () => {
+    expect(getBusyMessage('trezor_safe7')).toBe(
+      'SVRA is still waiting for your Trezor Safe 7. Finish on the Trezor Safe 7, or unplug it to stop. Then try again.'
+    )
+  })
+})
+
+describe('runTrezorSession()', () => {
+  it('should return the result of the command and end the session', async () => {
+    const run = start()
+    run.deviceFound('trezor_safe7')
+    const command = deferred<string>()
+    const session = runTrezorSession(run, () => command.promise, vi.fn())
+
+    expect(getPendingDevice()).toBe('trezor_safe7')
+    command.resolve('done')
+
+    await expect(session).resolves.toBe('done')
+    expect(getPendingDevice()).toBeNull()
+  })
+
+  it('should end the session when the command rejects, and pass the rejection on', async () => {
+    const run = start()
+    run.deviceFound('trezor_safe7')
+    const error = { error_type: 'TrezorError', message: 'x' }
+
+    await expect(runTrezorSession(run, () => Promise.reject(error), vi.fn())).rejects.toStrictEqual(error)
+    expect(getPendingDevice()).toBeNull()
+  })
+
+  it('should show each update once, and in the order it arrives', async () => {
+    const command = deferred<string>()
+    const show = vi.fn()
+    let channel!: TrezorChannel
+    const session = runTrezorSession(
+      start(),
+      (onProgress) => {
+        channel = onProgress
+        return command.promise
+      },
+      show
+    )
+
+    channel.onmessage({ step: 'connecting' })
+    channel.onmessage({ step: 'connecting' })
+    channel.onmessage({ step: 'enter-pairing-code' })
+    channel.onmessage({ step: 'enter-pairing-code' })
+    channel.onmessage({ step: 'checking-key' })
+    channel.onmessage({ step: 'sign' })
+    channel.onmessage({ step: 'sign' })
+
+    expect(show.mock.calls.map(([update]) => update)).toStrictEqual([
+      { step: 'connecting' },
+      { step: 'enter-pairing-code' },
+      { step: 'checking-key' },
+      { step: 'sign' },
+    ])
+
+    command.resolve('done')
+    await session
+  })
+
+  it('should ignore an update that arrives after the command resolved', async () => {
+    const show = vi.fn()
+    let channel!: TrezorChannel
+    await runTrezorSession(
+      start(),
+      (onProgress) => {
+        channel = onProgress
+        return Promise.resolve('done')
+      },
+      show
+    )
+
+    channel.onmessage({ step: 'sign' })
+    expect(show).not.toHaveBeenCalled()
+  })
+
+  it('should ignore an update that arrives after the command rejected', async () => {
+    const show = vi.fn()
+    let channel!: TrezorChannel
+    await expect(
+      runTrezorSession(
+        start(),
+        (onProgress) => {
+          channel = onProgress
+          return Promise.reject(new Error('x'))
+        },
+        show
+      )
+    ).rejects.toThrow('x')
+
+    channel.onmessage({ step: 'enter-pairing-code' })
     expect(show).not.toHaveBeenCalled()
   })
 })

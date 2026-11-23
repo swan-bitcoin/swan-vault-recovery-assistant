@@ -99,6 +99,42 @@ describe('getDeviceMessage()', () => {
     expect(message).toContain('SVRA lists only the BitBox02')
   })
 
+  it('should print a readable name for a Safe 7, say when SVRA reads its fingerprint, and hint per device', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null }]
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message).toContain('Found a Trezor Safe 7 device')
+    expect(message).toContain('SVRA reads its fingerprint when you sign')
+    expect(message).toContain(
+      'While a Trezor Safe 7 is connected, SVRA lists only the Trezor Safe 7. Unplug it to use another device.'
+    )
+    expect(message).not.toContain('no fingerprint')
+    expect(message).not.toContain('BitBox02')
+  })
+
+  it('should print the Safe 7 error when the device is in bootloader mode', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor_safe7', model: 'trezor_safe_7', error: 'bootloader mode', code: -12 }]
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message).toContain('Trezor Safe 7 device')
+    expect(message).toContain("reporting an error: 'bootloader mode'")
+    expect(message).toContain('SVRA lists only the Trezor Safe 7')
+  })
+
+  it('should keep the other Trezor models as HWI reports them, without the Safe 7 hint', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor', model: 'trezor_1', fingerprint: '12345678' }]
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message).toBe("Found a trezor_1 device with fingerprint '12345678'")
+  })
+
+  it('should give a hint for each device that SVRA drives itself', () => {
+    const devices = [
+      { ...DEVICE1, type: 'bitbox02', model: 'bitbox02_multi' },
+      { ...DEVICE2, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null },
+    ]
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message).toContain('SVRA lists only the BitBox02')
+    expect(message).toContain('SVRA lists only the Trezor Safe 7')
+  })
+
   it('should return a message when multiple devices are present', () => {
     const devices = [DEVICE1, DEVICE2, { ...DEVICE3, error: 'cheeseburger' }]
     expect(parsing.getDeviceMessage(JSON.stringify(devices))).toMatch(
@@ -122,6 +158,17 @@ describe('getDevicePrompt()', () => {
     const prompt = parsing.getDevicePrompt(JSON.stringify(devices))
     expect(prompt).toContain('cannot sign yet')
     expect(prompt).not.toMatch(/You may want to sign with this device/)
+  })
+
+  it('should not suggest signing with a Safe 7 that reports an error', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor_safe7', model: 'trezor_safe_7', error: 'bootloader mode', code: -12 }]
+    const prompt = parsing.getDevicePrompt(JSON.stringify(devices))
+    expect(prompt).toBe('This Trezor Safe 7 cannot sign yet. Read the error above first.')
+  })
+
+  it('should keep the usual message for a Safe 7 without an error', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null }]
+    expect(parsing.getDevicePrompt(JSON.stringify(devices))).toMatch(/You may want to sign with this device/)
   })
 
   it('should keep the usual message for a BitBox02 without an error', () => {
@@ -191,6 +238,37 @@ describe('getSignResultAndPsbt() fingerprint', () => {
       expect(result.signed).toBe(true)
     }
   )
+})
+
+describe('getSignResultAndPsbt() with a Safe 7 result', () => {
+  it('should return the psbt, the signed flag and the fingerprint', () => {
+    const response = { psbt: 'cHNidA==', signed: true, fingerprint: 'a1b2c3d4' }
+    expect(parsing.getSignResultAndPsbt(JSON.stringify(response))).toMatchObject({
+      psbt: 'cHNidA==',
+      signed: true,
+      fingerprint: 'a1b2c3d4',
+    })
+  })
+
+  it('should say that no signature was added when the key had signed already', () => {
+    const response = { psbt: 'cHNidA==', signed: false, fingerprint: 'a1b2c3d4' }
+    const result = parsing.getSignResultAndPsbt(JSON.stringify(response))
+    expect(result.signed).toBe(false)
+    expect(result.message).toContain('A signature was not added')
+  })
+})
+
+describe('getDevice() with a Safe 7 error', () => {
+  it('should throw a DeviceError that names the device type', () => {
+    const devices = [{ ...DEVICE1, type: 'trezor_safe7', error: 'bootloader mode' }]
+    try {
+      parsing.getDevice(JSON.stringify(devices))
+      expect.unreachable()
+    } catch (e) {
+      expect(e).toBeInstanceOf(parsing.DeviceError)
+      expect((e as parsing.DeviceError).deviceType).toBe('trezor_safe7')
+    }
+  })
 })
 
 describe('getDevice() with a BitBox02 error', () => {

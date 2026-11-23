@@ -1,0 +1,39 @@
+[package]
+name = "svra_trezor"
+version = "0.1.0"
+description = "Trezor Safe 7 PSBT signing for Swan vault recovery"
+edition = "2021"
+publish = false
+# `tests/emulator.rs` and `tests/support` are modules of the crate, because the emulator tests use
+# its internals to load a seed into the device. They are not test programs of their own.
+autotests = false
+
+[dependencies]
+bitcoin = "0.32"
+# 256-bit arithmetic for the Elligator 2 map of the pairing code. It has no unsafe code and no C.
+crypto-bigint = { version = "0.5.5", default-features = false }
+getrandom = "0.3.4"
+nusb = { version = "0.2.9", optional = true }
+prost = { version = "0.14.6", default-features = false, features = ["derive"] }
+semver = "1"
+sha2 = "0.10"
+subtle = "2.6"
+svra_vault = { path = "../vault" }
+# The device side of the channel is the software device of the tests. The host side is all
+# that the app needs, but the crate builds both.
+trezor-noise-rust-crypto = { version = "=0.6.2", default-features = false, features = ["use-x25519", "use-aes-256-gcm", "use-sha2"] }
+trezor-thp = { version = "=0.1.1", features = ["use_std"] }
+x25519-dalek = { version = "2.0.1", default-features = false }
+zeroize = "1"
+
+[dev-dependencies]
+bdk_wallet = "1.0.0"
+# The same consensus code Bitcoin Core runs, to check that a signed vault spend is valid.
+bitcoinconsensus = { version = "0.106.0", default-features = false }
+# The emulator tests turn the mnemonic that they load into the device into the keys that the
+# device has, with BIP-39: PBKDF2 with HMAC-SHA512.
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+
+[features]
+# USB transport for a physical Safe 7. The app enables this.
+usb = ["dep:nusb"]

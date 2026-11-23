@@ -133,6 +133,7 @@ pub enum SvraErrorType {
   PsbtSignError,
   TransactionError,
   TransactionsError,
+  TrezorError,
   WalletError,
   WalletSyncError,
   #[default]
@@ -161,6 +162,7 @@ impl std::fmt::Display for SvraErrorType {
       SvraErrorType::PsbtSignError => write!(f, "PsbtSignError"),
       SvraErrorType::TransactionError => write!(f, "TransactionError"),
       SvraErrorType::TransactionsError => write!(f, "TransactionsError"),
+      SvraErrorType::TrezorError => write!(f, "TrezorError"),
       SvraErrorType::WalletError => write!(f, "WalletError"),
       SvraErrorType::WalletSyncError => write!(f, "WalletSyncError"),
       SvraErrorType::UnknownError => write!(f, "UnknownError"),
@@ -184,6 +186,10 @@ impl SvraError {
 
   pub fn from_bitbox02(error: svra_bitbox02::Error) -> Self {
     SvraError::new(SvraErrorType::Bitbox02Error, &error.message)
+  }
+
+  pub fn from_trezor(error: svra_trezor::Error) -> Self {
+    SvraError::new(SvraErrorType::TrezorError, &error.message)
   }
 
   pub fn from_hwi_error_code(code: Option<i32>) -> Self {

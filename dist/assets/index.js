@@ -6,15 +6,19 @@ import {
   c as clearStatusIndicators,
   h as handleError,
   a as sanitize,
-  i as initializeDOM,
-  b as showTempLoadingMessage,
-  d as hideTempMessage,
-  e as getDeviceMessage,
-  f as getDevicePrompt,
-  j as getDevice,
-  k as getSignResultAndPsbt,
-  l as getPsbtStatusMessage,
-  m as DeviceError,
+  b as getSelfDrivenName,
+  i as isSelfDrivenType,
+  d as showTempLoadingMessage,
+  e as initializeDOM,
+  f as hideTempMessage,
+  j as getDeviceMessage,
+  k as getDevicePrompt,
+  l as getDevice,
+  m as getFoundMessage,
+  n as getSignResultAndPsbt,
+  o as getPsbtStatusMessage,
+  p as getUnplugMessage,
+  q as DeviceError,
   C as CircularTickIcon,
 } from './layout.js'
 function __classPrivateFieldGet(receiver, state, kind, f) {
@@ -153,6 +157,9 @@ const commands = {
   async broadcast(psbt, network, descriptors, electrum) {
     return await invoke('broadcast', { psbt, network, descriptors, electrum })
   },
+  async cancelTrezorPairing() {
+    return await invoke('cancel_trezor_pairing')
+  },
   async createWindow(label, html, title, width, height) {
     await invoke('create_window', { label, html, title, width, height })
   },
@@ -191,6 +198,12 @@ const commands = {
   },
   async signBitbox02(psbt, network, descriptors, onProgress) {
     return await invoke('sign_bitbox02', { psbt, network, descriptors, onProgress })
+  },
+  async signTrezor(psbt, network, descriptors, onProgress) {
+    return await invoke('sign_trezor', { psbt, network, descriptors, onProgress })
+  },
+  async submitTrezorPairingCode(code) {
+    return await invoke('submit_trezor_pairing_code', { code })
   },
   async sweep(address, feeRate, network, descriptors, electrum) {
     return await invoke('sweep', { address, feeRate, network, descriptors, electrum })
@@ -683,7 +696,7 @@ function parseBitbox02Error(e) {
   if (errorType !== 'Bitbox02Error' || typeof message !== 'string' || message === '') return null
   return { message }
 }
-const WAITING = 'Waiting for your BitBox02…'
+const WAITING$1 = 'Waiting for your BitBox02…'
 const WALLET_NAME = 'swan_vault'
 function getBitbox02StepMessage(update) {
   switch (update.step) {
@@ -691,12 +704,12 @@ function getBitbox02StepMessage(update) {
       return { loading: 'Connecting to your BitBox02…' }
     case 'unlock':
       return {
-        loading: WAITING,
+        loading: WAITING$1,
         bubble: 'Unlock your BitBox02. Enter your password on the device if it asks. To stop, unplug the BitBox02.',
       }
     case 'confirm-pairing':
       return {
-        loading: WAITING,
+        loading: WAITING$1,
         bubble:
           'Check that the code below is the same as the code on your BitBox02. If the codes are different, do not confirm. Unplug the BitBox02. If they are the same, confirm on the device.',
         code: update.code,
@@ -705,7 +718,7 @@ function getBitbox02StepMessage(update) {
       return { loading: 'Checking that your BitBox02 knows this vault…' }
     case 'register':
       return {
-        loading: WAITING,
+        loading: WAITING$1,
         // an unexpected registration can mean that the pasted wallet configuration is not the customer's vault, so both texts say when to stop
         bubble:
           update.name === WALLET_NAME
@@ -713,38 +726,40 @@ function getBitbox02StepMessage(update) {
             : `Your BitBox02 already has a different wallet named ${WALLET_NAME}. This is normal only if you used this BitBox02 for another Swan vault. If you did not, stop: unplug the BitBox02 and check the wallet configuration against your Swan Vault Recovery Sheet. To continue, check each key again, then confirm on the BitBox02. It shows this vault as ${update.name}.`,
       }
     case 'sign':
-      return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
+      return { loading: WAITING$1, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
   }
 }
-const BITBOX02_BUSY_MESSAGE =
-  'SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.'
+const getBusyMessage = (deviceType) => {
+  const name = getSelfDrivenName(deviceType)
+  return `SVRA is still waiting for your ${name}. Finish on the ${name}, or unplug it to stop. Then try again.`
+}
 let current = null
-const isBitbox02SessionPending = () => (current == null ? void 0 : current.bitbox02Pending) === true
+const getPendingDevice = () => (current == null ? void 0 : current.pendingDevice) ?? null
 function startSignRun() {
   if (current) return null
-  const state = { bitbox02Pending: false }
+  const state = { pendingDevice: null }
   current = state
   const release = () => {
     if (current === state) current = null
   }
   return {
     deviceFound: (deviceType) => {
-      if (deviceType === 'bitbox02') state.bitbox02Pending = true
+      if (isSelfDrivenType(deviceType)) state.pendingDevice = deviceType
       else release()
     },
     sessionEnded: () => {
-      state.bitbox02Pending = false
+      state.pendingDevice = null
     },
     release,
   }
 }
-async function runBitbox02Session(run, start, show) {
+async function runSession(run, start, show, keyOf) {
   let isSettled = false
   const shown = /* @__PURE__ */ new Set()
   const onProgress = new Channel()
   onProgress.onmessage = (update) => {
     if (isSettled) return
-    const key = update.step === 'register' ? `register:${update.name}` : update.step
+    const key = keyOf(update)
     if (shown.has(key)) return
     shown.add(key)
     show(update)
@@ -756,13 +771,17 @@ async function runBitbox02Session(run, start, show) {
     run.sessionEnded()
   }
 }
+const runBitbox02Session = (run, start, show) =>
+  runSession(run, start, show, (update) => (update.step === 'register' ? `register:${update.name}` : update.step))
+const runTrezorSession = (run, start, show) => runSession(run, start, show, (update) => update.step)
 function getDeviceName(device) {
   switch (device.type) {
     case 'jade': {
       return 'Jade'
     }
-    case 'bitbox02': {
-      return 'BitBox02'
+    case 'bitbox02':
+    case 'trezor_safe7': {
+      return getSelfDrivenName(device.type)
     }
     default: {
       return sanitize(device.type)
@@ -835,6 +854,177 @@ function getJadeDevice({ fingerprint }) {
 </defs>
 </svg>
 `
+}
+function getTrezorSafe7Device() {
+  return `<svg viewBox="0 0 309 138" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto" role="img" aria-label="Trezor Safe 7">
+<g>
+<rect x="64" y="12" width="176" height="114" rx="22" fill="#2A2C2E"/>
+<rect x="64" y="12" width="176" height="114" rx="22" fill="url(#trezor-safe7-sheen)"/>
+<rect x="240" y="58" width="14" height="22" rx="3" fill="#9A9A9A"/>
+<rect x="74" y="22" width="156" height="94" rx="14" fill="#050505"/>
+<rect x="92" y="42" width="84" height="6" rx="3" fill="#5A5C5E"/>
+<rect x="92" y="58" width="120" height="6" rx="3" fill="#3C3E40"/>
+<rect x="92" y="74" width="104" height="6" rx="3" fill="#3C3E40"/>
+<rect x="150" y="92" width="62" height="14" rx="7" fill="#90E3B1"/>
+</g>
+<defs>
+<linearGradient id="trezor-safe7-sheen" x1="64" y1="12" x2="240" y2="126" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0"/>
+<stop offset="0.82" stop-color="white" stop-opacity="0.07"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
+`
+}
+function parseTrezorError(e) {
+  if (typeof e !== 'object' || e === null) return null
+  const { error_type: errorType, message } = e
+  if (errorType !== 'TrezorError' || typeof message !== 'string' || message === '') return null
+  return { message }
+}
+const PAIRING_CODE_LENGTH = 6
+const PAIRING_SUBMITTED_MESSAGE = 'Checking the code with your Trezor…'
+const PAIRING_CANCELLED_MESSAGE = 'Cancelling…'
+const PAIRING_REFUSED_MESSAGE = 'SVRA could not send this to your Trezor. Unplug the Trezor, then try again.'
+const normalizePairingCode = (raw) => raw.replace(/\D/g, '').slice(0, PAIRING_CODE_LENGTH)
+const isPairingCodeComplete = (code) => new RegExp(`^\\d{${PAIRING_CODE_LENGTH}}$`).test(code)
+function createPairingCodeEntry(backend, hooks) {
+  let isOpen = true
+  let hasEnded = false
+  const use = async (reason, send) => {
+    var _a
+    if (!isOpen) return
+    isOpen = false
+    hooks.onClosed(reason)
+    try {
+      await send()
+    } catch (e) {
+      if (!hasEnded) hooks.onRefused(((_a = parseTrezorError(e)) == null ? void 0 : _a.message) ?? PAIRING_REFUSED_MESSAGE)
+    }
+  }
+  return {
+    submit: async (raw) => {
+      const code = normalizePairingCode(raw)
+      if (!isOpen || !isPairingCodeComplete(code)) return
+      await use('submitted', () => backend.submit(code))
+    },
+    cancel: () => use('cancelled', () => backend.cancel()),
+    end: () => {
+      hasEnded = true
+      if (!isOpen) return
+      isOpen = false
+      hooks.onClosed('ended')
+    },
+    isOpen: () => isOpen,
+  }
+}
+const WAITING = 'Waiting for your Trezor…'
+const STOP = 'To stop, unplug the Trezor.'
+function getTrezorStepMessage(update) {
+  switch (update.step) {
+    case 'connecting':
+      return { loading: 'Connecting to your Trezor…' }
+    case 'unlock':
+      return { loading: WAITING, bubble: `Unlock your Trezor. Enter your PIN on the device. ${STOP}` }
+    case 'confirm-connection':
+      return {
+        loading: WAITING,
+        bubble: `Your Trezor asks if it may connect to Swan Vault Recovery Assistant. Check the name on the Trezor, then allow the connection. ${STOP}`,
+      }
+    case 'enter-pairing-code':
+      return {
+        loading: 'Waiting for the 6-digit code…',
+        // the input and its buttons come after this bubble
+        bubble:
+          'Your Trezor shows a 6-digit code. Type it here. The code proves that SVRA talks to this Trezor and that nothing sits in between. SVRA asks for a code on every run, because it stores nothing. To stop, select Cancel or unplug the Trezor.',
+      }
+    case 'checking-key':
+      return { loading: 'Checking that your Trezor holds a key of this vault…' }
+    case 'passphrase':
+      return {
+        loading: WAITING,
+        bubble: `This Trezor has passphrase protection, and its standard wallet holds no key of this vault. Enter your passphrase on the Trezor. ${STOP}`,
+      }
+    case 'sign':
+      return {
+        loading: WAITING,
+        // the device holds no vault, so it shows whatever keys SVRA sends; its address and amount are the only check left
+        bubble: `Your Trezor now shows the transaction. It first warns that this is a multisig wallet. Check the address and the amount on the Trezor, then confirm. The Trezor does not know your vault and shows whatever keys SVRA sends, so the address and the amount on the Trezor are what you must check. ${STOP}`,
+      }
+  }
+}
+function createTrezorView() {
+  let pairing = null
+  return {
+    show(update) {
+      const { loading, bubble } = getTrezorStepMessage(update)
+      if (bubble) addToConversation(createConversationBubble({ content: bubble }))
+      showTempLoadingMessage(loading)
+      if (update.step === 'enter-pairing-code') pairing = showPairingCodeEntry()
+    },
+    // the sign command has settled, so a code that is still waiting can no longer be used
+    end() {
+      pairing == null ? void 0 : pairing.end()
+    },
+  }
+}
+function showPairingCodeEntry() {
+  const input = document.createElement('input')
+  input.className = 'input input-bordered input-secondary w-40 font-mono tracking-widest'
+  input.type = 'text'
+  input.inputMode = 'numeric'
+  input.autocomplete = 'off'
+  input.spellcheck = false
+  input.autofocus = true
+  input.placeholder = `${PAIRING_CODE_LENGTH} digits`
+  input.setAttribute('aria-label', `The ${PAIRING_CODE_LENGTH}-digit code that your Trezor shows`)
+  const continueButton = document.createElement('button')
+  continueButton.type = 'button'
+  continueButton.className = 'btn btn-primary btn-sm'
+  continueButton.textContent = 'Continue'
+  continueButton.classList.add('btn-disabled')
+  const cancelButton = document.createElement('button')
+  cancelButton.type = 'button'
+  cancelButton.className = 'btn btn-outline btn-sm'
+  cancelButton.textContent = 'Cancel'
+  const controls = document.createElement('div')
+  controls.className = 'flex flex-wrap items-center gap-2'
+  controls.append(input, continueButton, cancelButton)
+  const entry = createPairingCodeEntry(
+    { submit: (code) => commands.submitTrezorPairingCode(code), cancel: () => commands.cancelTrezorPairing() },
+    {
+      onClosed: (reason) => {
+        input.value = ''
+        input.readOnly = true
+        input.classList.add('opacity-70')
+        continueButton.classList.add('btn-disabled')
+        cancelButton.classList.add('btn-disabled')
+        controls.inert = true
+        if (reason === 'submitted') showTempLoadingMessage(PAIRING_SUBMITTED_MESSAGE)
+        if (reason === 'cancelled') showTempLoadingMessage(PAIRING_CANCELLED_MESSAGE)
+      },
+      onRefused: (message) => addToConversation(createConversationBubble({ content: message })),
+    }
+  )
+  input.addEventListener('input', () => {
+    input.value = normalizePairingCode(input.value)
+    continueButton.classList.toggle('btn-disabled', !entry.isOpen() || !isPairingCodeComplete(input.value))
+  })
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    entry.submit(input.value)
+  })
+  continueButton.addEventListener('click', () => entry.submit(input.value))
+  cancelButton.addEventListener('click', () => entry.cancel())
+  const actions = createConversationActions({ content: controls, dangerouslySetInnerHTML: true })
+  if (actions) {
+    addToConversation(actions)
+  } else {
+    entry.cancel()
+  }
+  return entry
 }
 const createConversationImage = ({ content, footer }) => {
   const chatContainer = document.createElement('div')
@@ -952,7 +1142,7 @@ async function broadcast() {
   }
 }
 async function enumerate() {
-  if (refuseWhileBitbox02SessionPending()) return
+  if (refuseWhileDeviceSessionPending()) return
   const { network } = getUserInputs()
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
@@ -1134,10 +1324,11 @@ function showBitbox02Step(update) {
   }
   showTempLoadingMessage(loading)
 }
-function refuseWhileBitbox02SessionPending() {
-  if (!isBitbox02SessionPending()) return false
+function refuseWhileDeviceSessionPending() {
+  const pendingDevice = getPendingDevice()
+  if (!pendingDevice) return false
   addToConversation(
-    createConversationBubble({ content: BITBOX02_BUSY_MESSAGE, footer: /* @__PURE__ */ new Date().toLocaleString() })
+    createConversationBubble({ content: getBusyMessage(pendingDevice), footer: /* @__PURE__ */ new Date().toLocaleString() })
   )
   return true
 }
@@ -1150,7 +1341,7 @@ const createTryAgainActions = (retryCount) =>
       ;(_a = parent.querySelector('#get-device-and-sign-again-btn')) == null
         ? void 0
         : _a.addEventListener('click', () => {
-            if (refuseWhileBitbox02SessionPending()) return
+            if (refuseWhileDeviceSessionPending()) return
             sign({ retryCount: retryCount + 1 })
           })
     },
@@ -1165,6 +1356,7 @@ async function sign({ retryCount = 0 } = {}) {
   }
 }
 async function signWithDevice(run, retryCount) {
+  var _a, _b
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   try {
@@ -1175,15 +1367,16 @@ async function signWithDevice(run, retryCount) {
     run.deviceFound(device.type)
     hideTempMessage()
     const isBitbox02 = device.type === 'bitbox02'
+    const isTrezorSafe7 = device.type === 'trezor_safe7'
     const deviceInstructionBubbles = [
-      ...(isBitbox02
+      ...(isSelfDrivenType(device.type)
         ? [
             {
-              content: getBitbox02Device(),
+              content: isBitbox02 ? getBitbox02Device() : getTrezorSafe7Device(),
               type: 'image',
             },
             {
-              content: 'Found your BitBox02. Keep this window open: it tells you when to look at the BitBox02.',
+              content: getFoundMessage(device.type),
               footer: /* @__PURE__ */ new Date().toLocaleString(),
               type: 'bubble',
             },
@@ -1227,6 +1420,17 @@ async function signWithDevice(run, retryCount) {
         (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
         showBitbox02Step
       )
+    } else if (isTrezorSafe7) {
+      const view = createTrezorView()
+      try {
+        response = await runTrezorSession(
+          run,
+          (onProgress) => commands.signTrezor(psbt, network, descriptors, onProgress),
+          view.show
+        )
+      } finally {
+        view.end()
+      }
     } else {
       await sleep(9e3)
       showTempLoadingMessage('Waiting for you to sign the transaction')
@@ -1243,7 +1447,7 @@ async function signWithDevice(run, retryCount) {
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      updateSignHistory(device, isBitbox02 ? fingerprint : void 0)
+      updateSignHistory(device, isSelfDrivenType(device.type) ? fingerprint : void 0)
     }
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
     await sleep(600)
@@ -1257,8 +1461,8 @@ async function signWithDevice(run, retryCount) {
       await sleep(4e3)
       addToConversation(
         createConversationBubble({
-          content: isBitbox02
-            ? 'Unplug the BitBox02 first, because SVRA lists only the BitBox02 while it is connected. Then connect another device to continue signing the transaction.'
+          content: isSelfDrivenType(device.type)
+            ? getUnplugMessage(device.type)
             : 'Connect another device to continue signing the transaction.',
         })
       )
@@ -1266,11 +1470,11 @@ async function signWithDevice(run, retryCount) {
         content: '<button class="btn btn-primary btn-sm">Continue signing with another device</button>',
         dangerouslySetInnerHTML: true,
         onAppended: (parent) => {
-          var _a
-          ;(_a = parent.querySelector('button')) == null
+          var _a2
+          ;(_a2 = parent.querySelector('button')) == null
             ? void 0
-            : _a.addEventListener('click', () => {
-                if (refuseWhileBitbox02SessionPending()) return
+            : _a2.addEventListener('click', () => {
+                if (refuseWhileDeviceSessionPending()) return
                 sign()
               })
         },
@@ -1280,17 +1484,15 @@ async function signWithDevice(run, retryCount) {
       }
     }
   } catch (e) {
-    const bitbox02Error = parseBitbox02Error(e)
-    const bitbox02Text = bitbox02Error
-      ? bitbox02Error.message
-      : e instanceof DeviceError && e.deviceType === 'bitbox02'
-        ? e.message
-        : null
-    if (bitbox02Text) {
+    const deviceErrorText =
+      ((_a = parseBitbox02Error(e)) == null ? void 0 : _a.message) ??
+      ((_b = parseTrezorError(e)) == null ? void 0 : _b.message) ??
+      (e instanceof DeviceError && isSelfDrivenType(e.deviceType) ? e.message : null)
+    if (deviceErrorText) {
       const tryAgainActions = createTryAgainActions(retryCount)
       hideTempMessage()
       addToConversation(
-        createConversationBubble({ content: bitbox02Text, footer: /* @__PURE__ */ new Date().toLocaleString() }),
+        createConversationBubble({ content: deviceErrorText, footer: /* @__PURE__ */ new Date().toLocaleString() }),
         {
           shouldScrollToLastMessage: !tryAgainActions,
         }
@@ -1461,7 +1663,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
-    if (refuseWhileBitbox02SessionPending()) return
+    if (refuseWhileDeviceSessionPending()) return
     const userBubble = createConversationBubble({
       content: 'Sign this transaction (PSBT)',
       isUserSpeaking: true,

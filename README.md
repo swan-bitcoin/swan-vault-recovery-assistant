@@ -30,7 +30,7 @@ No. While XPUBs are necessary and included in the wallet configuration (or descr
 
 > What wallets and signing devices does Swan Vault Recovery Assistant support?
 
-Swan Vault Recovery Assistant can import any wallet that supports exporting its configuration as output descriptors, including Swan Vault and many modern Bitcoin wallets. For signing transactions, Blockstream Jade is officially supported for use with Swan Vault Recovery Assistant. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery. If the BitBox02 does not know your vault yet, for example after a reset, it shows each key for you to confirm. See [Using a BitBox02](#using-a-bitbox02) for how to use it, and [Device Support](#device-support) for how it differs from Jade.
+Swan Vault Recovery Assistant can import any wallet that supports exporting its configuration as output descriptors, including Swan Vault and many modern Bitcoin wallets. For signing transactions, Blockstream Jade is officially supported for use with Swan Vault Recovery Assistant. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery. If the BitBox02 does not know your vault yet, for example after a reset, it shows each key for you to confirm. See [Using a BitBox02](#using-a-bitbox02) for how to use it, and [Device Support](#device-support) for how it differs from Jade. The Trezor Safe 7 is supported for Swan Vault recovery. It does not store your vault, so it cannot check that the keys are yours. See [Using a Trezor Safe 7](#using-a-trezor-safe-7) for how to use it, and [Device Support](#device-support) for how it differs from Jade.
 
 > Does Swan Vault Recovery Assistant collect any data?
 
@@ -60,6 +60,34 @@ Save the rule, reload udev, then unplug the BitBox02 and plug it in again:
 sudo tee /etc/udev/rules.d/50-bitbox02.rules > /dev/null <<'EOF'
 SUBSYSTEM=="usb", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-%n"
 KERNEL=="hidraw*", SUBSYSTEM=="hidraw", ATTRS{idVendor}=="03eb", ATTRS{idProduct}=="2403", TAG+="uaccess", TAG+="udev-acl", MODE="0660", GROUP="bitbox", SYMLINK+="bitbox02-f%n"
+EOF
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+# Using a Trezor Safe 7
+
+You can sign a transaction for your Swan vault with a Trezor Safe 7. Follow these steps.
+
+- **Close Trezor Suite first.** Only one program can use the Trezor Safe 7 at a time. If Trezor Suite and SVRA use it together, signing fails.
+- **Connect one signing device at a time.** While a Trezor Safe 7 or a BitBox02 is connected, SVRA lists only these devices and does not list other devices, such as a Jade. Connect only one Trezor Safe 7. Unplug it before you connect the next device.
+- **Allow the connection on the Trezor.** The Trezor asks if it may connect to Swan Vault Recovery Assistant. Check the name, then allow the connection.
+- **Type the 6-digit code into SVRA on every run.** The Trezor shows a 6-digit code. Type it into SVRA. The code proves that SVRA talks to this Trezor and that nothing sits in between. SVRA stores no pairing data, so it asks for a code on every run. If you type a wrong code, the session ends. Start again.
+- **Enter your passphrase on the Trezor if it asks.** If your Trezor uses a passphrase, and its standard wallet (the one without a passphrase) holds no key of your vault, SVRA asks you to enter the passphrase on the Trezor. You never type the passphrase into SVRA. A Trezor that always asks for the passphrase on the device asks for it at once.
+- **Know what the Trezor can check.** The Trezor Safe 7 stores no vault. SVRA sends the three keys of your vault with every signing request, and the Trezor checks only that its own key is one of them. The Trezor warns that this is a multisig wallet, and it shows whatever keys SVRA sends. It cannot tell you that the keys are the right ones. So paste the wallet configuration only from your Swan Vault Recovery Sheet.
+- **Check the address and the amount** on the Trezor before you confirm the transaction. They are the check that is left.
+- **To stop, select Cancel at the code step.** At any other step, unplug the Trezor. Plug it in again when you want to try again.
+
+## Linux: allow access to the Trezor Safe 7
+
+On Linux, a normal user cannot open the Trezor Safe 7 until you add a udev rule. (udev is the part of Linux that decides who may use a USB device.) If SVRA says that it found your Trezor but cannot open it, and Trezor Suite is closed, add this rule. The rule is from Trezor's own file [`51-trezor.rules`](https://data.trezor.io/udev/51-trezor.rules). The two lines below are the lines of that file for USB ID `1209:53c1` (the Trezor Safe 7) and `1209:53c0` (the same device in bootloader mode). The file also holds rules for older Trezor models and for the `hidraw` interface. SVRA opens the Trezor Safe 7 through USB directly, so you do not need those rules.
+
+Save the rule, reload udev, then unplug the Trezor and plug it in again:
+
+```bash
+sudo tee /etc/udev/rules.d/51-trezor.rules > /dev/null <<'EOF'
+SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="53c0", MODE="0660", GROUP="plugdev", TAG+="uaccess", TAG+="udev-acl", SYMLINK+="trezor%n"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="53c1", MODE="0660", GROUP="plugdev", TAG+="uaccess", TAG+="udev-acl", SYMLINK+="trezor%n"
 EOF
 sudo udevadm control --reload-rules
 sudo udevadm trigger
@@ -136,9 +164,9 @@ In order to best protect the user's privacy and security, SVRA is designed with 
 
 ## Device Support
 
-SVRA uses [bitcoin-core's open-source HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs), with one exception: the BitBox02 (see below).
+SVRA uses [bitcoin-core's open-source HWI interface](https://github.com/bitcoin-core/HWI) for device enumeration and signing transactions (PSBTs), with two exceptions: the BitBox02 and the Trezor Safe 7 (see below).
 
-HWI provides broad device support. However, only Jade devices are officially supported. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery.
+HWI provides broad device support. However, only Jade devices are officially supported. The BitBox02 Nova Bitcoin-only is supported for Swan Vault recovery. The Trezor Safe 7 is supported for Swan Vault recovery.
 
 SVRA has been tested with:
 
@@ -159,6 +187,19 @@ SVRA can sign a Swan Vault recovery with a BitBox02 Nova Bitcoin-only. The autom
 - SVRA stores no pairing data, because it must not write to disk. The user confirms the pairing code on every run.
 - The BitBox02 needs firmware 9.15.0 or newer. SVRA does not block other BitBox02 models, but it has not been tested with them.
 - On a test network (testnet, signet or regtest), the BitBox02 shows testnet-format addresses.
+
+### Trezor Safe 7
+
+SVRA can sign a Swan Vault recovery with a Trezor Safe 7. The automated tests sign against Trezor's firmware emulator (firmware 2.13.1) and against a software device. No physical Trezor Safe 7 has signed with this build yet. For how to use it, see [Using a Trezor Safe 7](#using-a-trezor-safe-7). It differs from Jade in these ways:
+
+- SVRA talks to the Trezor Safe 7 directly with Trezor's open-source [`trezor-thp`](https://crates.io/crates/trezor-thp) library. It does not use HWI for a Trezor Safe 7, because HWI 3.2.0 cannot speak the Trezor Host Protocol (THP). THP is the encrypted protocol that a Trezor Safe 7 uses. While a Trezor Safe 7 is on USB, SVRA does not call HWI `enumerate`, because HWI would send the older protocol to it.
+- Other Trezor models still go through HWI, as before. They are not officially supported.
+- The Trezor Safe 7 shows a 6-digit pairing code, and the user types it into SVRA on every run. SVRA stores no pairing data, because it must not write to disk.
+- The Trezor Safe 7 stores no vault, so there is no registration step. Every signing request carries the three keys of the vault in the order of the descriptor, and the device checks only that its own key is one of them. The device cannot tell the user that the keys are the right ones. SVRA reads the key of the device, compares it with the vault, and checks every signature that the device returns before it hands the transaction back.
+- With a Trezor Safe 7, SVRA signs only Swan Vault descriptors (unsorted `wsh(multi(...))`). Other wallets are not supported.
+- If the standard wallet of the device holds no key of the vault and the passphrase is on, SVRA opens a second wallet session. The user enters the passphrase on the device.
+- The Trezor Safe 7 needs firmware 2.9.3 or newer.
+- Trezor Safe 7 support adds Trezor's `trezor-thp` library and what it needs: USB access through `nusb` (pure Rust, so it needs no `libudev`), the Noise encrypted channel (`trezor-noise-rust-crypto`) and protobuf messages (`prost`). It also adds a crate of the SVRA workspace, `svra_vault`, which holds the descriptor and transaction checks that the BitBox02 code shares with the Trezor code.
 
 ## Setup Instructions
 
@@ -213,7 +254,7 @@ linux systems need these packages
 apt-get update && apt-get install -y build-essential curl wget file libwebkit2gtk-4.1-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libudev-dev
 ```
 
-`libudev-dev` is needed to build the BitBox02 USB code.
+`libudev-dev` is needed to build the BitBox02 USB code. The Trezor Safe 7 USB code needs no extra package.
 
 ### Run the application
 
@@ -276,6 +317,21 @@ chmod +x bitbox02-simulator
 
 BITBOX02_SIMULATOR="$PWD/bitbox02-simulator" cargo test -p svra_bitbox02 --features usb,simulator
 ```
+
+#### Trezor tests
+
+The Trezor device code is the crate `src-tauri/trezor` (`svra_trezor`). The descriptor and transaction checks that it shares with the BitBox02 code are in the crate `src-tauri/vault` (`svra_vault`). Neither has a Tauri dependency. Run their tests from `src-tauri`:
+
+```bash
+cargo test -p svra_vault
+cargo test -p svra_trezor --features usb
+```
+
+The emulator tests sign against Trezor's Safe 7 firmware emulator, and they need Trezor's model of the Tropic01 secure element next to it. They run only when the variable `TREZOR_EMULATOR` holds the path of the emulator. Without it, they skip and the run still passes. When it is set, `TREZOR_TROPIC_MODEL_SERVER` (the model server) and `TREZOR_TROPIC_MODEL_CONFIG` (its config file) must be set too. Each test starts its own model server and emulator.
+
+The setup is long, so it is not repeated here. The job `trezor tests` in [`.github/workflows/test.yml`](.github/workflows/test.yml) holds the steps and the pinned downloads, for Linux on x86-64. The folder [`src-tauri/trezor/tests/emulator-rig`](src-tauri/trezor/tests/emulator-rig) holds the other two pins and explains how to update them. In that job, a skipped emulator test fails the job.
+
+The app has unit tests for the Trezor glue and for the hand-over of the pairing code. They need the Tauri build dependencies. Run `cargo test -p swan_vault_recovery_assistant --bin swan_vault_recovery_assistant` from `src-tauri`. The Tauri build needs the `hwi` file in `src-tauri` (see the HWI step above).
 
 ### Manual testing with a simulated 'regtest' bitcoin network
 
