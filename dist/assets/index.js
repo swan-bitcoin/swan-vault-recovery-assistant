@@ -19,6 +19,7 @@ import {
   o as getPsbtStatusMessage,
   p as getUnplugMessage,
   q as DeviceError,
+  M as MultipleDevicesError,
   C as CircularTickIcon,
 } from './layout.js'
 function __classPrivateFieldGet(receiver, state, kind, f) {
@@ -40,8 +41,8 @@ typeof SuppressedError === 'function'
     }
 var _Channel_onmessage, _Channel_nextMessageIndex, _Channel_pendingMessages, _Channel_messageEndIndex
 const SERIALIZE_TO_IPC_FN = '__TAURI_TO_IPC_KEY__'
-function transformCallback(callback, once = false) {
-  return window.__TAURI_INTERNALS__.transformCallback(callback, once)
+function transformCallback(callback, once2 = false) {
+  return window.__TAURI_INTERNALS__.transformCallback(callback, once2)
 }
 class Channel {
   constructor(onmessage) {
@@ -731,6 +732,9 @@ function getBitbox02StepMessage(update) {
 }
 const getBusyMessage = (deviceType) => {
   const name = getSelfDrivenName(deviceType)
+  if (deviceType === 'trezor_safe7') {
+    return `SVRA is still waiting for your ${name}. If SVRA asks for the 6-digit code, type it or select Cancel. Otherwise finish on the ${name}, or unplug it to stop. Then try again.`
+  }
   return `SVRA is still waiting for your ${name}. Finish on the ${name}, or unplug it to stop. Then try again.`
 }
 let current = null
@@ -753,16 +757,31 @@ function startSignRun() {
     release,
   }
 }
-async function runSession(run, start, show, keyOf) {
-  let isSettled = false
+const once = (keyOf) => () => {
   const shown = /* @__PURE__ */ new Set()
+  return (update) => {
+    const key = keyOf(update)
+    if (shown.has(key)) return false
+    shown.add(key)
+    return true
+  }
+}
+const notRepeated = (keyOf) => () => {
+  let last = null
+  return (update) => {
+    const key = keyOf(update)
+    if (key === last) return false
+    last = key
+    return true
+  }
+}
+async function runSession(run, start, show, filter) {
+  let isSettled = false
+  const isNew = filter()
   const onProgress = new Channel()
   onProgress.onmessage = (update) => {
     if (isSettled) return
-    const key = keyOf(update)
-    if (shown.has(key)) return
-    shown.add(key)
-    show(update)
+    if (isNew(update)) show(update)
   }
   try {
     return await start(onProgress)
@@ -772,8 +791,19 @@ async function runSession(run, start, show, keyOf) {
   }
 }
 const runBitbox02Session = (run, start, show) =>
-  runSession(run, start, show, (update) => (update.step === 'register' ? `register:${update.name}` : update.step))
-const runTrezorSession = (run, start, show) => runSession(run, start, show, (update) => update.step)
+  runSession(
+    run,
+    start,
+    show,
+    once((update) => (update.step === 'register' ? `register:${update.name}` : update.step))
+  )
+const runTrezorSession = (run, start, show) =>
+  runSession(
+    run,
+    start,
+    show,
+    notRepeated((update) => update.step)
+  )
 function getDeviceName(device) {
   switch (device.type) {
     case 'jade': {
@@ -889,6 +919,15 @@ const PAIRING_CANCELLED_MESSAGE = 'Cancelling…'
 const PAIRING_REFUSED_MESSAGE = 'SVRA could not send this to your Trezor. Unplug the Trezor, then try again.'
 const normalizePairingCode = (raw) => raw.replace(/\D/g, '').slice(0, PAIRING_CODE_LENGTH)
 const isPairingCodeComplete = (code) => new RegExp(`^\\d{${PAIRING_CODE_LENGTH}}$`).test(code)
+let openEntry = null
+const cancelOpenPairingEntry = async () => {
+  if (openEntry == null ? void 0 : openEntry.isOpen()) await openEntry.cancel()
+}
+const cancelOrphanedPairing = async (cancel) => {
+  try {
+    await cancel()
+  } catch {}
+}
 function createPairingCodeEntry(backend, hooks) {
   let isOpen = true
   let hasEnded = false
@@ -903,7 +942,7 @@ function createPairingCodeEntry(backend, hooks) {
       if (!hasEnded) hooks.onRefused(((_a = parseTrezorError(e)) == null ? void 0 : _a.message) ?? PAIRING_REFUSED_MESSAGE)
     }
   }
-  return {
+  const entry = {
     submit: async (raw) => {
       const code = normalizePairingCode(raw)
       if (!isOpen || !isPairingCodeComplete(code)) return
@@ -918,6 +957,8 @@ function createPairingCodeEntry(backend, hooks) {
     },
     isOpen: () => isOpen,
   }
+  openEntry = entry
+  return entry
 }
 const WAITING = 'Waiting for your Trezor…'
 const STOP = 'To stop, unplug the Trezor.'
@@ -930,7 +971,8 @@ function getTrezorStepMessage(update) {
     case 'confirm-connection':
       return {
         loading: WAITING,
-        bubble: `Your Trezor asks if it may connect to Swan Vault Recovery Assistant. Check the name on the Trezor, then allow the connection. ${STOP}`,
+        // the question is the one that the Trezor shows, word for word, so that the user can find it on the screen
+        bubble: `Your Trezor asks: "Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?" Confirm on the Trezor. ${STOP}`,
       }
     case 'enter-pairing-code':
       return {
@@ -944,16 +986,22 @@ function getTrezorStepMessage(update) {
     case 'passphrase':
       return {
         loading: WAITING,
-        bubble: `This Trezor has passphrase protection, and its standard wallet holds no key of this vault. Enter your passphrase on the Trezor. ${STOP}`,
+        // The device can ask before or after SVRA checked the standard wallet, so the text must hold at both moments.
+        bubble: `Your Trezor asks for your passphrase. Enter it on the Trezor. The key of this vault may be in the standard wallet or in a passphrase wallet. To open the standard wallet, confirm an empty passphrase. ${STOP}`,
       }
     case 'sign':
       return {
         loading: WAITING,
-        // the device holds no vault, so it shows whatever keys SVRA sends; its address and amount are the only check left
-        bubble: `Your Trezor now shows the transaction. It first warns that this is a multisig wallet. Check the address and the amount on the Trezor, then confirm. The Trezor does not know your vault and shows whatever keys SVRA sends, so the address and the amount on the Trezor are what you must check. ${STOP}`,
+        // the Safe 7 shows no multisig warning and no keys; its address, amount and fee screens are the only check left
+        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. It shows the address and the amount of each payment, then the total with the fee. Check them, then hold to confirm. ${STOP}`,
       }
   }
 }
+const TAKE_KEYBOARD = ['fo', 'cus'].join('')
+const takeKeyboard = (element) =>
+  element[TAKE_KEYBOARD]({
+    preventScroll: true,
+  })
 function createTrezorView() {
   let pairing = null
   return {
@@ -976,7 +1024,6 @@ function showPairingCodeEntry() {
   input.inputMode = 'numeric'
   input.autocomplete = 'off'
   input.spellcheck = false
-  input.autofocus = true
   input.placeholder = `${PAIRING_CODE_LENGTH} digits`
   input.setAttribute('aria-label', `The ${PAIRING_CODE_LENGTH}-digit code that your Trezor shows`)
   const continueButton = document.createElement('button')
@@ -1021,6 +1068,7 @@ function showPairingCodeEntry() {
   const actions = createConversationActions({ content: controls, dangerouslySetInnerHTML: true })
   if (actions) {
     addToConversation(actions)
+    takeKeyboard(input)
   } else {
     entry.cancel()
   }
@@ -1522,6 +1570,15 @@ async function signWithDevice(run, retryCount) {
           }
         )
       }
+      if (e instanceof MultipleDevicesError) {
+        hideTempMessage()
+        addToConversation(
+          createConversationBubble({ content: e.message, footer: /* @__PURE__ */ new Date().toLocaleString() }),
+          {
+            shouldScrollToLastMessage: !tryAgainActions,
+          }
+        )
+      }
       if (e.message.toLowerCase().includes('failed to extract psbt')) {
         hideTempMessage()
         addToConversation(
@@ -1609,6 +1666,7 @@ async function sweep() {
 }
 window.addEventListener('DOMContentLoaded', () => {
   initializeDOM()
+  void cancelOrphanedPairing(() => commands.cancelTrezorPairing())
   DOM.buttons.broadcast.addEventListener('click', (e) => {
     e.preventDefault()
     broadcast()
@@ -1733,6 +1791,7 @@ window.addEventListener('DOMContentLoaded', () => {
   const observer = new MutationObserver(callback)
   observer.observe(DOM.outputs.conversation, config)
   DOM.buttons.clearMessages.addEventListener('click', () => {
+    void cancelOpenPairingEntry()
     DOM.outputs.conversation.innerHTML = ''
     DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
     DOM.buttons.clearMessages.classList.add('hidden')

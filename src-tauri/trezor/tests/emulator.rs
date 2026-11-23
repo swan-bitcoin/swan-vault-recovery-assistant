@@ -2,8 +2,10 @@
 //!
 //! Each test starts its own model server (the secure element of the Safe 7) and its own
 //! emulator, on free ports and with a new profile directory, and drives the screens of the
-//! device through the debug link. The tests skip when `TREZOR_EMULATOR` is not set. With it set,
-//! `TREZOR_TROPIC_MODEL_SERVER` and `TREZOR_TROPIC_MODEL_CONFIG` must be set too.
+//! device through the debug link. The tests skip when `TREZOR_EMULATOR` is not set, unless
+//! `TREZOR_EMULATOR_REQUIRED` is set: then a missing emulator fails the test. CI sets it. With
+//! `TREZOR_EMULATOR` set, `TREZOR_TROPIC_MODEL_SERVER` and `TREZOR_TROPIC_MODEL_CONFIG` must be
+//! set too.
 //!
 //! The debug link is the unencrypted protocol v1 over UDP, on the port after the wire port. The
 //! harness reads the pairing code from it and presses "confirm" on the screens that the session
@@ -13,13 +15,16 @@ use crate::device::Device;
 use crate::device_error::Step;
 use crate::link::USER;
 use crate::proto::{Success, Wire};
-use crate::session::{connect, sign_psbt, Progress, SignOutcome, SignRequest, Ui};
+use crate::session::{connect, sign_psbt, CodeEntry, Progress, SignOutcome, SignRequest, Ui};
 use crate::test_support::{sign_with, Vault};
 use crate::transport::{Transport, TransportError};
 use crate::{Error, ErrorKind};
+use bdk_wallet::KeychainKind;
+use bitcoin::absolute::LockTime;
 use bitcoin::bip32::Xpriv;
 use bitcoin::psbt::Psbt;
 use bitcoin::{Network, NetworkKind};
+use bitcoin::{OutPoint, Transaction, TxOut, Witness};
 use prost::Message;
 use sha2::Sha512;
 use std::io::ErrorKind as IoErrorKind;
@@ -48,6 +53,12 @@ struct LoadDevice {
 
 #[derive(Clone, PartialEq, Message)]
 struct LockDevice {}
+
+#[derive(Clone, PartialEq, Message)]
+struct ApplySettings {
+  #[prost(bool, optional, tag = "8")]
+  passphrase_always_on_device: Option<bool>,
+}
 
 #[derive(Clone, PartialEq, Message)]
 struct DebugLinkDecision {
@@ -90,6 +101,9 @@ impl Wire for LoadDevice {
 }
 impl Wire for LockDevice {
   const TYPE: u16 = 24;
+}
+impl Wire for ApplySettings {
+  const TYPE: u16 = 25;
 }
 impl Wire for DebugLinkDecision {
   const TYPE: u16 = 100;
@@ -452,6 +466,34 @@ struct Script {
   reject_transaction: AtomicBool,
   /// Confirms nothing. The session must stop on its own.
   stop: AtomicBool,
+  /// Presses "no" on the dialog that asks to allow the connection.
+  refuse_pairing: AtomicBool,
+  /// Every text screen that the device showed, once each and in order.
+  seen: Mutex<Vec<String>>,
+}
+
+/// The text of a layout without its markup, with the line breaks of the screen read as spaces. The
+/// device breaks its lines where they fit, so a phrase may span two tokens of the layout.
+fn plain(layout: &str) -> String {
+  layout
+    .replace("\\n", " ")
+    .replace(['"', ',', '[', ']', '{', '}', ':'], " ")
+    .split_whitespace()
+    .collect::<Vec<_>>()
+    .join(" ")
+}
+
+/// True for the screen that shows the pairing code.
+fn is_code_screen(layout: &str) -> bool {
+  plain(layout).contains("one-time security code")
+}
+
+/// Remembers a text screen, once for each time that it appears.
+fn note_screen(script: &Script, layout: &str) {
+  let mut seen = script.seen.lock().expect("the screen log");
+  if seen.last().map(String::as_str) != Some(layout) {
+    seen.push(layout.to_string());
+  }
 }
 
 /// Presses the buttons while a session runs on the main thread. It confirms every text screen
@@ -479,14 +521,20 @@ impl Presser {
               button: None,
               input: Some(passphrase.to_string()),
             })
-        } else if layout.contains("\"TextScreen\"") && !layout.contains("one-time security code") {
+        } else if layout.contains("\"TextScreen\"") && !is_code_screen(&layout) {
           let transaction = layout.contains("Recipient") || layout.contains("Total amount");
-          let reject = transaction && thread_script.reject_transaction.load(Ordering::SeqCst);
+          let pairing = layout.contains("pair with this");
+          let reject = (transaction && thread_script.reject_transaction.load(Ordering::SeqCst))
+            || (pairing && thread_script.refuse_pairing.load(Ordering::SeqCst));
+          note_screen(&thread_script, &layout);
           Some(DebugLinkDecision {
             button: Some(u32::from(!reject)),
             input: None,
           })
         } else {
+          if is_code_screen(&layout) {
+            note_screen(&thread_script, &layout);
+          }
           None
         };
         if let Some(decision) = decision {
@@ -533,31 +581,29 @@ impl Ui for RigUi {
     self.events.push(progress);
   }
 
-  fn pairing_code(&mut self) -> Option<String> {
+  fn pairing_code(&mut self, wait: Duration) -> CodeEntry {
     if self.code == Code::Cancel {
-      return None;
+      return CodeEntry::Cancelled;
     }
     let channel = u16::try_from(self.channel.load(Ordering::SeqCst)).expect("a channel number");
     // The device shows the code when it has answered the challenge, which is before this call.
-    // The pause only covers the time of the debug link.
-    for _ in 0..50 {
-      if let Some(code) = self
-        .debug
-        .lock()
-        .expect("the debug link")
-        .pairing_code(channel)
-      {
-        return Some(match self.code {
-          Code::Wrong => {
-            let first = if code.starts_with('0') { '1' } else { '0' };
-            format!("{first}{}", &code[1..])
-          }
-          _ => code,
-        });
+    // The debug link may need a moment.
+    let Some(code) = self
+      .debug
+      .lock()
+      .expect("the debug link")
+      .pairing_code(channel)
+    else {
+      std::thread::sleep(wait);
+      return CodeEntry::Pending;
+    };
+    CodeEntry::Entered(match self.code {
+      Code::Wrong => {
+        let first = if code.starts_with('0') { '1' } else { '0' };
+        format!("{first}{}", &code[1..])
       }
-      std::thread::sleep(Duration::from_millis(100));
-    }
-    panic!("the debug link gave no pairing code");
+      _ => code,
+    })
   }
 }
 
@@ -609,6 +655,12 @@ fn vault_for(slot: Option<usize>, network: Network) -> (&'static str, Vault) {
 impl Emulator {
   fn start(script: Script) -> Option<Emulator> {
     if std::env::var_os("TREZOR_EMULATOR").is_none() {
+      // CI sets this variable, so that a rig that is not set up fails the job and does not
+      // turn every emulator test into a pass that tested nothing.
+      assert!(
+        std::env::var_os("TREZOR_EMULATOR_REQUIRED").is_none(),
+        "TREZOR_EMULATOR_REQUIRED is set, but TREZOR_EMULATOR is not. The emulator rig is missing."
+      );
       println!("skipped: TREZOR_EMULATOR is not set");
       return None;
     }
@@ -631,6 +683,8 @@ impl Emulator {
       passphrase: None,
       reject_transaction: AtomicBool::new(false),
       stop: AtomicBool::new(false),
+      refuse_pairing: AtomicBool::new(false),
+      seen: Mutex::new(Vec::new()),
     }
   }
 
@@ -681,6 +735,30 @@ impl Emulator {
         .call(0, &LockDevice {}, USER, Step::Query, None)
         .expect("the device locks");
     }
+  }
+
+  /// Makes the device ask for the passphrase on its own screen for every wallet.
+  fn ask_for_the_passphrase_on_the_device(&self) {
+    let mut ui = self.ui(Code::Right);
+    let (link, _) = connect(self.transport(), &mut ui).expect("a channel");
+    let mut device = Device::new(link, &mut ui);
+    device.pair().expect("the pairing");
+    let _: Success = device
+      .call(
+        0,
+        &ApplySettings {
+          passphrase_always_on_device: Some(true),
+        },
+        USER,
+        Step::Query,
+        None,
+      )
+      .expect("the device takes the setting");
+  }
+
+  /// The text screens that the device showed so far, as the debug link gives them.
+  fn screens(&self) -> Vec<String> {
+    self.script.seen.lock().expect("the screen log").clone()
   }
 
   fn sign(
@@ -982,4 +1060,319 @@ fn a_wrong_passphrase_finds_no_key() {
   emulator.load_seed(mnemonic, None, true);
   let (result, _) = emulator.sign(&mut vault, None, Code::Right);
   assert_eq!(error_of(result).kind, ErrorKind::KeyNotInVault);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The code step: the device speaks while the app waits for the user.
+
+/// A user who presses the button of the code screen, which cancels the pairing on the device,
+/// and then types nothing. The session has to notice by itself.
+struct CancelOnDeviceUi {
+  inner: RigUi,
+  /// The code screen as it was when the user pressed it, and the moment of the press.
+  pressed: Option<(String, Instant)>,
+}
+
+impl Ui for CancelOnDeviceUi {
+  fn progress(&mut self, progress: Progress) {
+    self.inner.progress(progress);
+  }
+
+  fn pairing_code(&mut self, wait: Duration) -> CodeEntry {
+    if self.pressed.is_some() {
+      std::thread::sleep(wait);
+      return CodeEntry::Pending;
+    }
+    for _ in 0..100 {
+      let screen = self.inner.debug.lock().expect("the debug link").layout();
+      if is_code_screen(&screen) {
+        self
+          .inner
+          .debug
+          .lock()
+          .expect("the debug link")
+          .decide(&DebugLinkDecision {
+            button: Some(1),
+            input: None,
+          });
+        self.pressed = Some((screen, Instant::now()));
+        return CodeEntry::Pending;
+      }
+      std::thread::sleep(Duration::from_millis(50));
+    }
+    panic!("the device never showed its code screen");
+  }
+}
+
+#[test]
+fn cancelling_on_the_code_screen_ends_the_session_at_once_and_the_next_one_works() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut ui = CancelOnDeviceUi {
+    inner: emulator.ui(Code::Right),
+    pressed: None,
+  };
+  let psbt = vault.sweep_psbt();
+  let result = sign_psbt(
+    emulator.transport(),
+    SignRequest {
+      network: vault.network,
+      receive_descriptor: &vault.receive_descriptor,
+      change_descriptor: Some(&vault.change_descriptor),
+      psbt,
+    },
+    &mut ui,
+  );
+  let (screen, pressed_at) = ui.pressed.take().expect("the user pressed the code screen");
+  let error = error_of(result);
+  // The review measured about 21 seconds and a wrong message on the same device.
+  println!(
+    "the cancel on the code screen ended the session after {:?}",
+    pressed_at.elapsed()
+  );
+  assert!(
+    pressed_at.elapsed() < Duration::from_secs(5),
+    "{:?}",
+    pressed_at.elapsed()
+  );
+  assert_eq!(error.kind, ErrorKind::PairingRejected);
+  assert!(
+    error.message.contains("cancelled on the Trezor"),
+    "{}",
+    error.message
+  );
+  assert!(!error.message.contains("ten minutes"), "{}", error.message);
+  // The code screen names the computer, as the connection dialog does.
+  assert!(plain(&screen).contains("on this computer"), "{screen}");
+
+  // The device is back at its home screen, and a new session pairs again.
+  let (result, events) = emulator.sign(&mut vault, None, Code::Right);
+  assert_eq!(events, NORMAL_RUN);
+  finalize(&vault, result.expect("the session signs"));
+}
+
+#[test]
+fn the_dialogs_name_the_app_and_the_computer_and_fit_the_screen() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let (result, _) = emulator.sign(&mut vault, None, Code::Right);
+  result.expect("the session signs");
+  let screens = emulator.screens();
+  let dialog = screens
+    .iter()
+    .find(|screen| screen.contains("pair with this"))
+    .expect("the connection dialog was shown");
+  // The device breaks the text into lines, and keeps the words whole.
+  assert!(dialog.contains("Swan Vault"), "{dialog}");
+  assert!(dialog.contains("Recovery Assistant"), "{dialog}");
+  assert!(dialog.contains("this computer"), "{dialog}");
+  assert!(dialog.contains("\"fits\": true"), "{dialog}");
+  assert!(!dialog.contains("\"-\""), "a word was cut: {dialog}");
+}
+
+#[test]
+fn refusing_the_pairing_dialog_on_the_device_is_a_rejected_pairing_and_the_next_session_works() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  emulator.script.refuse_pairing.store(true, Ordering::SeqCst);
+  let (result, events) = emulator.sign(&mut vault, None, Code::Right);
+  let error = error_of(result);
+  assert_eq!(error.kind, ErrorKind::PairingRejected);
+  assert!(
+    error.message.contains("cancelled on the Trezor"),
+    "{}",
+    error.message
+  );
+  assert_eq!(events, [Progress::Connecting, Progress::ConfirmConnection]);
+
+  emulator
+    .script
+    .refuse_pairing
+    .store(false, Ordering::SeqCst);
+  let (result, _) = emulator.sign(&mut vault, None, Code::Right);
+  finalize(&vault, result.expect("the session signs"));
+}
+
+// ---------------------------------------------------------------------------------------------
+// What the device is asked to sign.
+
+#[test]
+fn a_previous_transaction_with_witness_data_signs() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut psbt = vault.sweep_psbt();
+  for input in &mut psbt.inputs {
+    let previous = input
+      .non_witness_utxo
+      .as_mut()
+      .expect("the previous transaction");
+    let txid = previous.compute_txid();
+    // The witness is not part of the transaction id, and the device never sees it.
+    previous.input[0].witness = Witness::from_slice(&[vec![0x30; 71], vec![0x02; 33]]);
+    assert_eq!(previous.compute_txid(), txid);
+    assert_ne!(previous.compute_wtxid().to_string(), txid.to_string());
+  }
+  let (result, _) = emulator.sign(&mut vault, Some(psbt), Code::Right);
+  finalize(&vault, result.expect("the session signs"));
+}
+
+#[test]
+fn two_inputs_that_spend_outputs_of_the_same_previous_transaction_sign() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut psbt = vault.sweep_psbt();
+  // One previous transaction that pays to the first two inputs' addresses.
+  let spent: Vec<TxOut> = psbt.inputs[..2]
+    .iter()
+    .map(|input| input.witness_utxo.clone().expect("a utxo"))
+    .collect();
+  let shared = Transaction {
+    output: spent,
+    ..crate::test_support::funding_transaction(0x77, bitcoin::ScriptBuf::new(), 1)
+  };
+  for (position, input) in psbt.inputs[..2].iter_mut().enumerate() {
+    input.non_witness_utxo = Some(shared.clone());
+    psbt.unsigned_tx.input[position].previous_output = OutPoint {
+      txid: shared.compute_txid(),
+      vout: position as u32,
+    };
+  }
+  let (result, _) = emulator.sign(&mut vault, Some(psbt), Code::Right);
+  finalize(&vault, result.expect("the session signs"));
+}
+
+#[test]
+fn an_output_to_an_own_receive_address_is_shown_as_a_payment() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut psbt = vault.spend_with_change_psbt(120_000);
+  let payment = psbt
+    .outputs
+    .iter()
+    .position(|output| output.bip32_derivation.is_empty())
+    .expect("the payment output");
+  let address = vault.pay_to_own_address(&mut psbt, payment, KeychainKind::External, 5);
+  let (result, _) = emulator.sign(&mut vault, Some(psbt), Code::Right);
+  let outcome = result.expect("the session signs");
+  let screens = emulator.screens();
+  // The device shows the receive address as a recipient, and the change as nothing.
+  let start = &address.to_string()[..12];
+  assert!(
+    screens
+      .iter()
+      .any(|screen| screen.contains("Recipient #1") && screen.contains(start)),
+    "{screens:?}"
+  );
+  assert!(
+    !screens.iter().any(|screen| screen.contains("Recipient #2")),
+    "{screens:?}"
+  );
+  let mut psbt = outcome.psbt;
+  sign_with(&vault.keys.software_xprv, &mut psbt);
+  vault.finalize_and_verify(psbt);
+}
+
+#[test]
+fn a_change_output_at_a_high_address_number_is_refused_before_the_device_signs() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut psbt = vault.spend_with_change_psbt(120_000);
+  let change = psbt
+    .outputs
+    .iter()
+    .position(|output| !output.bip32_derivation.is_empty())
+    .expect("the change output");
+  // The script and the key origin are right. Only the address number is out of reach of a wallet.
+  vault.pay_to_own_address(&mut psbt, change, KeychainKind::Internal, 500_000);
+  let (result, events) = emulator.sign(&mut vault, Some(psbt), Code::Right);
+  let error = error_of(result);
+  assert_eq!(error.kind, ErrorKind::InvalidPsbt);
+  assert!(error.message.contains("500000"), "{}", error.message);
+  assert!(!events.contains(&Progress::Sign), "{events:?}");
+  // The device never showed a screen of the transaction.
+  assert!(
+    !emulator
+      .screens()
+      .iter()
+      .any(|screen| screen.contains("Recipient") || screen.contains("Total amount")),
+    "{:?}",
+    emulator.screens()
+  );
+}
+
+#[test]
+fn a_lock_time_adds_a_screen_and_the_transaction_signs() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let mut psbt = vault.sweep_psbt();
+  psbt.unsigned_tx.lock_time = LockTime::from_height(800_000).expect("a block height");
+  let (result, _) = emulator.sign(&mut vault, Some(psbt), Code::Right);
+  let outcome = result.expect("the session signs");
+  assert_eq!(
+    outcome.psbt.unsigned_tx.lock_time.to_consensus_u32(),
+    800_000
+  );
+  assert!(
+    emulator
+      .screens()
+      .iter()
+      .any(|screen| screen.contains("800000")),
+    "{:?}",
+    emulator.screens()
+  );
+  finalize(&vault, outcome);
+}
+
+#[test]
+fn a_device_that_always_asks_for_the_passphrase_on_its_screen_signs() {
+  let mnemonic = MNEMONICS[0];
+  let master = master_of(mnemonic, "hunter2", NetworkKind::Test);
+  let mut vault = Vault::new(&master, Network::Testnet);
+  let Some(emulator) = Emulator::start(Script {
+    passphrase: Some("hunter2"),
+    ..Emulator::default_script()
+  }) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, true);
+  emulator.ask_for_the_passphrase_on_the_device();
+  let (result, events) = emulator.sign(&mut vault, None, Code::Right);
+  let outcome = result.expect("the session signs");
+  // The passphrase is asked once, before the first look at the keys, as the device does it.
+  assert_eq!(
+    events,
+    [
+      Progress::Connecting,
+      Progress::ConfirmConnection,
+      Progress::EnterPairingCode,
+      Progress::CheckingKey,
+      Progress::Passphrase,
+      Progress::Sign,
+    ]
+  );
+  finalize(&vault, outcome);
 }

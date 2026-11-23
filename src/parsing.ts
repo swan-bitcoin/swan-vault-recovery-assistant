@@ -33,6 +33,14 @@ export class DeviceError extends Error {
   }
 }
 
+// Lets the sign flow show this message and stop the spinner, as it does for a device error.
+export class MultipleDevicesError extends Error {
+  constructor() {
+    super('Multiple devices found. Please unplug all but one device.')
+    this.name = 'MultipleDevicesError'
+  }
+}
+
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 
 // the other Trezor models have type 'trezor' and go through HWI, so they are not here
@@ -52,7 +60,7 @@ export function getDevice(val: unknown): Device {
     throw new Error('No devices found')
   }
   if (devices.length > 1) {
-    throw new Error('Multiple devices found. Please unplug all but one device.')
+    throw new MultipleDevicesError()
   }
   const device = devices[0]
   if (device.error) {
@@ -92,12 +100,12 @@ export function getDeviceMessage(val: unknown): string {
     message = message.concat(']')
   }
   // the backend does not ask HWI while one of these devices is on USB, so another device stays hidden
-  const selfDrivenNames = new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))
-  if (selfDrivenNames.size > 0) {
-    const hints = [...selfDrivenNames].map(
-      (name) => `While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`
-    )
-    message = message.concat('. ', hints.join(' '))
+  const selfDrivenNames = [...new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))]
+  if (selfDrivenNames.length === 1) {
+    const [name] = selfDrivenNames
+    message = message.concat(`. While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`)
+  } else if (selfDrivenNames.length > 1) {
+    message = message.concat(`. While a ${selfDrivenNames.join(' or a ')} is connected, SVRA lists only those devices.`)
   }
   return message
 }

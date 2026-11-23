@@ -16,8 +16,8 @@ use bitcoin::psbt::Psbt;
 use bitcoin::secp256k1::{self, Message, Secp256k1};
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
 use bitcoin::{
-  ecdsa, transaction, Amount, FeeRate, Network, NetworkKind, OutPoint, PublicKey, ScriptBuf,
-  Sequence, Transaction, TxIn, TxOut, Txid, Witness,
+  ecdsa, transaction, Address, Amount, FeeRate, Network, NetworkKind, OutPoint, PublicKey,
+  ScriptBuf, Sequence, Transaction, TxIn, TxOut, Txid, Witness,
 };
 use std::str::FromStr;
 
@@ -291,6 +291,44 @@ impl Vault {
     );
     builder.fee_rate(FeeRate::from_sat_per_vb(2).expect("a fee rate"));
     builder.finish().expect("the spend is built")
+  }
+
+  /// Makes output `output` of `psbt` an output to the vault's own address at `keychain` and
+  /// `address_index`: its script is the vault's script there, and its key origin lists the key
+  /// of the device, as a wallet that made it would write it. Returns the address.
+  pub fn pay_to_own_address(
+    &self,
+    psbt: &mut Psbt,
+    output: usize,
+    keychain: KeychainKind,
+    address_index: u32,
+  ) -> Address {
+    let address = self.wallet.peek_address(keychain, address_index).address;
+    psbt.unsigned_tx.output[output].script_pubkey = address.script_pubkey();
+    let kind = NetworkKind::from(self.network);
+    let mut path: Vec<bitcoin::bip32::ChildNumber> =
+      account_path(kind).into_iter().copied().collect();
+    path.push(bitcoin::bip32::ChildNumber::Normal {
+      index: u32::from(keychain == KeychainKind::Internal),
+    });
+    path.push(bitcoin::bip32::ChildNumber::Normal {
+      index: address_index,
+    });
+    let path = DerivationPath::from(path);
+    let secp = Secp256k1::new();
+    let key = self
+      .keys
+      .device_xprv
+      .derive_priv(&secp, &path)
+      .expect("a derived key")
+      .private_key
+      .public_key(&secp);
+    psbt.outputs[output].bip32_derivation.clear();
+    psbt.outputs[output]
+      .bip32_derivation
+      .insert(key, (self.device_fingerprint, path));
+    psbt.outputs[output].witness_script = None;
+    address
   }
 
   /// Finalizes with the wallet, and checks every input against the consensus rules. Returns the

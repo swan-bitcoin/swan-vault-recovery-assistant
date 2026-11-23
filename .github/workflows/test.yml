@@ -104,7 +104,7 @@ jobs:
         working-directory: src-tauri
         run: |
           cargo fmt -p svra_bitbox02 -p svra_trezor -p svra_vault -- --check
-          rustfmt --check --edition 2021 src/bitbox02.rs src/trezor.rs src/trezor_pairing.rs
+          rustfmt --check --edition 2021 src/bitbox02.rs src/trezor.rs
 
       - name: lint the vault crate
         working-directory: src-tauri
@@ -141,6 +141,9 @@ jobs:
     permissions:
       contents: read
     env:
+      # With this set, an emulator test fails when the emulator is missing. Without it the test
+      # skips, so that a developer who has no emulator sees green.
+      TREZOR_EMULATOR_REQUIRED: '1'
       # Trezor Safe 7 firmware emulator (firmware 2.13.1, x86-64, a Nix build). The hash is the
       # only trust anchor: if Trezor replaces the file, the job fails until someone updates the
       # hash on purpose.
@@ -286,15 +289,16 @@ jobs:
           "$tropic/bin/model_server" tcp --help > /dev/null
 
       - name: test the Trezor crate
-        # The emulator tests pass without a check when TREZOR_EMULATOR is not set, so that a
-        # developer without the rig sees green. In this job that would hide a broken rig, so the
-        # job fails when a test reports the skip.
+        # TREZOR_EMULATOR_REQUIRED turns a missing or broken rig into failing tests. The count
+        # below is a second check: the run must have passed at least one emulator test.
         working-directory: src-tauri
         run: |
           set -o pipefail
-          cargo test --locked -p svra_trezor --features usb -- --nocapture 2>&1 | tee "$RUNNER_TEMP/trezor-test.log"
-          if grep -q 'skipped: TREZOR_EMULATOR' "$RUNNER_TEMP/trezor-test.log"; then
-            echo "::error::An emulator test was skipped. The rig is not set up."
+          cargo test --locked -p svra_trezor --features usb 2>&1 | tee "$RUNNER_TEMP/trezor-test.log"
+          passed=$(grep -c '^test emulator_tests::.* \.\.\. ok$' "$RUNNER_TEMP/trezor-test.log" || true)
+          echo "emulator tests that passed: $passed"
+          if [ "$passed" -eq 0 ]; then
+            echo "::error::No emulator test ran. The rig is not set up, or the tests were filtered out."
             exit 1
           fi
 

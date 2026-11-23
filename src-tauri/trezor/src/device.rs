@@ -2,7 +2,7 @@
 
 use crate::device_error::{failure_error, link_error, unexpected_message, Step};
 use crate::error::Error;
-use crate::link::{Link, Raw};
+use crate::link::{timeout_error, Deadline, Link, Raw};
 use crate::proto::{ButtonAck, Cancel, Failure, Wire};
 use crate::session::{Progress, Ui};
 use crate::transport::Transport;
@@ -34,14 +34,24 @@ impl<'a, X: Transport> Device<'a, X> {
     }
   }
 
-  fn receive_for(&mut self, session: u8, patience: Duration, step: Step) -> Result<Raw, Error> {
+  /// Waits for the next message of `session`. A wait that runs out is an error.
+  fn receive_for(&mut self, session: u8, patience: Duration) -> Result<Raw, Error> {
+    self
+      .listen(session, patience)?
+      .ok_or_else(|| link_error(timeout_error(patience)))
+  }
+
+  /// Listens to the device for at most `wait`, and acknowledges what it sends. Messages of other
+  /// sessions are skipped, and the whole wait has one deadline. Returns what the device sent for
+  /// `session`, or `None` when it stayed quiet. The pairing uses this while it
+  /// waits for the user, because the device speaks on its own when the user cancels on its screen.
+  pub(crate) fn listen(&mut self, session: u8, wait: Duration) -> Result<Option<Raw>, Error> {
+    let mut deadline = Deadline::new(wait);
     for _ in 0..MAX_FOREIGN_MESSAGES {
-      let raw = self
-        .link
-        .receive(patience)
-        .map_err(|error| link_error(error, step))?;
-      if raw.session == session {
-        return Ok(raw);
+      match self.link.receive_until(&mut deadline).map_err(link_error)? {
+        None => return Ok(None),
+        Some(raw) if raw.session == session => return Ok(Some(raw)),
+        Some(_) => {}
       }
     }
     Err(unexpected_message())
@@ -59,13 +69,10 @@ impl<'a, X: Transport> Device<'a, X> {
     announce: Option<Progress>,
   ) -> Result<Resp, Error> {
     self.session = session;
-    self
-      .link
-      .send(session, request)
-      .map_err(|error| link_error(error, step))?;
+    self.link.send(session, request).map_err(link_error)?;
     let mut patience = patience;
     for _ in 0..MAX_BUTTON_REQUESTS {
-      let raw = self.receive_for(session, patience, step)?;
+      let raw = self.receive_for(session, patience)?;
       if raw.message_type == Resp::TYPE {
         return Resp::decode(raw.body.as_slice()).map_err(|_| unexpected_message());
       }
@@ -83,10 +90,7 @@ impl<'a, X: Transport> Device<'a, X> {
               self.ui.progress(progress);
             }
           }
-          self
-            .link
-            .send(session, &ButtonAck {})
-            .map_err(|error| link_error(error, step))?;
+          self.link.send(session, &ButtonAck {}).map_err(link_error)?;
         }
         _ => return Err(unexpected_message()),
       }

@@ -31,10 +31,10 @@ describe('getTrezorStepMessage()', () => {
     expect(bubble).toContain('PIN')
   })
 
-  it('should ask the user to check the name before allowing the connection', () => {
+  it('should give the pairing question as the Trezor shows it', () => {
     const { bubble } = getTrezorStepMessage({ step: 'confirm-connection' })
-    expect(bubble).toContain('Swan Vault Recovery Assistant')
-    expect(bubble).toContain('Check the name on the Trezor')
+    expect(bubble).toContain('"Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?"')
+    expect(bubble).toContain('Confirm on the Trezor')
   })
 
   it('should ask for the 6-digit code, say why, and say that SVRA asks on every run', () => {
@@ -52,19 +52,21 @@ describe('getTrezorStepMessage()', () => {
     expect(message).not.toHaveProperty('bubble')
   })
 
-  it('should explain why the passphrase is asked for', () => {
+  it('should ask for the passphrase without saying which wallet was checked', () => {
     const { bubble } = getTrezorStepMessage({ step: 'passphrase' })
-    expect(bubble).toContain('passphrase protection')
-    expect(bubble).toContain('standard wallet holds no key of this vault')
-    expect(bubble).toContain('Enter your passphrase on the Trezor')
+    expect(bubble).toContain('Your Trezor asks for your passphrase. Enter it on the Trezor.')
+    expect(bubble).toContain('standard wallet or in a passphrase wallet')
+    expect(bubble).toContain('confirm an empty passphrase')
+    // the device can ask before SVRA has checked the standard wallet
+    expect(bubble).not.toContain('holds no key')
   })
 
-  it('should warn about the multisig notice and tell the user what to check when signing', () => {
+  it('should tell the user what the Safe 7 shows when it signs, and not promise a multisig warning or the keys', () => {
     const { bubble } = getTrezorStepMessage({ step: 'sign' })
-    expect(bubble).toContain('multisig')
-    expect(bubble).toContain('address and the amount')
-    expect(bubble).toContain('does not know your vault')
-    expect(bubble).toContain('whatever keys SVRA sends')
+    expect(bubble).toContain('does not know your vault and does not show its keys')
+    expect(bubble).toContain('the address and the amount of each payment, then the total with the fee')
+    expect(bubble).toContain('hold to confirm')
+    expect(bubble).not.toMatch(/warn|multisig|whatever keys/i)
   })
 
   it('should say how to stop at every step that waits for the user', () => {

@@ -12,6 +12,7 @@ mod error;
 mod keys;
 mod link;
 mod pairing;
+mod pairing_codes;
 mod proto;
 mod session;
 mod signing;
@@ -23,10 +24,13 @@ mod usb;
 mod test_device;
 
 pub use error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
-pub use session::{sign_psbt, Progress, SignOutcome, SignRequest, Ui, MIN_FIRMWARE_VERSION};
+pub use pairing_codes::{NotWaiting, PairingCodes, Wait};
+pub use session::{
+  sign_psbt, CodeEntry, Progress, SignOutcome, SignRequest, Ui, MIN_FIRMWARE_VERSION,
+};
 pub use transport::{Transport, TransportError, PACKET_LEN};
 #[cfg(feature = "usb")]
-pub use usb::{scan, sign_psbt_usb, DetectedDevice};
+pub use usb::{scan, session_running, sign_psbt_usb, DetectedDevice, BUSY_MESSAGE};
 
 #[cfg(test)]
 #[path = "../tests/support/mod.rs"]

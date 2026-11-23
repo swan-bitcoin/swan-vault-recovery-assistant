@@ -12,7 +12,7 @@ autotests = false
 bitcoin = "0.32"
 # 256-bit arithmetic for the Elligator 2 map of the pairing code. It has no unsafe code and no C.
 crypto-bigint = { version = "0.5.5", default-features = false }
-getrandom = "0.3.4"
+getrandom = "0.3"
 nusb = { version = "0.2.9", optional = true }
 prost = { version = "0.14.6", default-features = false, features = ["derive"] }
 semver = "1"

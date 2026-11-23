@@ -30,12 +30,16 @@ const HASH_BLOCK_SIZE: usize = 128;
 /// Maps 32 bytes to the u-coordinate of a point on Curve25519 (RFC 9380, `map_to_curve_elligator2`
 /// for curve25519, with the non-optimised steps). The code is the secret input, so every step
 /// runs in constant time. The result depends on the number only, not on how long it takes.
+///
+/// The field elements of the map live in registers and on the stack, and their type cannot be
+/// wiped. The input is derived from the code through SHA-512, so it does not give the code away
+/// directly, and it is wiped here.
 pub(crate) fn elligator2(input: &[u8; 32]) -> [u8; 32] {
   let params = DynResidueParams::new(&P);
   // A u-coordinate has 255 bits, and a number above P wraps around.
-  let mut bytes = *input;
+  let mut bytes = Zeroizing::new(*input);
   bytes[31] &= 0x7f;
-  let u = DynResidue::new(&U256::from_le_slice(&bytes), params);
+  let u = DynResidue::new(&U256::from_le_slice(&bytes[..]), params);
   let one = DynResidue::one(params);
   let j = DynResidue::new(&U256::from_u64(J), params);
   let minus_j = j.neg();
@@ -62,7 +66,9 @@ pub(crate) fn generator(code: &[u8], handshake_hash: &[u8; 32]) -> [u8; 32] {
   // fills the first hash block, so that the password sits in a block of its own.
   const DSI: &[u8] = b"CPace255";
   let padding = HASH_BLOCK_SIZE - (1 + DSI.len() + 1 + code.len() + 1);
-  let mut text = Vec::with_capacity(HASH_BLOCK_SIZE + 34);
+  // The text holds the code. The capacity is final, so that the buffer is never copied to a new
+  // place that stays unwiped.
+  let mut text = Zeroizing::new(Vec::with_capacity(HASH_BLOCK_SIZE + 34));
   text.push(DSI.len() as u8);
   text.extend_from_slice(DSI);
   text.push(code.len() as u8);
@@ -73,8 +79,8 @@ pub(crate) fn generator(code: &[u8], handshake_hash: &[u8; 32]) -> [u8; 32] {
   text.extend_from_slice(handshake_hash);
   // The session id is empty.
   text.push(0);
-  let digest = Sha512::digest(&text);
-  let mut point = [0_u8; 32];
+  let digest: Zeroizing<[u8; 64]> = Zeroizing::new(Sha512::digest(&text[..]).into());
+  let mut point = Zeroizing::new([0_u8; 32]);
   point.copy_from_slice(&digest[..32]);
   elligator2(&point)
 }
@@ -88,7 +94,9 @@ pub(crate) struct HostTag {
 /// Computes the message that proves to the device that the app knows `code`.
 ///
 /// `private_key` is 32 random bytes, used once. Returns `None` when the device's key is a point
-/// of low order: the shared secret would be 0 whatever the code is.
+/// of low order: the shared secret would be 0 whatever the code is. The caller wipes
+/// `private_key`. `x25519` takes its key by value, so the library holds one more copy on its
+/// stack that this code cannot reach. The key serves one pairing and is worthless after it.
 pub(crate) fn host_tag(
   code: &[u8],
   handshake_hash: &[u8; 32],
@@ -137,7 +145,7 @@ pub(crate) fn secret_matches(
   challenge: &[u8],
 ) -> bool {
   let committed = bool::from(Sha256::digest(secret).as_slice().ct_eq(commitment));
-  let expected = code_from_secret(handshake_hash, secret, challenge);
+  let expected = Zeroizing::new(code_from_secret(handshake_hash, secret, challenge));
   committed && bool::from(expected.as_bytes().ct_eq(code))
 }
 
@@ -308,5 +316,54 @@ mod tests {
       &hash,
       &challenge
     ));
+  }
+
+  /// `tests/support/cpace-vectors.txt` holds 282 Elligator 2 inputs and 100 whole CPace exchanges
+  /// that trezorlib computed. `tests/support/gen_cpace_vectors.py` writes the file and says how.
+  #[test]
+  fn the_code_and_the_pairing_match_trezorlib_on_the_checked_in_vectors() {
+    let vectors = include_str!("../tests/support/cpace-vectors.txt");
+    let (mut maps, mut exchanges) = (0, 0);
+    for line in vectors.lines() {
+      let fields: Vec<&str> = line.split(' ').collect();
+      match fields[0] {
+        "E" => {
+          assert_eq!(
+            elligator2(&array(fields[1])),
+            array(fields[2]),
+            "map {}",
+            fields[1]
+          );
+          maps += 1;
+        }
+        "C" => {
+          let code = fields[1].as_bytes();
+          let handshake_hash = array(fields[2]);
+          let tag =
+            host_tag(code, &handshake_hash, &array(fields[4]), &array(fields[3])).expect("a tag");
+          assert_eq!(tag.public_key, array(fields[5]), "host key {line}");
+          assert_eq!(tag.tag.to_vec(), hex(fields[6]), "host tag {line}");
+          // The firmware computes the same tag from its side, so it accepts the host's tag.
+          assert_eq!(tag.tag.to_vec(), hex(fields[7]), "device tag {line}");
+          let (secret, challenge) = (hex(fields[8]), hex(fields[9]));
+          assert_eq!(
+            code_from_secret(&handshake_hash, &secret, &challenge),
+            fields[10],
+            "code {line}"
+          );
+          let commitment = Sha256::digest(&secret);
+          assert!(secret_matches(
+            &commitment,
+            &secret,
+            fields[10].as_bytes(),
+            &handshake_hash,
+            &challenge
+          ));
+          exchanges += 1;
+        }
+        other => panic!("unknown vector kind {other}"),
+      }
+    }
+    assert_eq!((maps, exchanges), (282, 100));
   }
 }

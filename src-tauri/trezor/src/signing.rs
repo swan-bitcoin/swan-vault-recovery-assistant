@@ -102,7 +102,7 @@ fn signature_slots(
     if let Some(signature) = partial_sigs.get(&PublicKey::new(key)) {
       if position == vault.our_key_index {
         return Err(invalid(format!(
-          "Input {index} already holds a signature of this {}, but some other input does not. Create the transaction again with SVRA.",
+          "Input {index} holds a signature of this {} that SVRA cannot use. Either another input has none, or this one is not valid. Create the transaction again with SVRA.",
           vault.device_name()
         )));
       }
@@ -721,7 +721,27 @@ mod tests {
     let error = error_of(plan_of(&fixture));
     assert_eq!(error.kind, ErrorKind::InvalidPsbt);
     assert!(
-      error.message.contains("already holds a signature"),
+      error.message.contains("holds a signature of this"),
+      "{}",
+      error.message
+    );
+  }
+
+  #[test]
+  fn a_device_signature_that_does_not_verify_is_not_called_a_signature_on_one_input_only() {
+    let mut fixture = sweep();
+    sign_with(&fixture.vault.keys.device_xprv, &mut fixture.psbt);
+    // Every input holds a signature of the device, and none of them is valid for this lock time.
+    fixture.psbt.unsigned_tx.lock_time = bitcoin::absolute::LockTime::from_height(700_000).unwrap();
+    let error = error_of(plan_of(&fixture));
+    assert_eq!(error.kind, ErrorKind::InvalidPsbt);
+    assert!(
+      error.message.contains("SVRA cannot use"),
+      "{}",
+      error.message
+    );
+    assert!(
+      !error.message.contains("some other input does not"),
       "{}",
       error.message
     );

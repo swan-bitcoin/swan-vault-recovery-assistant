@@ -10,6 +10,7 @@ import {
   getDevicePrompt,
   getPsbtStatusMessage,
   getSignResultAndPsbt,
+  MultipleDevicesError,
   sanitize,
 } from './parsing'
 import {
@@ -26,6 +27,8 @@ import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 import { createConversationActions } from './utilities/createConversationActions'
 import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
 import {
+  cancelOpenPairingEntry,
+  cancelOrphanedPairing,
   getBitbox02Device,
   getBitbox02StepMessage,
   getBusyMessage,
@@ -657,6 +660,14 @@ async function signWithDevice(run: SignRun, retryCount: number) {
         )
       }
 
+      if (e instanceof MultipleDevicesError) {
+        hideTempMessage()
+
+        addToConversation(createConversationBubble({ content: e.message, footer: new Date().toLocaleString() }), {
+          shouldScrollToLastMessage: !tryAgainActions,
+        })
+      }
+
       // user likely canceled signing
       if (e.message.toLowerCase().includes('failed to extract psbt')) {
         hideTempMessage()
@@ -772,6 +783,9 @@ async function sweep() {
 window.addEventListener('DOMContentLoaded', () => {
   initializeMode()
   initializeDOM()
+
+  // A reload does not stop the backend session of the old page, and that session can wait for a code that nobody can type.
+  void cancelOrphanedPairing(() => commands.cancelTrezorPairing())
 
   DOM.buttons.broadcast.addEventListener('click', (e) => {
     e.preventDefault()
@@ -929,6 +943,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Clear messages via button click
   DOM.buttons.clearMessages.addEventListener('click', () => {
+    // the code entry holds the only Cancel button, so it ends the pairing before the controls go
+    void cancelOpenPairingEntry()
     DOM.outputs.conversation.innerHTML = ''
     DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
     DOM.buttons.clearMessages.classList.add('hidden')

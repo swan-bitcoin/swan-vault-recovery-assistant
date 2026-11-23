@@ -14,6 +14,18 @@ import {
   type PairingCodeEntry,
 } from './devices'
 
+// Tailwind reads every word of the source as a possible class name. The name of this method, and the word for a list of
+// choices, each match a daisyUI class that adds unused rules to the bundle. So the method name is built at run time, and
+// no comment here uses either word. The attribute of a similar name does not work for this input: the page ignores it
+// while the Sign button holds the keyboard, and on every run after the first.
+const TAKE_KEYBOARD = ['fo', 'cus'].join('')
+
+// the element must be in the page before it can take the keyboard
+const takeKeyboard = (element: HTMLElement) =>
+  (element as unknown as Record<string, (options: { preventScroll: boolean }) => void>)[TAKE_KEYBOARD]({
+    preventScroll: true,
+  })
+
 // The conversation side of a Safe 7 sign run: a message per step, and the input for the pairing code.
 export function createTrezorView() {
   let pairing: PairingCodeEntry | null = null
@@ -41,8 +53,6 @@ function showPairingCodeEntry() {
   input.inputMode = 'numeric'
   input.autocomplete = 'off'
   input.spellcheck = false
-  // The attribute does this job. Calling the method of the same name would make Tailwind add unused daisyUI rules.
-  input.autofocus = true
   input.placeholder = `${PAIRING_CODE_LENGTH} digits`
   input.setAttribute('aria-label', `The ${PAIRING_CODE_LENGTH}-digit code that your Trezor shows`)
 
@@ -99,6 +109,7 @@ function showPairingCodeEntry() {
   const actions = createConversationActions({ content: controls, dangerouslySetInnerHTML: true })
   if (actions) {
     addToConversation(actions)
+    takeKeyboard(input)
   } else {
     // without the input the session would wait for a code that nobody can type
     entry.cancel()

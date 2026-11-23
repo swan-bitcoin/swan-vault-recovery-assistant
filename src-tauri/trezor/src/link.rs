@@ -5,15 +5,18 @@
 //! it moves packets between the transport and the channel, answers every message with an ACK,
 //! and sends a message again when its ACK is late.
 //!
-//! Waiting is counted in the time that the transport waited with no packet, not in wall-clock
-//! time. A real transport blocks for the time it was given, so the two agree. A packet that
-//! arrives but does not belong to the channel costs no time, so there is a separate limit on how
-//! many of those one wait accepts.
+//! Every wait ends at a deadline that two clocks run. One counts the time that the transport
+//! waited with no packet. A real transport blocks for the time it was given, so this clock
+//! agrees with the wall clock, and the tests of the software device, which never blocks, need no
+//! real sleeping. The other is the wall clock, so that a device that keeps sending packets cannot
+//! stretch a wait. The wait ends when the first of the two runs out. A packet that does not
+//! belong to the channel costs no counted time, so there is also a limit on how many of those one
+//! wait accepts.
 
 use crate::proto::{ThpDeviceProperties, Wire};
 use crate::transport::{Transport, TransportError};
 use prost::Message;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use trezor_noise_rust_crypto::{Aes256Gcm, Sha256, X25519};
 use trezor_thp::channel::buffered::Buffered;
 use trezor_thp::channel::host::{Channel, ChannelOpen, Mux};
@@ -31,8 +34,14 @@ pub(crate) const USER: Duration = Duration::from_secs(10 * 60);
 /// The longest the transport blocks in one read. A short read keeps the loop responsive.
 const SLICE: Duration = Duration::from_secs(1);
 /// Times that one message is sent again, without an ACK, before the link gives up. The waits
-/// between the tries grow from 0.2 to 3.5 seconds, so this is about thirteen seconds.
+/// between the tries grow from 0.2 to 1.5 seconds, so all of them together are about 14.6
+/// seconds.
 const MAX_RETRANSMISSIONS: u8 = 15;
+/// The longest that one message may wait for its ACK, by the wall clock. It is longer than the
+/// retransmissions need.
+const SEND_LIMIT: Duration = Duration::from_secs(20);
+/// The same for the short farewell message of [`Link::send_once`].
+const SEND_ONCE_LIMIT: Duration = Duration::from_secs(4);
 /// Packets that one wait ignores before it gives up. A device that is quiet has a few stale
 /// packets at most.
 const MAX_IGNORED_PACKETS: u32 = 5_000;
@@ -73,12 +82,57 @@ pub(crate) fn random_bytes(dest: &mut [u8]) {
   Crypto::random_bytes(dest);
 }
 
+/// A wait that ends at a deadline. See the module documentation for the two clocks.
+pub(crate) struct Deadline {
+  patience: Duration,
+  /// The time that the transport waited with no packet.
+  silent: Duration,
+  started: Instant,
+}
+
+impl Deadline {
+  pub(crate) fn new(patience: Duration) -> Self {
+    Deadline {
+      patience,
+      silent: Duration::ZERO,
+      started: Instant::now(),
+    }
+  }
+
+  /// Adds time that the transport waited with no packet.
+  pub(crate) fn silence(&mut self, waited: Duration) {
+    self.silent += waited;
+  }
+
+  pub(crate) fn remaining(&self) -> Duration {
+    self
+      .patience
+      .saturating_sub(self.silent.max(self.started.elapsed()))
+  }
+
+  pub(crate) fn expired(&self) -> bool {
+    self.remaining().is_zero()
+  }
+}
+
+/// The error for a wait of `patience` that ran out. Only a wait that gave the user the full time
+/// is a user timeout.
+pub(crate) fn timeout_error(patience: Duration) -> LinkError {
+  if patience >= USER {
+    LinkError::UserTimeout
+  } else {
+    LinkError::Timeout
+  }
+}
+
 /// Why the link failed. The session turns this into an error for the user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LinkError {
   Transport(TransportError),
-  /// The device did not answer in time.
+  /// The device did not answer in time, or did not acknowledge a message.
   Timeout,
+  /// The user did not finish what the device asked for in the whole time that the user has.
+  UserTimeout,
   /// The device is locked, and the handshake did not ask it to show the PIN screen.
   DeviceLocked,
   /// The device dropped the channel or could not decrypt a message, or the channel broke.
@@ -195,12 +249,12 @@ fn allocate_channel<T: Transport>(
   for _ in 0..ALLOCATION_ATTEMPTS {
     mux.request_channel(try_to_unlock);
     flush(transport, &mut mux)?;
-    let mut waited = Duration::ZERO;
+    let mut deadline = Deadline::new(ALLOCATION_WAIT);
     let mut ignored = 0;
-    while waited < ALLOCATION_WAIT {
-      let slice = SLICE.min(ALLOCATION_WAIT - waited);
+    while !deadline.expired() {
+      let slice = SLICE.min(deadline.remaining());
       match transport.read_packet(slice)? {
-        None => waited += slice,
+        None => deadline.silence(slice),
         Some(packet) => {
           ignored += 1;
           if ignored > MAX_IGNORED_PACKETS {
@@ -236,7 +290,10 @@ impl<T: Transport> Allocated<T> {
   }
 
   fn run_handshake(&mut self, patience: Duration) -> Result<(), LinkError> {
-    let mut waited = Duration::ZERO;
+    // The time that the device has to answer. The time that a message spends waiting for its ACK
+    // is not part of it, so the clock starts again when a message has been acknowledged.
+    let mut answer = Deadline::new(patience);
+    let mut sending_since: Option<Instant> = None;
     let mut retries = 0_u8;
     let mut ignored = 0_u32;
     loop {
@@ -248,13 +305,22 @@ impl<T: Transport> Allocated<T> {
         return Err(LinkError::ChannelLost);
       }
       let sending = self.channel.sending_retry();
+      match sending {
+        Some(_) => {
+          if sending_since.get_or_insert_with(Instant::now).elapsed() > SEND_LIMIT {
+            return Err(LinkError::Timeout);
+          }
+        }
+        None => {
+          if sending_since.take().is_some() {
+            answer = Deadline::new(patience);
+            retries = 0;
+          }
+        }
+      }
       let slice = match sending {
         Some(retry) => Duration::from_millis(retransmit_after_ms(retry).into()),
-        None => SLICE.min(
-          patience
-            .saturating_sub(waited)
-            .max(Duration::from_millis(1)),
-        ),
+        None => SLICE.min(answer.remaining().max(Duration::from_millis(1))),
       };
       match self.transport.read_packet(slice)? {
         None => match sending {
@@ -269,9 +335,9 @@ impl<T: Transport> Allocated<T> {
               .map_err(|_| LinkError::Protocol)?;
           }
           None => {
-            waited += slice;
-            if waited >= patience {
-              return Err(LinkError::Timeout);
+            answer.silence(slice);
+            if answer.expired() {
+              return Err(timeout_error(patience));
             }
           }
         },
@@ -281,6 +347,9 @@ impl<T: Transport> Allocated<T> {
             return Err(LinkError::Protocol);
           }
           classify(self.channel.packet_in(&packet))?;
+          if sending.is_none() && answer.expired() {
+            return Err(timeout_error(patience));
+          }
         }
       }
     }
@@ -354,13 +423,13 @@ impl<T: Transport> Link<T> {
 
   /// Sends one message and waits until the device has acknowledged it.
   pub(crate) fn send<M: Wire>(&mut self, session: u8, message: &M) -> Result<(), LinkError> {
-    self.send_with(session, message, MAX_RETRANSMISSIONS)
+    self.send_with(session, message, MAX_RETRANSMISSIONS, SEND_LIMIT)
   }
 
   /// Sends a message that the app does not need an answer to, such as a cancel before it gives
-  /// up. A device that does not answer costs two short waits and not the full thirteen seconds.
+  /// up. A device that does not answer costs a short wait and not the full fifteen seconds.
   pub(crate) fn send_once<M: Wire>(&mut self, session: u8, message: &M) -> Result<(), LinkError> {
-    self.send_with(session, message, 2)
+    self.send_with(session, message, 2, SEND_ONCE_LIMIT)
   }
 
   fn send_with<M: Wire>(
@@ -368,17 +437,22 @@ impl<T: Transport> Link<T> {
     session: u8,
     message: &M,
     max_retransmissions: u8,
+    limit: Duration,
   ) -> Result<(), LinkError> {
     self
       .channel
       .message_in(session, M::TYPE, &message.encode_to_vec())
       .map_err(|_| LinkError::Protocol)?;
+    let started = Instant::now();
     let mut retries = 0_u8;
     let mut ignored = 0_u32;
     loop {
       flush(&mut self.transport, &mut self.channel)?;
       if self.channel.message_in_ready() {
         return Ok(());
+      }
+      if started.elapsed() > limit {
+        return Err(LinkError::Timeout);
       }
       let retry = self.channel.sending_retry().unwrap_or(retries);
       let slice = Duration::from_millis(retransmit_after_ms(retry).into());
@@ -404,24 +478,18 @@ impl<T: Transport> Link<T> {
     }
   }
 
-  /// Waits for one message, and acknowledges it. `patience` is how long the device may stay quiet.
-  pub(crate) fn receive(&mut self, patience: Duration) -> Result<Raw, LinkError> {
-    let mut waited = Duration::ZERO;
+  /// Waits for one message until `deadline`, and acknowledges it. `Ok(None)` means that the
+  /// deadline passed first.
+  pub(crate) fn receive_until(
+    &mut self,
+    deadline: &mut Deadline,
+  ) -> Result<Option<Raw>, LinkError> {
     let mut ignored = 0_u32;
     loop {
       flush(&mut self.transport, &mut self.channel)?;
-      let slice = SLICE.min(
-        patience
-          .saturating_sub(waited)
-          .max(Duration::from_millis(1)),
-      );
+      let slice = SLICE.min(deadline.remaining().max(Duration::from_millis(1)));
       match self.transport.read_packet(slice)? {
-        None => {
-          waited += slice;
-          if waited >= patience {
-            return Err(LinkError::Timeout);
-          }
-        }
+        None => deadline.silence(slice),
         Some(packet) => {
           ignored += 1;
           if ignored > MAX_IGNORED_PACKETS {
@@ -433,13 +501,16 @@ impl<T: Transport> Link<T> {
               .message_out()
               .map_err(|_| LinkError::ChannelLost)?;
             flush(&mut self.transport, &mut self.channel)?;
-            return Ok(Raw {
+            return Ok(Some(Raw {
               session,
               message_type,
               body,
-            });
+            }));
           }
         }
+      }
+      if deadline.expired() {
+        return Ok(None);
       }
     }
   }
@@ -525,11 +596,87 @@ mod tests {
 
   #[test]
   fn a_lost_packet_is_sent_again() {
-    let mut device = SoftDevice::new(Behavior {
-      drop_host_packets: vec![3],
-      ..Behavior::default()
-    });
+    let packets_of_a_run = |drop_host_packets: Vec<usize>| {
+      let mut device = SoftDevice::new(Behavior {
+        drop_host_packets,
+        ..Behavior::default()
+      });
+      let allocated = Allocated::allocate(&mut device, false).expect("a channel");
+      assert!(allocated.handshake(QUICK).is_ok());
+      device.host_packet_count()
+    };
+    let without_loss = packets_of_a_run(Vec::new());
+    let with_loss = packets_of_a_run(vec![3]);
+    // The lost packet was sent again, so the host wrote more packets than in a clean run.
+    assert!(with_loss > without_loss, "{with_loss} {without_loss}");
+  }
+
+  /// The soft device until `chatty` is set. Then every read takes `delay` and gives a packet of a
+  /// channel that the link does not use.
+  struct Chatty {
+    device: SoftDevice,
+    chatty: std::rc::Rc<std::cell::Cell<bool>>,
+    delay: Duration,
+  }
+
+  impl Transport for Chatty {
+    fn write_packet(&mut self, packet: &[u8]) -> Result<(), TransportError> {
+      self.device.write_packet(packet)
+    }
+
+    fn read_packet(&mut self, timeout: Duration) -> Result<Option<Vec<u8>>, TransportError> {
+      if !self.chatty.get() {
+        return self.device.read_packet(timeout);
+      }
+      std::thread::sleep(self.delay);
+      let mut packet = vec![0x04, 0x07, 0x07, 0x00, 0x10];
+      packet.resize(64, 0);
+      Ok(Some(packet))
+    }
+  }
+
+  fn chatty_link(delay: Duration) -> (Link<Chatty>, std::rc::Rc<std::cell::Cell<bool>>) {
+    let chatty = std::rc::Rc::new(std::cell::Cell::new(false));
+    let transport = Chatty {
+      device: SoftDevice::new(Behavior::default()),
+      chatty: chatty.clone(),
+      delay,
+    };
+    let allocated = Allocated::allocate(transport, false).expect("a channel");
+    let (link, _) = allocated.handshake(QUICK).expect("a handshake");
+    (link, chatty)
+  }
+
+  #[test]
+  fn a_device_that_keeps_sending_packets_cannot_stretch_a_wait() {
+    // The packets cost no counted silence, and 5000 of them would take 100 seconds. The wall
+    // clock ends the wait first.
+    let (mut link, chatty) = chatty_link(Duration::from_millis(20));
+    chatty.set(true);
+    let started = Instant::now();
+    let message = link
+      .receive_until(&mut Deadline::new(Duration::from_millis(200)))
+      .expect("no error");
+    assert!(message.is_none());
+    assert!(started.elapsed() >= Duration::from_millis(200));
+    assert!(started.elapsed() < Duration::from_secs(5));
+  }
+
+  #[test]
+  fn a_wait_of_a_silent_device_ends_without_real_sleeping() {
+    let mut device = SoftDevice::new(Behavior::default());
     let allocated = Allocated::allocate(&mut device, false).expect("a channel");
-    assert!(allocated.handshake(QUICK).is_ok());
+    let (mut link, _) = allocated.handshake(QUICK).expect("a handshake");
+    let started = Instant::now();
+    // Ten minutes of silence pass at once, because the soft device does not block.
+    assert_eq!(link.receive_until(&mut Deadline::new(USER)), Ok(None));
+    assert!(started.elapsed() < Duration::from_secs(5));
+  }
+
+  #[test]
+  fn only_the_full_user_patience_is_a_user_timeout() {
+    assert_eq!(timeout_error(USER), LinkError::UserTimeout);
+    assert_eq!(timeout_error(QUICK), LinkError::Timeout);
+    assert_eq!(timeout_error(Duration::from_secs(599)), LinkError::Timeout);
   }
 }

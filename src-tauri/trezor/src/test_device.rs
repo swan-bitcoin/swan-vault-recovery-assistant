@@ -66,8 +66,11 @@ pub(crate) struct Behavior {
   pub disconnect_after: Option<usize>,
   /// The user refuses the connection on the device.
   pub refuse_pairing: bool,
-  /// The user presses cancel on the code screen.
+  /// The user presses the button of the code screen, which cancels the pairing. The device sends
+  /// its failure at once, as the firmware does, and drops any host message after it.
   pub cancel_at_code: bool,
+  /// The device is unplugged right after it sent its answer to the pairing challenge.
+  pub unplug_at_code: bool,
   /// The device says that it is already paired.
   pub claim_paired: bool,
   pub model: String,
@@ -99,6 +102,7 @@ impl Default for Behavior {
       disconnect_after: None,
       refuse_pairing: false,
       cancel_at_code: false,
+      unplug_at_code: false,
       claim_paired: false,
       model: "T3W1".to_string(),
       major_version: 2,
@@ -188,6 +192,8 @@ struct Inner {
   signing: Option<SignState>,
   /// Every application message that the host sent, in order: session and type.
   received: Vec<(u8, u16)>,
+  /// The user cancelled on the code screen. The pairing is over, and the device answers nothing.
+  cancelled: bool,
 }
 
 #[derive(Clone)]
@@ -228,12 +234,18 @@ impl SoftDevice {
       after_button: None,
       signing: None,
       received: Vec::new(),
+      cancelled: false,
     })))
   }
 
   /// The code on the device's screen. `None` before the device shows one.
   pub(crate) fn code(&self) -> Option<String> {
     self.0.borrow().code.clone()
+  }
+
+  /// The number of packets that the host wrote so far, the ones that never arrived included.
+  pub(crate) fn host_packet_count(&self) -> usize {
+    self.0.borrow().host_packets
   }
 
   /// Every packet that the device sent so far.
@@ -294,6 +306,9 @@ impl Transport for SoftDevice {
     let mut inner = self.0.borrow_mut();
     if inner.behavior.silent {
       return Ok(None);
+    }
+    if inner.behavior.unplug_at_code && inner.code.is_some() && inner.outbox.is_empty() {
+      return Err(TransportError::Disconnected);
     }
     if inner.behavior.babble {
       let mut packet = vec![0x04, 0x07, 0x07, 0x00, 0x10];
@@ -431,6 +446,9 @@ impl Inner {
 
   fn on_message(&mut self, session: u8, message_type: u16, body: &[u8], hash: [u8; 32]) {
     self.received.push((session, message_type));
+    if self.cancelled {
+      return;
+    }
     match message_type {
       ThpPairingRequest::TYPE => {
         if self.behavior.refuse_pairing {
@@ -471,15 +489,17 @@ impl Inner {
             cpace_trezor_public_key: public.to_vec(),
           },
         );
-      }
-      ThpCodeEntryCpaceHostTag::TYPE => {
+        // The firmware cancels by itself when the user presses the button of the code screen. It
+        // sends the failure at once and does not wait for the host.
         if self.behavior.cancel_at_code {
+          self.cancelled = true;
           self.queue(
             session,
             &failure(FailureType::ActionCancelled, "Action cancelled"),
           );
-          return;
         }
+      }
+      ThpCodeEntryCpaceHostTag::TYPE => {
         let Ok(tag) = ThpCodeEntryCpaceHostTag::decode(body) else {
           return;
         };

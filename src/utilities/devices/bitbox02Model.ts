@@ -7,5 +7,6 @@ const MODEL_NAMES: Record<string, string> = {
 
 // Unknown models get the plain family name, so a value from the backend never reaches the page unchecked.
 export function getBitbox02ModelName(model: string): string {
-  return Object.hasOwn(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
+  // not Object.hasOwn: older WebKit lacks it
+  return Object.prototype.hasOwnProperty.call(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
 }

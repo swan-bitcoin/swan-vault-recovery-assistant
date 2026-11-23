@@ -1,17 +1,19 @@
-// Hands the pairing code from the window to the thread that talks to the Trezor Safe 7.
-//
-// The session thread blocks while the user reads the code on the Trezor and types it into SVRA.
-// The window answers with a separate command, so the two sides need a place to meet. This module
-// is that place. It has no Tauri types, so unit tests cover it.
-//
-// Rules that the tests pin down:
-// - At most one wait is open. A new wait cancels an older one that is still open.
-// - A code reaches the wait once. After that, the slot is empty and a second code is refused.
-// - A wait removes its own entry when it ends, for any reason, so a code that a later session
-//   receives was always meant for that later session.
+//! Hands the pairing code from the window to the thread that talks to the Trezor Safe 7.
+//!
+//! The session thread polls while the user reads the code on the Trezor and types it into the
+//! app. The window answers with a separate command, so the two sides need a place to meet. This
+//! module is that place. It has no types of the app shell, so unit tests cover it.
+//!
+//! Rules that the tests pin down:
+//! - At most one wait is open. A new wait cancels an older one that is still open.
+//! - A code reaches the wait once. After that, the slot is empty and a second code is refused.
+//! - A wait removes its own entry when it ends, for any reason, so a code that a later session
+//!   receives was always meant for that later session.
 
-use std::sync::mpsc::{self, Receiver, Sender};
+use crate::session::CodeEntry;
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 /// No session waits for a code.
 #[derive(Debug, PartialEq, Eq)]
@@ -78,7 +80,7 @@ impl PairingCodes {
 
   /// Ends the open wait without a code.
   pub fn cancel(&self) -> Result<(), NotWaiting> {
-    // Dropping the sender wakes the session thread.
+    // Dropping the sender tells the session thread.
     self.slot().waiting.take().map(drop).ok_or(NotWaiting)
   }
 
@@ -95,6 +97,12 @@ impl PairingCodes {
   }
 }
 
+impl Default for PairingCodes {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 /// The session side of one wait. Dropping it closes the wait.
 pub struct Wait<'a> {
   codes: &'a PairingCodes,
@@ -103,9 +111,14 @@ pub struct Wait<'a> {
 }
 
 impl Wait<'_> {
-  /// Blocks until the window sends a code. Returns `None` when the wait was cancelled.
-  pub fn recv(&self) -> Option<String> {
-    self.receiver.recv().ok()
+  /// Waits up to `wait` for the window to send a code. A wait that was cancelled, or whose
+  /// window is gone, answers `Cancelled`.
+  pub fn poll(&self, wait: Duration) -> CodeEntry {
+    match self.receiver.recv_timeout(wait) {
+      Ok(code) => CodeEntry::Entered(code),
+      Err(RecvTimeoutError::Timeout) => CodeEntry::Pending,
+      Err(RecvTimeoutError::Disconnected) => CodeEntry::Cancelled,
+    }
   }
 }
 
@@ -127,25 +140,41 @@ impl Drop for Wait<'_> {
 mod tests {
   use super::*;
   use std::thread;
-  use std::time::Duration;
+
+  const SHORT: Duration = Duration::from_millis(5);
+  const LONG: Duration = Duration::from_secs(10);
+
+  fn entered(code: &str) -> CodeEntry {
+    CodeEntry::Entered(code.to_string())
+  }
 
   #[test]
   fn a_code_reaches_the_open_wait() {
     let codes = PairingCodes::new();
     let wait = codes.begin("main");
     assert_eq!(codes.submit("123456".to_string()), Ok(()));
-    assert_eq!(wait.recv(), Some("123456".to_string()));
+    assert_eq!(wait.poll(SHORT), entered("123456"));
   }
 
   #[test]
-  fn a_code_that_arrives_while_the_session_blocks_wakes_it() {
+  fn a_wait_with_no_code_yet_is_pending() {
+    let codes = PairingCodes::new();
+    let wait = codes.begin("main");
+    assert_eq!(wait.poll(SHORT), CodeEntry::Pending);
+    assert_eq!(wait.poll(Duration::ZERO), CodeEntry::Pending);
+    // The poll took nothing: the wait is still open.
+    assert_eq!(codes.submit("123456".to_string()), Ok(()));
+  }
+
+  #[test]
+  fn a_code_that_arrives_while_the_session_polls_wakes_it() {
     let codes = PairingCodes::new();
     thread::scope(|scope| {
       let wait = codes.begin("main");
-      let session = scope.spawn(move || wait.recv());
+      let session = scope.spawn(move || wait.poll(LONG));
       thread::sleep(Duration::from_millis(20));
       assert_eq!(codes.submit("654321".to_string()), Ok(()));
-      assert_eq!(session.join().unwrap(), Some("654321".to_string()));
+      assert_eq!(session.join().unwrap(), entered("654321"));
     });
   }
 
@@ -163,15 +192,15 @@ mod tests {
     assert_eq!(codes.submit("111111".to_string()), Ok(()));
     assert_eq!(codes.submit("222222".to_string()), Err(NotWaiting));
     assert_eq!(codes.cancel(), Err(NotWaiting));
-    assert_eq!(wait.recv(), Some("111111".to_string()));
+    assert_eq!(wait.poll(SHORT), entered("111111"));
   }
 
   #[test]
-  fn cancel_wakes_the_wait_with_none() {
+  fn cancel_ends_the_wait() {
     let codes = PairingCodes::new();
     let wait = codes.begin("main");
     assert_eq!(codes.cancel(), Ok(()));
-    assert_eq!(wait.recv(), None);
+    assert_eq!(wait.poll(SHORT), CodeEntry::Cancelled);
     // The cancel used the wait up.
     assert_eq!(codes.submit("123456".to_string()), Err(NotWaiting));
   }
@@ -207,7 +236,17 @@ mod tests {
     assert_eq!(codes.submit("123456".to_string()), Err(NotWaiting));
     let next = codes.begin("main");
     assert_eq!(codes.cancel(), Ok(()));
-    assert_eq!(next.recv(), None);
+    assert_eq!(next.poll(SHORT), CodeEntry::Cancelled);
+  }
+
+  #[test]
+  fn a_new_wait_cancels_an_orphaned_one() {
+    let codes = PairingCodes::new();
+    let orphan = codes.begin("main");
+    let newer = codes.begin("main");
+    assert_eq!(orphan.poll(SHORT), CodeEntry::Cancelled);
+    assert_eq!(codes.submit("123456".to_string()), Ok(()));
+    assert_eq!(newer.poll(SHORT), entered("123456"));
   }
 
   #[test]
@@ -215,11 +254,10 @@ mod tests {
     let codes = PairingCodes::new();
     let old = codes.begin("main");
     let newer = codes.begin("main");
-    // The newer wait cancelled the old one.
-    assert_eq!(old.recv(), None);
+    assert_eq!(old.poll(SHORT), CodeEntry::Cancelled);
     drop(old);
     assert_eq!(codes.submit("123456".to_string()), Ok(()));
-    assert_eq!(newer.recv(), Some("123456".to_string()));
+    assert_eq!(newer.poll(SHORT), entered("123456"));
   }
 
   #[test]
@@ -227,7 +265,7 @@ mod tests {
     let codes = PairingCodes::new();
     let wait = codes.begin("main");
     codes.cancel_owned_by("main");
-    assert_eq!(wait.recv(), None);
+    assert_eq!(wait.poll(SHORT), CodeEntry::Cancelled);
     assert_eq!(codes.submit("123456".to_string()), Err(NotWaiting));
   }
 
@@ -236,19 +274,20 @@ mod tests {
     let codes = PairingCodes::new();
     let wait = codes.begin("main");
     codes.cancel_owned_by("help");
+    assert_eq!(wait.poll(SHORT), CodeEntry::Pending);
     assert_eq!(codes.submit("123456".to_string()), Ok(()));
-    assert_eq!(wait.recv(), Some("123456".to_string()));
+    assert_eq!(wait.poll(SHORT), entered("123456"));
   }
 
   #[test]
-  fn a_blocked_session_ends_when_its_window_closes() {
+  fn a_polling_session_ends_when_its_window_closes() {
     let codes = PairingCodes::new();
     thread::scope(|scope| {
       let wait = codes.begin("main");
-      let session = scope.spawn(move || wait.recv());
+      let session = scope.spawn(move || wait.poll(LONG));
       thread::sleep(Duration::from_millis(20));
       codes.cancel_owned_by("main");
-      assert_eq!(session.join().unwrap(), None);
+      assert_eq!(session.join().unwrap(), CodeEntry::Cancelled);
     });
   }
 }

@@ -256,9 +256,9 @@ describe('getBusyMessage()', () => {
     )
   })
 
-  it('should name the Safe 7', () => {
+  it('should send the user of a Safe 7 to SVRA first, because the code step is in SVRA', () => {
     expect(getBusyMessage('trezor_safe7')).toBe(
-      'SVRA is still waiting for your Trezor Safe 7. Finish on the Trezor Safe 7, or unplug it to stop. Then try again.'
+      'SVRA is still waiting for your Trezor Safe 7. If SVRA asks for the 6-digit code, type it or select Cancel. Otherwise finish on the Trezor Safe 7, or unplug it to stop. Then try again.'
     )
   })
 })
@@ -286,7 +286,7 @@ describe('runTrezorSession()', () => {
     expect(getPendingDevice()).toBeNull()
   })
 
-  it('should show each update once, and in the order it arrives', async () => {
+  it('should drop only an update that repeats the one before it, and in the order it arrives', async () => {
     const command = deferred<string>()
     const show = vi.fn()
     let channel!: TrezorChannel
@@ -316,6 +316,93 @@ describe('runTrezorSession()', () => {
 
     command.resolve('done')
     await session
+  })
+
+  it('should show a step again when the device asks again', async () => {
+    const command = deferred<string>()
+    const show = vi.fn()
+    let channel!: TrezorChannel
+    const session = runTrezorSession(
+      start(),
+      (onProgress) => {
+        channel = onProgress
+        return command.promise
+      },
+      show
+    )
+
+    // the crate sends these on purpose: the device locked again, or asked for a second wallet
+    for (const step of [
+      'connecting',
+      'unlock',
+      'enter-pairing-code',
+      'checking-key',
+      'passphrase',
+      'unlock',
+      'checking-key',
+      'sign',
+    ] as const) {
+      channel.onmessage({ step })
+    }
+
+    expect(show.mock.calls.map(([update]) => update.step)).toStrictEqual([
+      'connecting',
+      'unlock',
+      'enter-pairing-code',
+      'checking-key',
+      'passphrase',
+      'unlock',
+      'checking-key',
+      'sign',
+    ])
+
+    command.resolve('done')
+    await session
+  })
+
+  it('should not show the same step twice in a row, even after a step in between was dropped', async () => {
+    const command = deferred<string>()
+    const show = vi.fn()
+    let channel!: TrezorChannel
+    const session = runTrezorSession(
+      start(),
+      (onProgress) => {
+        channel = onProgress
+        return command.promise
+      },
+      show
+    )
+
+    for (const step of ['passphrase', 'passphrase', 'checking-key', 'passphrase', 'passphrase'] as const) {
+      channel.onmessage({ step })
+    }
+
+    expect(show.mock.calls.map(([update]) => update.step)).toStrictEqual(['passphrase', 'checking-key', 'passphrase'])
+
+    command.resolve('done')
+    await session
+  })
+
+  it('should keep a separate filter for each session', async () => {
+    const show = vi.fn()
+    for (let i = 0; i < 2; i++) {
+      const command = deferred<string>()
+      let channel!: TrezorChannel
+      const session = runTrezorSession(
+        start(),
+        (onProgress) => {
+          channel = onProgress
+          return command.promise
+        },
+        show
+      )
+      channel.onmessage({ step: 'connecting' })
+      command.resolve('done')
+      await session
+      runs.splice(0).forEach((run) => run.release())
+    }
+
+    expect(show).toHaveBeenCalledTimes(2)
   })
 
   it('should ignore an update that arrives after the command resolved', async () => {

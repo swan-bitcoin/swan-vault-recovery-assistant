@@ -1,5 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createPairingCodeEntry, isPairingCodeComplete, normalizePairingCode } from './trezorPairing'
+import {
+  cancelOpenPairingEntry,
+  cancelOrphanedPairing,
+  createPairingCodeEntry,
+  isPairingCodeComplete,
+  normalizePairingCode,
+} from './trezorPairing'
 
 describe('normalizePairingCode()', () => {
   it.each([
@@ -12,6 +18,8 @@ describe('normalizePairingCode()', () => {
     ['12a3b4', '1234'],
     ['abc', ''],
     ['1234567890', '123456'],
+    // other digits around the code are not told apart from the code: the first six digits stay
+    ['1. 088 626', '108862'],
     // the Arabic-Indic digits are not digits for the device
     ['١٢٣٤٥٦', ''],
   ])('should turn %j into %j', (raw, code) => {
@@ -188,5 +196,70 @@ describe('createPairingCodeEntry()', () => {
     await sending
 
     expect(onRefused).not.toHaveBeenCalled()
+  })
+})
+
+describe('cancelOpenPairingEntry()', () => {
+  it('should cancel the entry that is open', async () => {
+    const { cancel, onClosed } = setup()
+
+    await cancelOpenPairingEntry()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(onClosed.mock.calls).toStrictEqual([['cancelled']])
+  })
+
+  it('should do nothing when the entry already sent its code', async () => {
+    const { entry, cancel } = setup()
+    await entry.submit('123456')
+
+    await cancelOpenPairingEntry()
+
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('should do nothing when the entry was cancelled before', async () => {
+    const { entry, cancel } = setup()
+    await entry.cancel()
+
+    await cancelOpenPairingEntry()
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('should do nothing when the session ended', async () => {
+    const { entry, cancel } = setup()
+    entry.end()
+
+    await cancelOpenPairingEntry()
+
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('should cancel only the newest entry', async () => {
+    const first = setup()
+    const second = setup()
+
+    await cancelOpenPairingEntry()
+
+    expect(first.cancel).not.toHaveBeenCalled()
+    expect(second.cancel).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('cancelOrphanedPairing()', () => {
+  it('should ask the backend to cancel', async () => {
+    const cancel = vi.fn().mockResolvedValue(null)
+
+    await cancelOrphanedPairing(cancel)
+
+    expect(cancel).toHaveBeenCalledTimes(1)
+  })
+
+  it('should ignore the refusal of a backend that has no session waiting for a code', async () => {
+    const cancel = vi.fn().mockRejectedValue({ error_type: 'TrezorError', message: 'No Trezor waits for a code.' })
+
+    await expect(cancelOrphanedPairing(cancel)).resolves.toBeUndefined()
+    expect(cancel).toHaveBeenCalledTimes(1)
   })
 })

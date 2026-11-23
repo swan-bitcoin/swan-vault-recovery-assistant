@@ -7,7 +7,9 @@ const NAMES = {
 
 export type SelfDrivenType = keyof typeof NAMES
 
-export const isSelfDrivenType = (deviceType: string): deviceType is SelfDrivenType => Object.hasOwn(NAMES, deviceType)
+// Object.hasOwn is newer than the WebKit of the oldest macOS that SVRA supports, and this runs for every device
+export const isSelfDrivenType = (deviceType: string): deviceType is SelfDrivenType =>
+  Object.prototype.hasOwnProperty.call(NAMES, deviceType)
 
 export const getSelfDrivenName = (deviceType: SelfDrivenType) => NAMES[deviceType]
 

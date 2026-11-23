@@ -10,10 +10,6 @@ use crate::transport::TransportError;
 /// steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Step {
-  /// Opening the channel: allocation and handshake.
-  Connect,
-  /// Waiting for the user to unlock the device.
-  Unlock,
   /// The pairing, up to the point where the user types the code.
   Pair,
   /// The pairing, after the code went to the device.
@@ -29,31 +25,8 @@ pub(crate) enum Step {
 const RESTART_ADVICE: &str = "Unplug the Trezor Safe 7, plug it in again, and try again.";
 const SUITE_ADVICE: &str = "If Trezor Suite is open, close it.";
 
-/// The longest device text that a message repeats. The text comes from the device, so the
-/// message keeps the printable characters of the first part and nothing else.
-const MAX_DEVICE_TEXT: usize = 100;
-
 fn error(kind: ErrorKind, message: impl Into<String>) -> Error {
   Error::new(kind, message)
-}
-
-fn user_waits(step: Step) -> bool {
-  matches!(
-    step,
-    Step::Unlock | Step::Pair | Step::PairCode | Step::Passphrase | Step::Sign
-  )
-}
-
-fn device_text(failure: &Failure) -> Option<String> {
-  let text: String = failure
-    .message
-    .as_deref()?
-    .chars()
-    .filter(|c| c.is_ascii() && !c.is_ascii_control())
-    .take(MAX_DEVICE_TEXT)
-    .collect();
-  let text = text.trim();
-  (!text.is_empty()).then(|| text.to_string())
 }
 
 /// The error for an unexpected message: a type that the step does not allow.
@@ -67,7 +40,7 @@ pub(crate) fn unexpected_message() -> Error {
 }
 
 /// The error for a lost or broken connection to the device.
-pub(crate) fn link_error(link_error: LinkError, step: Step) -> Error {
+pub(crate) fn link_error(link_error: LinkError) -> Error {
   match link_error {
     LinkError::Transport(TransportError::Disconnected) => error(
       ErrorKind::Communication,
@@ -81,14 +54,14 @@ pub(crate) fn link_error(link_error: LinkError, step: Step) -> Error {
         "SVRA cannot talk to the Trezor Safe 7. Close Trezor Suite, because only one program can use the Trezor Safe 7. {RESTART_ADVICE}"
       ),
     ),
-    LinkError::Timeout if user_waits(step) => error(
+    LinkError::UserTimeout => error(
       ErrorKind::Communication,
       "SVRA waited ten minutes for you on the Trezor Safe 7. Nothing was signed. Start again when you are ready.",
     ),
     LinkError::Timeout => error(
       ErrorKind::Communication,
       format!(
-        "The Trezor Safe 7 did not answer in time. {SUITE_ADVICE} {RESTART_ADVICE}"
+        "The Trezor Safe 7 stopped answering. Nothing was signed. Unplug the Trezor Safe 7, plug it in again, and start again. {SUITE_ADVICE}"
       ),
     ),
     LinkError::DeviceLocked => error(
@@ -105,16 +78,12 @@ pub(crate) fn link_error(link_error: LinkError, step: Step) -> Error {
   }
 }
 
-/// The error for a `Failure` message of the device.
+/// The error for a `Failure` message of the device. The text of the device is not shown: SVRA
+/// has its own sentence for each failure that it knows, and for the others it shows the code.
 pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
   let code = failure
     .code
     .and_then(|code| FailureType::try_from(code).ok());
-  let text = device_text(failure);
-  let with_text = |lead: &str| match &text {
-    Some(text) => format!("{lead} The Trezor Safe 7 says: \"{text}\"."),
-    None => lead.to_string(),
-  };
   match (code, step) {
     (Some(FailureType::ActionCancelled), Step::Pair | Step::PairCode) => error(
       ErrorKind::PairingRejected,
@@ -124,8 +93,9 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
       ErrorKind::UserAbort,
       "You cancelled on the Trezor Safe 7. Nothing was signed. Start again when you are ready.",
     ),
-    // The device rejects a tag that does not fit the code with a data error.
-    (_, Step::PairCode) => error(
+    // The device rejects a tag that does not fit the code with a data error. Any other failure
+    // at this step has its own message below.
+    (Some(FailureType::DataError), Step::PairCode) => error(
       ErrorKind::PairingRejected,
       "The pairing code was wrong. Start again, and type the code that the Trezor Safe 7 shows.",
     ),
@@ -160,7 +130,13 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
         "SVRA lost contact with the Trezor Safe 7. {SUITE_ADVICE} {RESTART_ADVICE}"
       ),
     ),
-    (_, Step::Query) if text.as_deref().is_some_and(|text| text.contains("Forbidden key path")) => {
+    // The text of the device only decides which message to show. It is never shown.
+    (Some(FailureType::DataError), Step::Query)
+      if failure
+        .message
+        .as_deref()
+        .is_some_and(|text| text.contains("Forbidden key path")) =>
+    {
       error(
         ErrorKind::KeyNotInVault,
         "The Trezor Safe 7 refuses to give the key that your vault uses. Check that the wallet configuration is the one from your Swan Vault Recovery Sheet. If it is, contact Swan support.",
@@ -174,16 +150,50 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
       ErrorKind::InvalidSignature,
       "The Trezor Safe 7 reports a signature that does not verify. Do not use the result. Contact Swan support.",
     ),
-    (_, Step::Sign) => error(
+    (
+      Some(
+        FailureType::DataError
+        | FailureType::ProcessError
+        | FailureType::FirmwareError
+        | FailureType::UnexpectedMessage
+        | FailureType::ButtonExpected,
+      ),
+      Step::Sign,
+    ) => error(
       ErrorKind::InvalidPsbt,
-      with_text("The Trezor Safe 7 refused the transaction. Check that the transaction and the wallet configuration are from the same vault. If they are, create the transaction again with SVRA."),
+      "The Trezor Safe 7 refused the transaction. Check that the transaction and the wallet configuration are from the same vault. If they are, create the transaction again with SVRA.",
     ),
-    (_, _) => error(
+    (Some(FailureType::FirmwareError), _) => error(
       ErrorKind::Other,
-      with_text(&format!(
-        "The Trezor Safe 7 returned an error that SVRA does not know. {RESTART_ADVICE}"
-      )),
+      format!(
+        "The firmware of the Trezor Safe 7 reported an internal error. {RESTART_ADVICE} If it happens again, contact Swan support."
+      ),
     ),
+    (
+      Some(
+        FailureType::DataError
+        | FailureType::ProcessError
+        | FailureType::UnexpectedMessage
+        | FailureType::ButtonExpected,
+      ),
+      _,
+    ) => error(
+      ErrorKind::Other,
+      format!(
+        "The Trezor Safe 7 could not carry out a request of SVRA. {RESTART_ADVICE} If it happens again, contact Swan support."
+      ),
+    ),
+    _ => {
+      let number = failure
+        .code
+        .map_or_else(|| "none".to_string(), |code| code.to_string());
+      error(
+        ErrorKind::Other,
+        format!(
+          "The Trezor Safe 7 returned an error that SVRA does not know (code {number}). {RESTART_ADVICE}"
+        ),
+      )
+    }
   }
 }
 
@@ -217,7 +227,7 @@ mod tests {
   }
 
   #[test]
-  fn any_other_failure_after_the_code_means_a_wrong_code() {
+  fn a_data_error_after_the_code_means_a_wrong_code() {
     let mapped = failure_error(
       &failure(FailureType::DataError, Some("Unexpected Code Entry Tag")),
       Step::PairCode,
@@ -225,6 +235,43 @@ mod tests {
     assert_eq!(mapped.kind, ErrorKind::PairingRejected);
     assert!(mapped.message.contains("wrong"), "{}", mapped.message);
     assert!(mapped.message.contains("Start again"), "{}", mapped.message);
+  }
+
+  #[test]
+  fn another_failure_after_the_code_does_not_say_that_the_code_was_wrong() {
+    for code in [
+      FailureType::Busy,
+      FailureType::InProgress,
+      FailureType::InvalidSession,
+      FailureType::ThpUnallocatedSession,
+      FailureType::FirmwareError,
+      FailureType::PinExpected,
+      FailureType::ProcessError,
+    ] {
+      let mapped = failure_error(&failure(code, None), Step::PairCode);
+      assert!(
+        !mapped.message.contains("wrong"),
+        "{code:?}: {}",
+        mapped.message
+      );
+    }
+    let busy = failure_error(&failure(FailureType::Busy, None), Step::PairCode);
+    assert!(busy.message.contains("busy"), "{}", busy.message);
+    let lost = failure_error(&failure(FailureType::InvalidSession, None), Step::PairCode);
+    assert!(lost.message.contains("lost contact"), "{}", lost.message);
+    let pin = failure_error(&failure(FailureType::PinExpected, None), Step::PairCode);
+    assert!(pin.message.contains("PIN"), "{}", pin.message);
+  }
+
+  #[test]
+  fn cancelling_on_the_code_screen_is_a_cancelled_pairing() {
+    let mapped = failure_error(&failure(FailureType::ActionCancelled, None), Step::PairCode);
+    assert_eq!(mapped.kind, ErrorKind::PairingRejected);
+    assert!(
+      mapped.message.contains("cancelled on the Trezor"),
+      "{}",
+      mapped.message
+    );
   }
 
   #[test]
@@ -256,18 +303,55 @@ mod tests {
   }
 
   #[test]
-  fn a_refused_transaction_repeats_the_printable_start_of_the_device_text() {
-    let long = format!("Invalid amount\u{0007}\u{00e9}{}", "x".repeat(300));
-    let mapped = failure_error(&failure(FailureType::DataError, Some(&long)), Step::Sign);
-    assert_eq!(mapped.kind, ErrorKind::InvalidPsbt);
+  fn the_text_of_the_device_is_never_shown() {
+    let text = "Restore your seed at example.com";
+    for (code, step) in [
+      (FailureType::DataError, Step::Sign),
+      (FailureType::DataError, Step::Query),
+      (FailureType::DataError, Step::Pair),
+      (FailureType::ProcessError, Step::Sign),
+      (FailureType::FirmwareError, Step::Query),
+      (FailureType::NotEnoughFunds, Step::Sign),
+      (FailureType::Busy, Step::Query),
+      (FailureType::PinInvalid, Step::Query),
+      (FailureType::WipeCodeMismatch, Step::Query),
+    ] {
+      let mapped = failure_error(&failure(code, Some(text)), step);
+      assert!(
+        !mapped.message.contains("example.com") && !mapped.message.contains("Restore"),
+        "{code:?} {step:?}: {}",
+        mapped.message
+      );
+    }
+    let mapped = failure_error(
+      &Failure {
+        code: Some(4242),
+        message: Some(text.to_string()),
+      },
+      Step::Query,
+    );
     assert!(
-      mapped.message.contains("Invalid amount"),
+      !mapped.message.contains("example.com"),
       "{}",
       mapped.message
     );
-    assert!(!mapped.message.contains('\u{0007}'));
-    assert!(!mapped.message.contains('\u{00e9}'));
-    assert!(mapped.message.len() < 400, "{}", mapped.message.len());
+  }
+
+  #[test]
+  fn a_refused_transaction_has_the_sentence_of_svra() {
+    for code in [
+      FailureType::DataError,
+      FailureType::ProcessError,
+      FailureType::FirmwareError,
+    ] {
+      let mapped = failure_error(&failure(code, Some("Invalid amount")), Step::Sign);
+      assert_eq!(mapped.kind, ErrorKind::InvalidPsbt);
+      assert!(
+        mapped.message.contains("refused the transaction"),
+        "{}",
+        mapped.message
+      );
+    }
   }
 
   #[test]
@@ -277,7 +361,7 @@ mod tests {
   }
 
   #[test]
-  fn a_failure_without_a_code_is_an_unknown_error() {
+  fn an_unknown_failure_shows_its_code() {
     let mapped = failure_error(
       &Failure {
         code: None,
@@ -286,6 +370,7 @@ mod tests {
       Step::Query,
     );
     assert_eq!(mapped.kind, ErrorKind::Other);
+    assert!(mapped.message.contains("code none"), "{}", mapped.message);
     let mapped = failure_error(
       &Failure {
         code: Some(4242),
@@ -294,6 +379,7 @@ mod tests {
       Step::Query,
     );
     assert_eq!(mapped.kind, ErrorKind::Other);
+    assert!(mapped.message.contains("code 4242"), "{}", mapped.message);
   }
 
   #[test]
@@ -306,49 +392,47 @@ mod tests {
 
   #[test]
   fn link_errors_become_communication_errors() {
-    for (link, step) in [
-      (
-        LinkError::Transport(TransportError::Disconnected),
-        Step::Sign,
-      ),
-      (LinkError::Transport(TransportError::Failed), Step::Connect),
-      (LinkError::Timeout, Step::Query),
-      (LinkError::ChannelLost, Step::Sign),
-      (LinkError::Protocol, Step::Sign),
+    for link in [
+      LinkError::Transport(TransportError::Disconnected),
+      LinkError::Transport(TransportError::Failed),
+      LinkError::Timeout,
+      LinkError::UserTimeout,
+      LinkError::ChannelLost,
+      LinkError::Protocol,
     ] {
-      let mapped = link_error(link, step);
+      let mapped = link_error(link);
       assert_eq!(mapped.kind, ErrorKind::Communication, "{link:?}");
     }
   }
 
   #[test]
   fn an_unplugged_device_says_so() {
-    let mapped = link_error(
-      LinkError::Transport(TransportError::Disconnected),
-      Step::Sign,
-    );
+    let mapped = link_error(LinkError::Transport(TransportError::Disconnected));
     assert!(mapped.message.contains("unplugged"), "{}", mapped.message);
   }
 
   #[test]
-  fn a_timeout_while_the_user_acts_says_that_nothing_was_signed() {
-    let mapped = link_error(LinkError::Timeout, Step::Sign);
+  fn only_a_wait_of_ten_minutes_says_that_svra_waited_ten_minutes() {
+    let user = link_error(LinkError::UserTimeout);
+    assert!(user.message.contains("ten minutes"), "{}", user.message);
     assert!(
-      mapped.message.contains("Nothing was signed"),
+      user.message.contains("Nothing was signed"),
       "{}",
-      mapped.message
+      user.message
     );
-    let mapped = link_error(LinkError::Timeout, Step::Query);
+    let short = link_error(LinkError::Timeout);
+    assert!(!short.message.contains("ten minutes"), "{}", short.message);
     assert!(
-      mapped.message.contains("did not answer"),
+      short.message.contains("stopped answering"),
       "{}",
-      mapped.message
+      short.message
     );
+    assert!(short.message.contains("Unplug"), "{}", short.message);
   }
 
   #[test]
   fn a_locked_device_that_stays_locked_is_a_user_abort() {
-    let mapped = link_error(LinkError::DeviceLocked, Step::Unlock);
+    let mapped = link_error(LinkError::DeviceLocked);
     assert_eq!(mapped.kind, ErrorKind::UserAbort);
     assert!(mapped.message.contains("PIN"), "{}", mapped.message);
   }

@@ -15,6 +15,12 @@ use std::collections::BTreeMap;
 /// The first child number of a hardened key.
 const HARDENED: u32 = 0x8000_0000;
 
+/// The highest address index that an output to the device's own key may have. The BitBox02
+/// firmware refuses a higher one. The Trezor firmware treats an output as change, and does not show
+/// it, up to index 1,000,000. A wallet that looks for its funds with a normal gap limit does not
+/// scan so far, so change at a high index would be hidden from the user and hard to find.
+const MAX_OWN_ADDRESS_INDEX: u32 = 9_999;
+
 /// The first sentence of every refusal in this file. SVRA builds the transaction with all the data
 /// that these checks look for, so a failed check means that the transaction came from somewhere
 /// else or that someone edited it.
@@ -234,7 +240,8 @@ pub fn precheck(
 }
 
 /// Checks the outputs that claim to belong to the device. The device does not show such an output
-/// as a payment, so its script must be the vault's script at the key path that the PSBT gives.
+/// as a payment, so its script must be the vault's script at the key path that the PSBT gives,
+/// and its address number must be one that a wallet finds again.
 fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result<(), Error> {
   let device = vault.device_name();
   if psbt.outputs.len() != psbt.unsigned_tx.output.len() {
@@ -258,7 +265,15 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
     let Some((_, path)) = key_of_device(&output.bip32_derivation, fingerprint) else {
       continue;
     };
-    let vault_script = address_steps(vault, path)
+    let steps = address_steps(vault, path);
+    if let Some([_, ChildNumber::Normal { index }]) = steps {
+      if index > MAX_OWN_ADDRESS_INDEX {
+        return Err(invalid_psbt(format!(
+          "Output {number} pays to address number {index} of the vault. SVRA signs only outputs to address numbers up to {MAX_OWN_ADDRESS_INDEX}, because the {device} may not show such an output, and a wallet may not look for funds at a higher number."
+        )));
+      }
+    }
+    let vault_script = steps
       .and_then(|steps| vault_witness_script(vault, &steps))
       .map(|witness_script| ScriptBuf::new_p2wsh(&witness_script.wscript_hash()));
     if vault_script.as_ref() != Some(&tx_output.script_pubkey) {
@@ -780,6 +795,56 @@ mod tests {
       .insert(device_key, source);
     case.psbt.outputs[0].witness_script = case.psbt.inputs[0].witness_script.clone();
     precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
+  }
+
+  /// Makes output 0 an output to the vault's own address at `keychain` and `index`, with a valid
+  /// script and the key origin of the device, as a wallet that made change would write it.
+  fn pay_to_own_address(case: &mut Case, keychain: u32, index: u32) {
+    let steps = [
+      ChildNumber::Normal { index: keychain },
+      ChildNumber::Normal { index },
+    ];
+    let witness_script = vault_witness_script(&case.vault, &steps).expect("a script");
+    case.psbt.unsigned_tx.output[0].script_pubkey =
+      ScriptBuf::new_p2wsh(&witness_script.wscript_hash());
+    let key = vault_public_key(&case.vault, case.vault.our_key_index, &steps).expect("a key");
+    let path = case.vault.our_account_path.extend(steps);
+    case.psbt.outputs[0].bip32_derivation.clear();
+    case.psbt.outputs[0]
+      .bip32_derivation
+      .insert(key, (case.fingerprint, path));
+    case.psbt.outputs[0].witness_script = Some(witness_script);
+  }
+
+  #[test]
+  fn accepts_an_own_output_at_the_highest_address_number() {
+    let mut case = case();
+    pay_to_own_address(&mut case, 1, MAX_OWN_ADDRESS_INDEX);
+    precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
+    pay_to_own_address(&mut case, 0, MAX_OWN_ADDRESS_INDEX);
+    precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
+  }
+
+  #[test]
+  fn refuses_an_own_output_above_the_highest_address_number() {
+    // The script and the key origin are right, so only the address number is wrong.
+    for (keychain, index) in [
+      (1, MAX_OWN_ADDRESS_INDEX + 1),
+      (0, MAX_OWN_ADDRESS_INDEX + 1),
+      (1, 500_000),
+      (1, HARDENED - 1),
+    ] {
+      let mut case = case();
+      pay_to_own_address(&mut case, keychain, index);
+      let error = precheck_error(&case, &case.psbt);
+      assert!(error.message.contains("Output 1"), "{}", error.message);
+      assert!(
+        error.message.contains(&format!("number {index} ")),
+        "{}",
+        error.message
+      );
+      assert!(error.message.contains("up to 9999"), "{}", error.message);
+    }
   }
 
   #[test]

@@ -243,13 +243,13 @@ const MODEL_NAMES = {
   bitbox02_multi: 'BitBox02 Multi',
 }
 function getBitbox02ModelName(model) {
-  return Object.hasOwn(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
+  return Object.prototype.hasOwnProperty.call(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
 }
 const NAMES = {
   bitbox02: 'BitBox02',
   trezor_safe7: 'Trezor Safe 7',
 }
-const isSelfDrivenType = (deviceType) => Object.hasOwn(NAMES, deviceType)
+const isSelfDrivenType = (deviceType) => Object.prototype.hasOwnProperty.call(NAMES, deviceType)
 const getSelfDrivenName = (deviceType) => NAMES[deviceType]
 const getFoundMessage = (deviceType) => {
   const name = getSelfDrivenName(deviceType)
@@ -266,6 +266,12 @@ class DeviceError extends Error {
     this.name = 'DeviceError'
   }
 }
+class MultipleDevicesError extends Error {
+  constructor() {
+    super('Multiple devices found. Please unplug all but one device.')
+    this.name = 'MultipleDevicesError'
+  }
+}
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 const getSelfDrivenDeviceName = (device) => (isSelfDrivenType(device.type) ? getSelfDrivenName(device.type) : null)
 const isSelfDriven = (device) => getSelfDrivenDeviceName(device) !== null
@@ -279,7 +285,7 @@ function getDevice(val) {
     throw new Error('No devices found')
   }
   if (devices.length > 1) {
-    throw new Error('Multiple devices found. Please unplug all but one device.')
+    throw new MultipleDevicesError()
   }
   const device = devices[0]
   if (device.error) {
@@ -311,12 +317,12 @@ function getDeviceMessage(val) {
   if (devices.length > 1) {
     message = message.concat(']')
   }
-  const selfDrivenNames = new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))
-  if (selfDrivenNames.size > 0) {
-    const hints = [...selfDrivenNames].map(
-      (name) => `While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`
-    )
-    message = message.concat('. ', hints.join(' '))
+  const selfDrivenNames = [...new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))]
+  if (selfDrivenNames.length === 1) {
+    const [name] = selfDrivenNames
+    message = message.concat(`. While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`)
+  } else if (selfDrivenNames.length > 1) {
+    message = message.concat(`. While a ${selfDrivenNames.join(' or a ')} is connected, SVRA lists only those devices.`)
   }
   return message
 }
@@ -452,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
 export {
   CircularTickIcon as C,
   DOM as D,
+  MultipleDevicesError as M,
   Sats as S,
   sanitize as a,
   getSelfDrivenName as b,

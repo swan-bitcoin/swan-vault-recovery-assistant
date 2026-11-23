@@ -19,7 +19,8 @@ export function getTrezorStepMessage(update: TrezorProgress): TrezorStepMessage 
     case 'confirm-connection':
       return {
         loading: WAITING,
-        bubble: `Your Trezor asks if it may connect to Swan Vault Recovery Assistant. Check the name on the Trezor, then allow the connection. ${STOP}`,
+        // the question is the one that the Trezor shows, word for word, so that the user can find it on the screen
+        bubble: `Your Trezor asks: "Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?" Confirm on the Trezor. ${STOP}`,
       }
     case 'enter-pairing-code':
       return {
@@ -33,13 +34,14 @@ export function getTrezorStepMessage(update: TrezorProgress): TrezorStepMessage 
     case 'passphrase':
       return {
         loading: WAITING,
-        bubble: `This Trezor has passphrase protection, and its standard wallet holds no key of this vault. Enter your passphrase on the Trezor. ${STOP}`,
+        // The device can ask before or after SVRA checked the standard wallet, so the text must hold at both moments.
+        bubble: `Your Trezor asks for your passphrase. Enter it on the Trezor. The key of this vault may be in the standard wallet or in a passphrase wallet. To open the standard wallet, confirm an empty passphrase. ${STOP}`,
       }
     case 'sign':
       return {
         loading: WAITING,
-        // the device holds no vault, so it shows whatever keys SVRA sends; its address and amount are the only check left
-        bubble: `Your Trezor now shows the transaction. It first warns that this is a multisig wallet. Check the address and the amount on the Trezor, then confirm. The Trezor does not know your vault and shows whatever keys SVRA sends, so the address and the amount on the Trezor are what you must check. ${STOP}`,
+        // the Safe 7 shows no multisig warning and no keys; its address, amount and fee screens are the only check left
+        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. It shows the address and the amount of each payment, then the total with the fee. Check them, then hold to confirm. ${STOP}`,
       }
   }
 }

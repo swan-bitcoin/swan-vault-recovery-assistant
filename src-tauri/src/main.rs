@@ -15,7 +15,6 @@ use std::sync::Arc;
 mod errors;
 mod bitbox02;
 mod trezor;
-mod trezor_pairing;
 use bdk_wallet::psbt::PsbtUtils;
 use bitbox02::Bitbox02Progress;
 use errors::{DescriptorType, SvraError, SvraErrorType};
@@ -587,6 +586,12 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
     return serde_json::to_string(&devices)
       .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
   }
+  // A Safe 7 session has claimed its device, and the operating system may not list a claimed
+  // device. Without this check the scan would find nothing, and HWI would send the old protocol
+  // to the device that the session uses.
+  if trezor::session_running() {
+    return Err(trezor::busy_error());
+  }
 
   let network: HwiNetwork = network.into();
 
@@ -848,7 +853,7 @@ async fn sign_trezor(
     descriptors.receive,
     descriptors.change,
     on_progress,
-    window.label().to_string(),
+    window,
   )
   .await
 }

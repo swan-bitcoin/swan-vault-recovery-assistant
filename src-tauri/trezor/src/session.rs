@@ -15,7 +15,7 @@
 //! passphrase that the user enters on the device.
 
 use crate::device::Device;
-use crate::device_error::{link_error, unexpected_message, Step};
+use crate::device_error::{link_error, unexpected_message};
 use crate::error::{Error, ErrorKind};
 use crate::keys::{check_features, coin_name, Matched, DEVICE_NAME, SAFE_7_MODEL};
 use crate::link::{
@@ -27,6 +27,7 @@ use crate::signing::prepare;
 use crate::transport::Transport;
 use bitcoin::bip32::Fingerprint;
 use bitcoin::psbt::Psbt;
+use std::time::Duration;
 use svra_vault::{already_signed, parse_vault, precheck, verify_signed};
 use trezor_thp::channel::PairingState;
 
@@ -50,8 +51,8 @@ pub enum Progress {
   Unlock,
   /// The user must allow the connection on the device.
   ConfirmConnection,
-  /// The device shows a 6-digit code, and the app must ask the user for it. The session goes on
-  /// when [`Ui::pairing_code`] returns.
+  /// The device shows a 6-digit code, and the app must ask the user for it. The session polls
+  /// [`Ui::pairing_code`] until the user answers.
   EnterPairingCode,
   /// Reading the device's key and comparing it with the vault.
   CheckingKey,
@@ -61,14 +62,39 @@ pub enum Progress {
   Sign,
 }
 
+/// What the user did since the last poll for the pairing code.
+#[derive(Clone, PartialEq, Eq)]
+pub enum CodeEntry {
+  /// The user typed the code that the device shows.
+  Entered(String),
+  /// The user cancelled in the app.
+  Cancelled,
+  /// Nothing happened yet.
+  Pending,
+}
+
+// The code is a secret for the length of one pairing, so the debug output hides it.
+impl std::fmt::Debug for CodeEntry {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      CodeEntry::Entered(_) => f.write_str("Entered(..)"),
+      CodeEntry::Cancelled => f.write_str("Cancelled"),
+      CodeEntry::Pending => f.write_str("Pending"),
+    }
+  }
+}
+
 /// How the session talks to the user.
 pub trait Ui {
   /// Reports a step. Return quickly: the session waits for it.
   fn progress(&mut self, progress: Progress);
 
-  /// Blocks until the user typed the code that the device shows. `None` means that the user
-  /// cancelled.
-  fn pairing_code(&mut self) -> Option<String>;
+  /// Asks whether the user typed the code that the device shows. The session calls this again and
+  /// again after [`Progress::EnterPairingCode`], and between the calls it listens to the device,
+  /// because the user may cancel on the device or unplug it. Wait up to `wait` for the user and
+  /// then return [`CodeEntry::Pending`], so that the session can listen. A [`CodeEntry::Entered`]
+  /// or [`CodeEntry::Cancelled`] ends the polling. The session gives up after ten minutes.
+  fn pairing_code(&mut self, wait: Duration) -> CodeEntry;
 }
 
 /// One signing attempt.
@@ -116,7 +142,7 @@ pub(crate) fn connect<T: Transport>(
   transport: T,
   ui: &mut dyn Ui,
 ) -> Result<(Link<T>, PairingState), Error> {
-  let fail = |failed: Failed<T>| link_error(failed.error, Step::Connect);
+  let fail = |failed: Failed<T>| link_error(failed.error);
   if !check_random() {
     return Err(Error::new(
       ErrorKind::Other,
@@ -125,7 +151,7 @@ pub(crate) fn connect<T: Transport>(
   }
   let mut transport = transport;
   // An earlier session may have left packets in the device's queue.
-  discard_stale_packets(&mut transport).map_err(|error| link_error(error, Step::Connect))?;
+  discard_stale_packets(&mut transport).map_err(link_error)?;
 
   let allocated = Allocated::allocate(transport, false).map_err(fail)?;
   check_properties(&allocated.properties)?;
@@ -136,10 +162,9 @@ pub(crate) fn connect<T: Transport>(
       transport,
     }) => {
       ui.progress(Progress::Unlock);
-      let unlock = |failed: Failed<T>| link_error(failed.error, Step::Unlock);
-      let allocated = Allocated::allocate(transport, true).map_err(unlock)?;
+      let allocated = Allocated::allocate(transport, true).map_err(fail)?;
       check_properties(&allocated.properties)?;
-      allocated.handshake(USER).map_err(unlock)
+      allocated.handshake(USER).map_err(fail)
     }
     Err(failed) => Err(fail(failed)),
   }
@@ -149,8 +174,11 @@ pub(crate) fn connect<T: Transport>(
 /// transaction, sign, verify.
 ///
 /// This call blocks until the user finishes on the device. It returns an error of kind
-/// [`ErrorKind::PairingRejected`] when the pairing code was wrong, and of kind
-/// [`ErrorKind::UserAbort`] when the user cancelled on the device or in the app.
+/// [`ErrorKind::PairingRejected`] when the pairing code was wrong or the user refused or cancelled
+/// the pairing on the device, and of kind [`ErrorKind::UserAbort`] when the user cancelled in the
+/// app or cancelled a prompt on the device. An unplugged device and a device that stops
+/// answering give [`ErrorKind::Communication`]. The wait for the pairing code ends by itself
+/// after ten minutes.
 pub fn sign_psbt<T: Transport>(
   transport: T,
   request: SignRequest<'_>,
@@ -272,12 +300,28 @@ mod tests {
     Spaced,
     /// The user cancels.
     Cancel,
+    /// The user types the right code after this many polls.
+    After(u32),
+    /// The user never types anything.
+    Never,
   }
 
   struct TestUi {
     device: SoftDevice,
     code: Code,
     events: Vec<Progress>,
+    polls: u32,
+  }
+
+  impl TestUi {
+    fn new(device: &SoftDevice, code: Code) -> Self {
+      TestUi {
+        device: device.clone(),
+        code,
+        events: Vec::new(),
+        polls: 0,
+      }
+    }
   }
 
   impl Ui for TestUi {
@@ -285,16 +329,20 @@ mod tests {
       self.events.push(progress);
     }
 
-    fn pairing_code(&mut self) -> Option<String> {
-      let shown = self.device.code().expect("the device shows a code");
+    fn pairing_code(&mut self, _wait: Duration) -> CodeEntry {
+      self.polls += 1;
+      let shown = || self.device.code().expect("the device shows a code");
       match self.code {
-        Code::Right => Some(shown),
-        Code::Spaced => Some(format!("{} {}", &shown[..3], &shown[3..])),
+        Code::Right => CodeEntry::Entered(shown()),
+        Code::Spaced => CodeEntry::Entered(format!("{} {}", &shown()[..3], &shown()[3..])),
         Code::Wrong => {
+          let shown = shown();
           let first = if shown.starts_with('0') { '1' } else { '0' };
-          Some(format!("{first}{}", &shown[1..]))
+          CodeEntry::Entered(format!("{first}{}", &shown[1..]))
         }
-        Code::Cancel => None,
+        Code::Cancel => CodeEntry::Cancelled,
+        Code::After(polls) if self.polls > polls => CodeEntry::Entered(shown()),
+        Code::After(_) | Code::Never => CodeEntry::Pending,
       }
     }
   }
@@ -316,11 +364,7 @@ mod tests {
     code: Code,
   ) -> (Result<SignOutcome, Error>, Vec<Progress>) {
     let psbt = psbt.unwrap_or_else(|| vault.sweep_psbt());
-    let mut ui = TestUi {
-      device: device.clone(),
-      code,
-      events: Vec::new(),
-    };
+    let mut ui = TestUi::new(device, code);
     let result = sign_psbt(
       device.clone(),
       SignRequest {
@@ -451,11 +495,7 @@ mod tests {
   #[test]
   fn a_multipath_wallet_configuration_signs() {
     let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
-    let mut ui = TestUi {
-      device: device.clone(),
-      code: Code::Right,
-      events: Vec::new(),
-    };
+    let mut ui = TestUi::new(&device, Code::Right);
     let psbt = vault.sweep_psbt();
     let outcome = sign_psbt(
       device.clone(),
@@ -508,8 +548,8 @@ mod tests {
     struct Short;
     impl Ui for Short {
       fn progress(&mut self, _: Progress) {}
-      fn pairing_code(&mut self) -> Option<String> {
-        Some("12345".to_string())
+      fn pairing_code(&mut self, _: Duration) -> CodeEntry {
+        CodeEntry::Entered("12345".to_string())
       }
     }
     let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
@@ -556,7 +596,40 @@ mod tests {
   }
 
   #[test]
-  fn cancelling_on_the_code_screen_of_the_device_is_a_rejected_pairing() {
+  fn cancelling_on_the_code_screen_of_the_device_ends_the_session_at_once() {
+    let (device, mut vault) = setup(
+      Behavior {
+        cancel_at_code: true,
+        ..Behavior::default()
+      },
+      Network::Testnet,
+    );
+    // The user would type the code a little later, but the device has cancelled already.
+    let (result, events) = attempt(&device, &mut vault, None, Code::After(50));
+    let error = error_of(result);
+    assert_eq!(error.kind, ErrorKind::PairingRejected);
+    assert!(
+      error.message.contains("cancelled on the Trezor"),
+      "{}",
+      error.message
+    );
+    assert_eq!(
+      events,
+      [
+        Progress::Connecting,
+        Progress::ConfirmConnection,
+        Progress::EnterPairingCode,
+      ]
+    );
+    // The host did not send its tag to a device that had given up.
+    assert!(!device
+      .received()
+      .iter()
+      .any(|(_, kind)| *kind == crate::proto::ThpCodeEntryCpaceHostTag::TYPE));
+  }
+
+  #[test]
+  fn a_cancel_on_the_device_wins_over_a_code_that_was_typed_at_the_same_time() {
     let (device, mut vault) = setup(
       Behavior {
         cancel_at_code: true,
@@ -565,9 +638,48 @@ mod tests {
       Network::Testnet,
     );
     let (result, _) = attempt(&device, &mut vault, None, Code::Right);
+    assert_eq!(error_of(result).kind, ErrorKind::PairingRejected);
+    assert!(!device
+      .received()
+      .iter()
+      .any(|(_, kind)| *kind == crate::proto::ThpCodeEntryCpaceHostTag::TYPE));
+  }
+
+  #[test]
+  fn unplugging_the_device_at_the_code_step_ends_the_session() {
+    let (device, mut vault) = setup(
+      Behavior {
+        unplug_at_code: true,
+        ..Behavior::default()
+      },
+      Network::Testnet,
+    );
+    let (result, events) = attempt(&device, &mut vault, None, Code::Never);
     let error = error_of(result);
-    assert_eq!(error.kind, ErrorKind::PairingRejected);
-    assert!(error.message.contains("cancelled"), "{}", error.message);
+    assert_eq!(error.kind, ErrorKind::Communication);
+    assert!(error.message.contains("unplugged"), "{}", error.message);
+    assert_eq!(events.last(), Some(&Progress::EnterPairingCode));
+  }
+
+  #[test]
+  fn a_code_that_the_user_types_late_pairs() {
+    let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
+    let (result, events) = attempt(&device, &mut vault, None, Code::After(25));
+    finalize(&vault, result.expect("the session signs"));
+    assert_eq!(events, NORMAL_RUN);
+  }
+
+  #[test]
+  fn a_user_who_types_nothing_for_ten_minutes_ends_the_session() {
+    let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
+    let (result, _) = attempt(&device, &mut vault, None, Code::Never);
+    let error = error_of(result);
+    assert_eq!(error.kind, ErrorKind::Communication);
+    assert!(
+      error.message.contains("waited ten minutes"),
+      "{}",
+      error.message
+    );
   }
 
   #[test]
@@ -583,8 +695,8 @@ mod tests {
   fn the_pairing_request_names_the_app() {
     // The device shows these names, and the user decides on them.
     use crate::pairing::{APP_NAME, HOST_NAME};
-    assert_eq!(HOST_NAME, "Swan Vault Recovery Assistant");
-    assert!(!APP_NAME.is_empty());
+    assert_eq!(APP_NAME, "Swan Vault Recovery Assistant");
+    assert_eq!(HOST_NAME, "this computer");
     let request = ThpPairingRequest {
       host_name: HOST_NAME.to_string(),
       app_name: APP_NAME.to_string(),
@@ -918,20 +1030,17 @@ mod tests {
     let error = error_of(result);
     assert_eq!(error.kind, ErrorKind::Communication);
     assert!(
-      error.message.contains("did not answer"),
+      error.message.contains("stopped answering"),
       "{}",
       error.message
     );
+    assert!(!error.message.contains("ten minutes"), "{}", error.message);
   }
 
   #[test]
   fn a_descriptor_that_the_app_cannot_use_fails_before_the_device_is_touched() {
     let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
-    let mut ui = TestUi {
-      device: device.clone(),
-      code: Code::Right,
-      events: Vec::new(),
-    };
+    let mut ui = TestUi::new(&device, Code::Right);
     let error = error_of(sign_psbt(
       device.clone(),
       SignRequest {

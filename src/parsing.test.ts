@@ -51,6 +51,22 @@ describe('getDevice()', () => {
     expect(() => parsing.getDevice(JSON.stringify(devices))).toThrowError(/Multiple devices found/)
   })
 
+  it('should throw an error that the sign flow can recognise when a BitBox02 and a Safe 7 are both connected', () => {
+    const devices = [
+      { ...DEVICE1, type: 'bitbox02', model: 'bitbox02_multi' },
+      { ...DEVICE2, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null },
+    ]
+    let thrown: unknown
+    try {
+      parsing.getDevice(JSON.stringify(devices))
+    } catch (e) {
+      thrown = e
+    }
+
+    expect(thrown).toBeInstanceOf(parsing.MultipleDevicesError)
+    expect((thrown as Error).message).toBe('Multiple devices found. Please unplug all but one device.')
+  })
+
   it('should throw an error when a device reports an error', () => {
     const devices = [
       {
@@ -125,14 +141,24 @@ describe('getDeviceMessage()', () => {
     expect(message).toBe("Found a trezor_1 device with fingerprint '12345678'")
   })
 
-  it('should give a hint for each device that SVRA drives itself', () => {
+  it('should give one hint when the list holds a BitBox02 and a Safe 7', () => {
     const devices = [
       { ...DEVICE1, type: 'bitbox02', model: 'bitbox02_multi' },
       { ...DEVICE2, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null },
     ]
     const message = parsing.getDeviceMessage(JSON.stringify(devices))
-    expect(message).toContain('SVRA lists only the BitBox02')
-    expect(message).toContain('SVRA lists only the Trezor Safe 7')
+    expect(message).toContain('. While a BitBox02 or a Trezor Safe 7 is connected, SVRA lists only those devices.')
+    expect(message.match(/SVRA lists only/g)).toHaveLength(1)
+  })
+
+  it('should give one hint when two Safe 7 are connected', () => {
+    const devices = [
+      { ...DEVICE1, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null },
+      { ...DEVICE2, type: 'trezor_safe7', model: 'trezor_safe_7', fingerprint: null },
+    ]
+    const message = parsing.getDeviceMessage(JSON.stringify(devices))
+    expect(message.match(/SVRA lists only/g)).toHaveLength(1)
+    expect(message).toContain('While a Trezor Safe 7 is connected, SVRA lists only the Trezor Safe 7.')
   })
 
   it('should return a message when multiple devices are present', () => {

@@ -6,13 +6,17 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use specta::Type;
 use std::str::FromStr;
-use svra_trezor::{DetectedDevice, Progress, SignRequest, Ui, BOOTLOADER_MESSAGE};
+use std::time::Duration;
+use svra_trezor::{
+  CodeEntry, DetectedDevice, PairingCodes, Progress, SignRequest, Ui, Wait, BOOTLOADER_MESSAGE,
+  BUSY_MESSAGE,
+};
 use tauri::ipc::Channel;
+use tauri::Manager;
 
 use crate::errors::{SvraError, SvraErrorType};
 use crate::extract_txid;
 use crate::network::Network;
-use crate::trezor_pairing::{PairingCodes, Wait};
 
 // HWI error code for "device is not ready".
 const HWI_DEVICE_NOT_READY: i32 = -12;
@@ -65,9 +69,28 @@ pub fn cancel_pairing() -> Result<(), SvraError> {
   PAIRING.cancel().map_err(|_| not_waiting())
 }
 
-/// A session that waits for a code in a window that closes would wait forever.
+/// A session that waits for a code in a window that closes has nobody to ask.
 pub fn window_closed(label: &str) {
   PAIRING.cancel_owned_by(label);
+}
+
+/// The error for a scan that finds no Safe 7 while a session runs. The session has claimed the
+/// device, and the operating system may not list a claimed device. HWI must not look then,
+/// because it would send the old protocol to the Safe 7 that the session uses.
+pub fn busy_error() -> SvraError {
+  SvraError::new(SvraErrorType::TrezorError, BUSY_MESSAGE)
+}
+
+/// True while a Safe 7 session holds the device.
+pub fn session_running() -> bool {
+  svra_trezor::session_running()
+}
+
+/// A page only starts a run when it has no run open, so a code wait that is still open when a run
+/// starts belongs to a page that was reloaded or cleared. Ending it lets its session let go of
+/// the device.
+fn end_orphaned_wait(codes: &PairingCodes) {
+  let _ = codes.cancel();
 }
 
 /// Lists the Trezor Safe 7 devices on USB, in the JSON shape of `hwi enumerate`. Returns no
@@ -105,24 +128,39 @@ fn device_entries(devices: &[DetectedDevice]) -> Vec<Value> {
 // window hears about the step, so a fast answer cannot arrive before the wait exists.
 struct SessionUi {
   on_progress: Channel<TrezorProgress>,
-  owner: String,
+  window: tauri::Window,
   wait: Option<Wait<'static>>,
+}
+
+impl SessionUi {
+  // The window is gone when the app no longer lists it.
+  fn window_is_open(&self) -> bool {
+    self
+      .window
+      .get_webview_window(self.window.label())
+      .is_some()
+  }
 }
 
 impl Ui for SessionUi {
   fn progress(&mut self, progress: Progress) {
-    let asks_for_code = progress == Progress::EnterPairingCode;
-    if asks_for_code {
-      self.wait = Some(PAIRING.begin(&self.owner));
+    if progress == Progress::EnterPairingCode {
+      // The wait opens first, and then the window is checked. A window that closes from now on
+      // cancels the wait through `window_closed`. A window that is gone already gets no wait,
+      // because nobody could answer it.
+      let wait = PAIRING.begin(self.window.label());
+      self.wait = self.window_is_open().then_some(wait);
     }
-    // The window may be gone. Then nobody can type the code, so the session must not wait for it.
-    if self.on_progress.send(progress.into()).is_err() && asks_for_code {
-      self.wait = None;
-    }
+    // A send to a window that closed does not fail from this thread. The code step above is the
+    // only step that needs the window, so the result is not used.
+    let _ = self.on_progress.send(progress.into());
   }
 
-  fn pairing_code(&mut self) -> Option<String> {
-    self.wait.take()?.recv()
+  fn pairing_code(&mut self, wait: Duration) -> CodeEntry {
+    match &self.wait {
+      Some(wait_for_code) => wait_for_code.poll(wait),
+      None => CodeEntry::Cancelled,
+    }
   }
 }
 
@@ -132,8 +170,10 @@ pub async fn sign(
   receive_descriptor: String,
   change_descriptor: Option<String>,
   on_progress: Channel<TrezorProgress>,
-  window_label: String,
+  window: tauri::Window,
 ) -> Result<String, SvraError> {
+  end_orphaned_wait(&PAIRING);
+
   // grab the txid before the device sees the PSBT so that we can detect unexpected edits. This is
   // the same check that the HWI path makes.
   let txid = extract_txid(&psbt)?;
@@ -149,7 +189,7 @@ pub async fn sign(
     };
     let mut ui = SessionUi {
       on_progress,
-      owner: window_label,
+      window,
       wait: None,
     };
     svra_trezor::sign_psbt_usb(request, &mut ui)
@@ -242,9 +282,26 @@ mod tests {
   }
 
   #[test]
+  fn a_run_that_starts_ends_a_code_wait_that_nobody_answers() {
+    let codes = PairingCodes::new();
+    let orphan = codes.begin("main");
+    end_orphaned_wait(&codes);
+    assert_eq!(orphan.poll(Duration::from_millis(5)), CodeEntry::Cancelled);
+    // With no wait open, the call does nothing.
+    end_orphaned_wait(&codes);
+  }
+
+  #[test]
+  fn a_scan_that_finds_nothing_during_a_session_says_that_the_session_runs() {
+    let error = busy_error();
+    assert_eq!(error.error_type, "TrezorError");
+    assert!(error.message.contains("still waiting"), "{}", error.message);
+  }
+
+  #[test]
   fn the_commands_refuse_when_no_session_waits() {
-    // The tests of the hand-over itself are in trezor_pairing.rs. This one covers the message
-    // and the error type that the window sees.
+    // The tests of the hand-over itself are in the crate. This one covers the message and the
+    // error type that the window sees.
     let error = cancel_pairing().unwrap_err();
     assert_eq!(error.error_type, "TrezorError");
     assert!(error.message.contains("not waiting"));
