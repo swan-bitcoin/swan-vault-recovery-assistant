@@ -51,6 +51,10 @@ jobs:
   rust-test:
     name: rust tests
     runs-on: ubuntu-latest
+    # This job compiles third-party build scripts and runs a downloaded binary, so it gets no
+    # token and leaves none on disk.
+    permissions:
+      contents: read
     env:
       # Firmware simulator for the BitBox02 tests. This is the newest entry of
       # tests/simulators.json in https://github.com/BitBoxSwiss/bitbox-api-rs
@@ -61,6 +65,8 @@ jobs:
     steps:
       - name: checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
 
       - name: checkout private actions
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -69,6 +75,7 @@ jobs:
           ref: master
           token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
           path: .github/private-actions
+          persist-credentials: false
 
       - name: set up rust
         uses: ./.github/private-actions/actions-rs/toolchain
@@ -97,17 +104,20 @@ jobs:
 
       - name: lint the BitBox02 crate
         working-directory: src-tauri
-        run: cargo clippy -p svra_bitbox02 --all-targets --features usb,simulator -- -D warnings
+        run: cargo clippy --locked -p svra_bitbox02 --all-targets --features usb,simulator -- -D warnings
 
       - name: test the BitBox02 crate
         working-directory: src-tauri
         env:
           BITBOX02_SIMULATOR: ${{ runner.temp }}/bitbox02-simulator
-        run: cargo test -p svra_bitbox02 --features usb,simulator
+        run: cargo test --locked -p svra_bitbox02 --features usb,simulator
 
   scenario-test:
     name: scenario tests
-    runs-on: ubuntu-latest
+    # `ubuntu-latest` is now Ubuntu 26.04, which has no `webkit2gtk-driver` package (it was
+    # renamed), so the dependency install fails. This failure exists on master too. The pin keeps
+    # the job on the image where it last passed.
+    runs-on: ubuntu-24.04
     steps:
       - name: checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
