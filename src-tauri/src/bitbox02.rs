@@ -10,12 +10,14 @@ use svra_bitbox02::{DetectedDevice, Progress, SignRequest};
 use tauri::ipc::Channel;
 
 use crate::errors::{SvraError, SvraErrorType};
+use crate::extract_txid;
 use crate::network::Network;
 
 // HWI error code for "device is not ready".
 const HWI_DEVICE_NOT_READY: i32 = -12;
 
-/// What the device session is doing. The frontend shows a matching instruction for each step.
+// What the device session is doing. The frontend shows a matching instruction for each step.
+// This is a plain comment because the binding generator copies doc comments into bindings.ts.
 #[derive(Clone, Debug, Serialize, Type)]
 #[serde(tag = "step", rename_all = "kebab-case")]
 pub enum Bitbox02Progress {
@@ -23,7 +25,7 @@ pub enum Bitbox02Progress {
   Unlock,
   ConfirmPairing { code: String },
   CheckingRegistration,
-  Register,
+  Register { name: String },
   Sign,
 }
 
@@ -34,7 +36,7 @@ impl From<Progress> for Bitbox02Progress {
       Progress::Unlock => Bitbox02Progress::Unlock,
       Progress::ConfirmPairing { code } => Bitbox02Progress::ConfirmPairing { code },
       Progress::CheckingRegistration => Bitbox02Progress::CheckingRegistration,
-      Progress::Register => Bitbox02Progress::Register,
+      Progress::Register { name } => Bitbox02Progress::Register { name },
       Progress::Sign => Bitbox02Progress::Sign,
     }
   }
@@ -85,10 +87,10 @@ pub async fn sign(
   change_descriptor: Option<String>,
   on_progress: Channel<Bitbox02Progress>,
 ) -> Result<String, SvraError> {
+  // grab the txid before the device sees the PSBT so that we can detect unexpected edits. This is
+  // the same check that the HWI path makes.
+  let txid = extract_txid(&psbt)?;
   let psbt = resolve!(Psbt::from_str(&psbt), SvraErrorType::PsbtError);
-
-  // grab the txid before the device sees the PSBT so that we can detect unexpected edits.
-  let txid = psbt.unsigned_tx.compute_txid();
 
   // the device session blocks on user input and must stay on one thread from start to end.
   let outcome = tokio::task::spawn_blocking(move || {
@@ -112,7 +114,8 @@ pub async fn sign(
   })?
   .map_err(SvraError::from_bitbox02)?;
 
-  if outcome.psbt.unsigned_tx.compute_txid() != txid {
+  let signed_psbt = outcome.psbt.to_string();
+  if extract_txid(&signed_psbt)? != txid {
     return Err(SvraError::new(
       SvraErrorType::TransactionError,
       "The signed transaction does not match the original transaction. There may be have been malicious edit to the transaction.",
@@ -121,7 +124,7 @@ pub async fn sign(
 
   Ok(
     json!({
-      "psbt": outcome.psbt.to_string(),
+      "psbt": signed_psbt,
       "signed": outcome.signed,
       "fingerprint": outcome.fingerprint.to_string(),
       "registered": outcome.registered,

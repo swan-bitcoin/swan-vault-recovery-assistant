@@ -1,15 +1,17 @@
 use crate::device_error::{map_device_error, Step};
 use crate::error::{Error, ErrorKind};
-use crate::policy::parse_vault;
+use crate::policy::{parse_vault, PolicyArtifact};
 use crate::psbt_checks::{already_signed, precheck, verify_signed};
 use bitbox_api::btc::make_script_config_policy;
+use bitbox_api::error::{BitBoxError, Error as DeviceError};
 use bitbox_api::pb::{
   btc_register_script_config_request::XPubType, btc_sign_init_request::FormatUnit, BtcCoin,
-  BtcScriptConfigWithKeypath,
+  BtcScriptConfig, BtcScriptConfigWithKeypath,
 };
 use bitbox_api::runtime::Runtime;
-use bitbox_api::BitBox;
+use bitbox_api::{BitBox, PairedBitBox};
 use bitcoin::bip32::Fingerprint;
+use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::psbt::Psbt;
 use bitcoin::Network;
 use std::str::FromStr;
@@ -19,9 +21,6 @@ pub const POLICY_NAME: &str = "swan_vault";
 
 /// Oldest firmware that supports `wsh()` wallet policies.
 pub const MIN_FIRMWARE_VERSION: &str = "9.15.0";
-
-/// Oldest firmware that supports regtest.
-const MIN_FIRMWARE_VERSION_REGTEST: &str = "9.21.0";
 
 /// What the device session is doing, so the app can tell the user where to look.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,8 +33,10 @@ pub enum Progress {
   ConfirmPairing { code: String },
   /// Asking the device whether it holds the vault registration.
   CheckingRegistration,
-  /// Waiting for the user to confirm the vault registration on the device.
-  Register,
+  /// Waiting for the user to confirm the vault registration on the device. `name` is the name
+  /// that the device shows for the wallet. It comes twice when the device refuses
+  /// [`POLICY_NAME`] because another wallet uses it: the second time with the fallback name.
+  Register { name: String },
   /// Waiting for the user to confirm the transaction on the device.
   Sign,
 }
@@ -61,13 +62,13 @@ pub struct SignOutcome {
   pub registered: bool,
 }
 
-/// The coin that the device is asked about. Testnet, testnet4 and signet all use `Tbtc`, because
-/// the device knows one coin for them.
+/// The coin that the device is asked about. Testnet, testnet4, signet and regtest all use `Tbtc`,
+/// because the firmware accepts wallet policies for `Btc` and `Tbtc` only. On regtest the device
+/// then shows addresses in the testnet format (`tb1...`), not `bcrt1...`.
 pub(crate) fn coin_for_network(network: Network) -> Result<BtcCoin, Error> {
   match network {
     Network::Bitcoin => Ok(BtcCoin::Btc),
-    Network::Testnet | Network::Testnet4 | Network::Signet => Ok(BtcCoin::Tbtc),
-    Network::Regtest => Ok(BtcCoin::Rbtc),
+    Network::Testnet | Network::Testnet4 | Network::Signet | Network::Regtest => Ok(BtcCoin::Tbtc),
     other => Err(Error::new(
       ErrorKind::Other,
       format!("The BitBox02 does not support the {other} network."),
@@ -75,13 +76,9 @@ pub(crate) fn coin_for_network(network: Network) -> Result<BtcCoin, Error> {
   }
 }
 
-/// Checks that the firmware supports vault policies, and regtest when the network is regtest.
-pub(crate) fn check_firmware(version: &semver::Version, network: Network) -> Result<(), Error> {
-  let (needed, reason) = match network {
-    Network::Regtest => (MIN_FIRMWARE_VERSION_REGTEST, " for regtest"),
-    _ => (MIN_FIRMWARE_VERSION, ""),
-  };
-  let needed_version = semver::Version::parse(needed)
+/// Checks that the firmware supports vault policies.
+pub(crate) fn check_firmware(version: &semver::Version) -> Result<(), Error> {
+  let needed_version = semver::Version::parse(MIN_FIRMWARE_VERSION)
     .map_err(|_| Error::new(ErrorKind::Other, "The firmware version limit is not valid."))?;
   if *version >= needed_version {
     return Ok(());
@@ -89,9 +86,60 @@ pub(crate) fn check_firmware(version: &semver::Version, network: Network) -> Res
   Err(Error::new(
     ErrorKind::FirmwareTooOld,
     format!(
-      "This BitBox02 runs firmware {version}. Signing a Swan vault needs firmware {needed}{reason} or newer. Update the firmware in the BitBoxApp, then try again."
+      "This BitBox02 runs firmware {version}. Signing a Swan vault needs firmware {MIN_FIRMWARE_VERSION} or newer. Update the firmware in the BitBoxApp, then try again."
     ),
   ))
+}
+
+/// The name for the vault when another wallet on the device already uses [`POLICY_NAME`]. The
+/// device tells wallets apart by a hash of coin, policy and keys, and keeps the name as a label
+/// that must be unique. The name comes from the policy and the keys, so a vault gets the same name
+/// on every run. At 19 bytes it fits the 30 bytes the device allows.
+pub fn fallback_policy_name(artifact: &PolicyArtifact) -> String {
+  let mut engine = sha256::Hash::engine();
+  engine.input(artifact.policy.as_bytes());
+  for key in &artifact.keys {
+    engine.input(&key.xpub.encode());
+  }
+  let digest = sha256::Hash::from_engine(engine).to_string();
+  format!("{POLICY_NAME}_{}", &digest[..8])
+}
+
+/// Registers the vault on the device. The device refuses a name that another wallet uses, and it
+/// says so only after the user confirmed the keys. This is why the second attempt makes the user
+/// confirm the keys again.
+async fn register_vault<R: Runtime>(
+  paired: &PairedBitBox<R>,
+  coin: BtcCoin,
+  config: &BtcScriptConfig,
+  artifact: &PolicyArtifact,
+  on_progress: &mut dyn FnMut(Progress),
+) -> Result<(), Error> {
+  on_progress(Progress::Register {
+    name: POLICY_NAME.to_string(),
+  });
+  match paired
+    .btc_register_script_config(
+      coin,
+      config,
+      None,
+      XPubType::AutoXpubTpub,
+      Some(POLICY_NAME),
+    )
+    .await
+  {
+    Err(DeviceError::BitBox(BitBoxError::Duplicate)) => {}
+    result => return result.map_err(|error| map_device_error(error, Step::Register(coin))),
+  }
+
+  let fallback = fallback_policy_name(artifact);
+  on_progress(Progress::Register {
+    name: fallback.clone(),
+  });
+  paired
+    .btc_register_script_config(coin, config, None, XPubType::AutoXpubTpub, Some(&fallback))
+    .await
+    .map_err(|error| map_device_error(error, Step::Register(coin)))
 }
 
 /// Runs one signing attempt on an opened, not yet paired device: unlock, pair, check the
@@ -131,7 +179,7 @@ pub async fn sign_psbt<R: Runtime>(
       "This BitBox02 has no wallet yet. Set it up or restore it in the BitBoxApp first, then try again.",
     ));
   }
-  check_firmware(paired.version(), request.network)?;
+  check_firmware(paired.version())?;
 
   let fingerprint = paired
     .root_fingerprint()
@@ -166,17 +214,7 @@ pub async fn sign_psbt<R: Runtime>(
     .await
     .map_err(|error| map_device_error(error, Step::Registration(coin)))?;
   if !is_registered {
-    on_progress(Progress::Register);
-    paired
-      .btc_register_script_config(
-        coin,
-        &config,
-        None,
-        XPubType::AutoXpubTpub,
-        Some(POLICY_NAME),
-      )
-      .await
-      .map_err(|error| map_device_error(error, Step::Register(coin)))?;
+    register_vault(&paired, coin, &config, artifact, on_progress).await?;
   }
 
   on_progress(Progress::Sign);
@@ -213,9 +251,8 @@ mod tests {
   }
 
   #[test]
-  fn the_minimum_firmware_constants_are_valid_versions() {
+  fn the_minimum_firmware_constant_is_a_valid_version() {
     assert!(semver::Version::parse(MIN_FIRMWARE_VERSION).is_ok());
-    assert!(semver::Version::parse(MIN_FIRMWARE_VERSION_REGTEST).is_ok());
   }
 
   #[test]
@@ -227,28 +264,75 @@ mod tests {
       Some(BtcCoin::Tbtc)
     );
     assert_eq!(coin_for_network(Network::Signet).ok(), Some(BtcCoin::Tbtc));
-    assert_eq!(coin_for_network(Network::Regtest).ok(), Some(BtcCoin::Rbtc));
+    // The firmware has no wallet policies for its regtest coin.
+    assert_eq!(coin_for_network(Network::Regtest).ok(), Some(BtcCoin::Tbtc));
   }
 
   #[test]
   fn firmware_9_15_0_is_the_floor_for_policies() {
-    assert!(check_firmware(&version("9.15.0"), Network::Bitcoin).is_ok());
-    assert!(check_firmware(&version("9.27.1"), Network::Testnet).is_ok());
-    let too_old =
-      check_firmware(&version("9.14.1"), Network::Bitcoin).expect_err("9.14.1 is too old");
+    assert!(check_firmware(&version("9.15.0")).is_ok());
+    assert!(check_firmware(&version("9.27.1")).is_ok());
+    let too_old = check_firmware(&version("9.14.1")).expect_err("9.14.1 is too old");
     assert_eq!(too_old.kind, ErrorKind::FirmwareTooOld);
     assert!(too_old.message.contains("9.14.1"), "{}", too_old.message);
     assert!(too_old.message.contains("9.15.0"), "{}", too_old.message);
   }
 
+  // The keys of the vault in the webapp's tests, as in `policy.rs`.
+  const CLOUD: &str = "[7737acb8]tpubD6NzVbkrYhZ4X3vCdevm3aFUdeSAWsbR4UhhdApbXnVUnvuwtq5NYqQ7zCkNhYG4JcPdGW4Wg4ZrVSYGpdoWsn337qmkP6CFgs7pZid12Sa/0/*";
+  const GHOST: &str = "[8c24a510/48h/1h/0h/2h]tpubDDzWqfZ5TH48383Byd9PFGxEP1Ws5NVXyYcHTmnHwmhJciowLeBDWNHcpLGocofanSyVHeiNqL4HZkXZfKM7NKm7gZZoPjmA9vTKPpwRSkx/0/*";
+  const KEEN: &str = "[dcbf0caf/48h/1h/0h/2h]tpubDFd7VxopNeZg93uqR7CSvJLkw3UanF8rywdQTxhCPFt1P33eZkxJJ91XXEbY2Q4Suw3jyscRwGzjVyfgq97N7sRvPHQVxruHwsKvsvQizSk/0/*";
+
+  fn artifact(threshold: usize, keys: [&str; 3]) -> PolicyArtifact {
+    let descriptor = format!(
+      "wsh(multi({threshold},{},{},{}))",
+      keys[0], keys[1], keys[2]
+    );
+    crate::build_policy(
+      &descriptor,
+      None,
+      Fingerprint::from_str("dcbf0caf").expect("a fingerprint"),
+    )
+    .expect("the policy is built")
+  }
+
   #[test]
-  fn regtest_needs_firmware_9_21_0() {
-    assert!(check_firmware(&version("9.21.0"), Network::Regtest).is_ok());
-    let too_old = check_firmware(&version("9.20.0"), Network::Regtest)
-      .expect_err("9.20.0 is too old for regtest");
-    assert_eq!(too_old.kind, ErrorKind::FirmwareTooOld);
-    assert!(too_old.message.contains("9.21.0"), "{}", too_old.message);
-    assert!(too_old.message.contains("regtest"), "{}", too_old.message);
-    assert!(check_firmware(&version("9.20.0"), Network::Testnet).is_ok());
+  fn the_fallback_name_is_the_base_name_and_eight_hex_characters() {
+    let name = fallback_policy_name(&artifact(2, [CLOUD, GHOST, KEEN]));
+    let suffix = name
+      .strip_prefix("swan_vault_")
+      .expect("the name starts with the base name and an underscore");
+    assert_eq!(suffix.len(), 8, "{name}");
+    assert!(
+      suffix
+        .chars()
+        .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)),
+      "{name}"
+    );
+    // The device allows 30 bytes of printable ASCII.
+    assert!(name.len() <= 30);
+    assert!(name.bytes().all(|byte| (0x20..0x7f).contains(&byte)));
+  }
+
+  #[test]
+  fn the_fallback_name_of_a_vault_never_changes() {
+    // SHA-256 over the policy string and the 78 bytes of each xpub in the order of the vault,
+    // computed outside of this crate.
+    let vault = artifact(2, [CLOUD, GHOST, KEEN]);
+    assert_eq!(fallback_policy_name(&vault), "swan_vault_f990ad1d");
+    assert_eq!(fallback_policy_name(&vault), fallback_policy_name(&vault));
+  }
+
+  #[test]
+  fn the_fallback_name_depends_on_the_policy_and_the_order_of_the_keys() {
+    let name = fallback_policy_name(&artifact(2, [CLOUD, GHOST, KEEN]));
+    assert_ne!(
+      name,
+      fallback_policy_name(&artifact(3, [CLOUD, GHOST, KEEN]))
+    );
+    assert_ne!(
+      name,
+      fallback_policy_name(&artifact(2, [GHOST, CLOUD, KEEN]))
+    );
   }
 }

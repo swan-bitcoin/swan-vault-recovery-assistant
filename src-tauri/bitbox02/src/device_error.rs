@@ -45,10 +45,6 @@ fn communication_error(step: Step) -> Error {
 
 fn invalid_input(step: Step) -> Error {
   match step {
-    Step::Register(BtcCoin::Rbtc) | Step::Registration(BtcCoin::Rbtc) | Step::Sign(BtcCoin::Rbtc) => error(
-      ErrorKind::Other,
-      "The BitBox02 firmware does not accept a vault on regtest. Firmware up to 9.27.0 accepts vaults on mainnet and testnet only.",
-    ),
     Step::Registration(_) | Step::Register(_) => error(
       ErrorKind::UnsupportedDescriptor,
       "The BitBox02 refused to register the vault. It checks that its own key matches the descriptor. Check that the descriptors belong to the vault of this BitBox02.",
@@ -104,7 +100,7 @@ pub(crate) fn map_device_error(device_error: DeviceError, step: Step) -> Error {
     DeviceError::BitBox(BitBoxError::Duplicate) if matches!(step, Step::Register(_)) => error(
       ErrorKind::PolicyNameTaken,
       format!(
-        "This BitBox02 already holds a different wallet named {POLICY_NAME}, for example another Swan vault. A BitBox02 keeps one wallet for each name. Use the BitBox02 that belongs to this vault. {RESET_ADVICE}"
+        "This BitBox02 already holds a different wallet under each name that SVRA can use for this vault: {POLICY_NAME} and {POLICY_NAME}_ with 8 more characters. A BitBox02 keeps one wallet for each name. Use the BitBox02 that belongs to this vault. {RESET_ADVICE}"
       ),
     ),
     DeviceError::BitBox(BitBoxError::Generic) if matches!(step, Step::Register(_)) => error(
@@ -113,6 +109,9 @@ pub(crate) fn map_device_error(device_error: DeviceError, step: Step) -> Error {
         "The BitBox02 could not store the vault. Its list of registered wallets may be full, because it holds 25. {RESET_ADVICE}"
       ),
     ),
+    // The library turns every failure of the unlock request into this error, so here it means
+    // that the device went away.
+    DeviceError::Unknown if matches!(step, Step::Connect) => communication_error(step),
     DeviceError::BitBox(BitBoxError::InvalidInput) => invalid_input(step),
     DeviceError::BitBox(BitBoxError::Memory) => error(
       ErrorKind::Other,
@@ -195,13 +194,14 @@ mod tests {
   }
 
   #[test]
-  fn a_duplicate_name_while_registering_means_the_name_is_taken() {
+  fn a_duplicate_name_while_registering_means_the_names_are_taken() {
     let mapped = map(
       DeviceError::BitBox(BitBoxError::Duplicate),
       Step::Register(BtcCoin::Tbtc),
     );
     assert_eq!(mapped.kind, ErrorKind::PolicyNameTaken);
     assert!(mapped.message.contains(POLICY_NAME));
+    assert!(mapped.message.contains("each name"), "{}", mapped.message);
     assert!(mapped.message.contains("reset"));
   }
 
@@ -239,16 +239,6 @@ mod tests {
       map(invalid(), Step::Sign(BtcCoin::Btc)).kind,
       ErrorKind::InvalidPsbt
     );
-  }
-
-  #[test]
-  fn invalid_input_on_regtest_says_that_the_firmware_lacks_regtest_vaults() {
-    let mapped = map(
-      DeviceError::BitBox(BitBoxError::InvalidInput),
-      Step::Register(BtcCoin::Rbtc),
-    );
-    assert_eq!(mapped.kind, ErrorKind::Other);
-    assert!(mapped.message.contains("regtest"), "{}", mapped.message);
   }
 
   #[test]
@@ -296,8 +286,17 @@ mod tests {
   }
 
   #[test]
-  fn an_unknown_error_is_other() {
+  fn an_unknown_error_while_connecting_is_a_lost_connection() {
+    // The device library returns it when the unlock request fails, for example when the user
+    // unplugs the device.
     let mapped = map(DeviceError::Unknown, Step::Connect);
+    assert_eq!(mapped.kind, ErrorKind::Communication);
+    assert!(mapped.message.contains("BitBox02"), "{}", mapped.message);
+  }
+
+  #[test]
+  fn an_unknown_error_is_other() {
+    let mapped = map(DeviceError::Unknown, Step::Sign(BtcCoin::Btc));
     assert_eq!(mapped.kind, ErrorKind::Other);
     let mapped = map(
       DeviceError::BitBox(BitBoxError::Unknown),

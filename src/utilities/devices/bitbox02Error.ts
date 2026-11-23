@@ -15,14 +15,3 @@ export function parseBitbox02Error(e: unknown): Bitbox02ErrorInfo | null {
   const match = ERROR_TYPE.exec(errorType)
   return match ? { code: match[1], message } : null
 }
-
-export function getBitbox02ErrorText({ code, message }: Bitbox02ErrorInfo): string {
-  switch (code) {
-    case 'user-abort':
-      return 'Looks like you refused to sign this transaction on your BitBox02. If this was a mistake, you can try again.'
-    case 'pairing-rejected':
-      return 'Looks like you rejected the pairing code on your BitBox02. If this was a mistake, you can try again.'
-    default:
-      return message
-  }
-}

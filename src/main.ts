@@ -1,6 +1,5 @@
 import { readText as fromClipboard, writeText as toClipboard } from '@tauri-apps/plugin-clipboard-manager'
-import { Channel } from '@tauri-apps/api/core'
-import { Bitbox02Progress, commands, Descriptors } from './bindings'
+import { Bitbox02Progress, commands } from './bindings'
 import { Transactions } from './components'
 import { clearStatusIndicators, DOM, getUserInputs, handleError, initializeDOM, initializeMode } from './dom'
 import {
@@ -28,11 +27,12 @@ import { createConversationActions } from './utilities/createConversationActions
 import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
 import {
   getBitbox02Device,
-  getBitbox02ErrorText,
   getBitbox02StepMessage,
+  isBitbox02SessionPending,
   getJadeDevice,
   getDeviceName,
   parseBitbox02Error,
+  runBitbox02Session,
 } from './utilities/devices'
 import { createConversationImage } from './utilities/createConversationImage'
 import { CircularTickIcon } from './icons/circularTick'
@@ -391,8 +391,8 @@ const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidd
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
 
-function showBitbox02Step(progress: Bitbox02Progress) {
-  const { loading, bubble, code } = getBitbox02StepMessage(progress)
+function showBitbox02Step(update: Bitbox02Progress) {
+  const { loading, bubble, code } = getBitbox02StepMessage(update)
 
   if (bubble) {
     const content = document.createElement('div')
@@ -414,18 +414,6 @@ function showBitbox02Step(progress: Bitbox02Progress) {
   showTempLoadingMessage(loading)
 }
 
-function signWithBitbox02(psbt: string, network: string, descriptors: Descriptors) {
-  const shownSteps = new Set<Bitbox02Progress['step']>()
-  const onProgress = new Channel<Bitbox02Progress>()
-  onProgress.onmessage = (progress) => {
-    if (shownSteps.has(progress.step)) return
-    shownSteps.add(progress.step)
-    showBitbox02Step(progress)
-  }
-
-  return commands.signBitbox02(psbt, network, descriptors, onProgress)
-}
-
 const createTryAgainActions = (retryCount: number) =>
   createConversationActions({
     content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
@@ -438,6 +426,8 @@ const createTryAgainActions = (retryCount: number) =>
   })
 
 async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
+  if (isBitbox02SessionPending()) return
+
   const { psbt, descriptors, network } = getUserInputs()
   require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
@@ -505,8 +495,11 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
 
     let response: string
     if (isBitbox02) {
-      // the device reports its own progress, so there is no fixed wait
-      response = await signWithBitbox02(psbt, network, descriptors)
+      // the backend reports each stage itself, so there is no timed wait
+      response = await runBitbox02Session(
+        (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
+        showBitbox02Step
+      )
     } else {
       // let them read past messages first.
       // give the device some time to receive the psbt.
@@ -523,14 +516,15 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
     const { psbt: responsePsbt, message, signed, fingerprint } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
-      content: isBitbox02 && !signed ? `${message} Unplug the BitBox02 and connect the other device.` : message,
+      content: message,
       //footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      updateSignHistory(device, fingerprint)
+      // only the BitBox02 backend reports a fingerprint; HWI devices keep the one from enumeration
+      updateSignHistory(device, isBitbox02 ? fingerprint : undefined)
     }
 
     // Give feedback via shrimpy
@@ -572,7 +566,7 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
     // BitBox02 errors arrive as plain objects, and its bootloader error is thrown by getDevice. Both carry text written for users.
     const bitbox02Error = parseBitbox02Error(e)
     const bitbox02Text = bitbox02Error
-      ? getBitbox02ErrorText(bitbox02Error)
+      ? bitbox02Error.message
       : e instanceof DeviceError && e.deviceType === 'bitbox02'
         ? e.message
         : null

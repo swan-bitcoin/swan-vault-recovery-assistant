@@ -154,11 +154,14 @@ fn derived_key(key: &str, keychain: u32, index: u32) -> secp256k1::PublicKey {
 /// The first order of the keys whose multisig is not in BIP-67 order at the first two receive
 /// addresses and the first change address, which are the addresses that the tests fund. A
 /// `sortedmulti` descriptor over the same keys would be a different wallet at each of them.
-pub fn unsorted_order(keys: &VaultKeys) -> [usize; 3] {
+/// `device_slot` limits the choice to the orders that put the device key (key 0) at that
+/// position.
+pub fn unsorted_order(keys: &VaultKeys, device_slot: Option<usize>) -> [usize; 3] {
   let expressions = keys.expressions();
   let addresses = [(0, 0), (0, 1), (1, 0)];
   ORDERS
     .into_iter()
+    .filter(|order| device_slot.is_none_or(|slot| order[slot] == 0))
     .find(|order| {
       addresses.iter().all(|(keychain, index)| {
         let in_order: Vec<[u8; 33]> = order
@@ -170,7 +173,7 @@ pub fn unsorted_order(keys: &VaultKeys) -> [usize; 3] {
         in_order != sorted
       })
     })
-    .expect("one of the six orders is unsorted at every funded address")
+    .expect("one of the orders is unsorted at every funded address")
 }
 
 /// A vault wallet with funds, and everything needed to build and sign a sweep.
@@ -188,10 +191,21 @@ pub struct Vault {
 
 impl Vault {
   /// A vault of the device with the master key `device_master`, a software key and a cloud key,
-  /// in an order that differs from the sorted order, with two receive and one change UTXO.
+  /// in an order that differs from the sorted order, with two receive and one change UTXO. The
+  /// keys are xpubs on mainnet and tpubs on every other network.
   pub fn new(device_master: &Xpriv, network: Network) -> Vault {
-    let keys = VaultKeys::new(device_master, NetworkKind::Test);
-    let order = unsorted_order(&keys);
+    Vault::build(device_master, network, None)
+  }
+
+  /// Like [`Vault::new`], with the key of the device at position `device_slot` (0 to 2) of the
+  /// descriptor.
+  pub fn with_device_at(device_master: &Xpriv, network: Network, device_slot: usize) -> Vault {
+    Vault::build(device_master, network, Some(device_slot))
+  }
+
+  fn build(device_master: &Xpriv, network: Network, device_slot: Option<usize>) -> Vault {
+    let keys = VaultKeys::new(device_master, NetworkKind::from(network));
+    let order = unsorted_order(&keys, device_slot);
     let expressions = keys.expressions();
     let ordered: Vec<&str> = order
       .iter()

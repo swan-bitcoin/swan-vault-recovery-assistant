@@ -64,9 +64,10 @@ fn our_key(input: &Input, fingerprint: Fingerprint) -> Option<(SecpPublicKey, &D
     .map(|(public_key, (_, path))| (*public_key, path))
 }
 
-/// The witness script that the vault has at `path`, which is the account keypath of the device
-/// followed by the keychain and the address index. `None` when the path does not fit the vault.
-fn vault_witness_script(vault: &Vault, path: &DerivationPath) -> Option<ScriptBuf> {
+/// The keychain and the address index of `path`, when `path` is the account keypath of the
+/// device followed by a keychain and an address index. `None` when the path does not fit the
+/// vault.
+fn address_steps(vault: &Vault, path: &DerivationPath) -> Option<[ChildNumber; 2]> {
   let account = vault.artifact.our_account_keypath.to_vec();
   let numbers = path.to_u32_vec();
   if numbers.len() != account.len() + 2 || !numbers.starts_with(&account) {
@@ -77,16 +78,32 @@ fn vault_witness_script(vault: &Vault, path: &DerivationPath) -> Option<ScriptBu
   if keychain > 1 || index >= HARDENED {
     return None;
   }
-
-  let secp = Secp256k1::verification_only();
-  let steps = [
+  Some([
     ChildNumber::Normal { index: keychain },
     ChildNumber::Normal { index },
-  ];
+  ])
+}
+
+/// The public key that the vault has for its key number `key_index` at `steps`.
+fn vault_public_key(
+  vault: &Vault,
+  key_index: usize,
+  steps: &[ChildNumber; 2],
+) -> Option<SecpPublicKey> {
+  let key = vault.artifact.keys.get(key_index)?;
+  let child = key
+    .xpub
+    .derive_pub(&Secp256k1::verification_only(), steps)
+    .ok()?;
+  Some(child.public_key)
+}
+
+/// The witness script that the vault has at `steps`.
+fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<ScriptBuf> {
   let mut script = Builder::new().push_int(vault.threshold as i64);
-  for key in &vault.artifact.keys {
-    let child = key.xpub.derive_pub(&secp, &steps).ok()?;
-    script = script.push_key(&PublicKey::new(child.public_key));
+  for key_index in 0..vault.artifact.keys.len() {
+    let key = vault_public_key(vault, key_index, steps)?;
+    script = script.push_key(&PublicKey::new(key));
   }
   Some(
     script
@@ -144,9 +161,26 @@ pub(crate) fn precheck(
         "Input {number} has no key path for the connected BitBox02 (fingerprint {fingerprint}). Check that this BitBox02 holds a key of the vault, and that the PSBT comes from the same vault."
       ))
     })?;
-    if vault_witness_script(vault, path).as_ref() != Some(witness_script) {
+    let steps = address_steps(vault, path);
+    if steps
+      .as_ref()
+      .and_then(|steps| vault_witness_script(vault, steps))
+      .as_ref()
+      != Some(witness_script)
+    {
       return Err(invalid_psbt(format!(
         "Input {number} does not belong to the vault of the descriptors. Check that the transaction and the descriptors come from the same vault."
+      )));
+    }
+    // The fingerprint in the PSBT is only a label. The key under it must be the key that the
+    // vault has for the device, or a PSBT could pass another key off as the device's key and
+    // make the device look as if it had signed.
+    let device_key = steps
+      .as_ref()
+      .and_then(|steps| vault_public_key(vault, vault.artifact.our_key_index, steps));
+    if device_key != Some(public_key) {
+      return Err(invalid_psbt(format!(
+        "Input {number} lists a key for the connected BitBox02 (fingerprint {fingerprint}) that is not the key of the BitBox02 in the vault. The PSBT is damaged, or it comes from another vault."
       )));
     }
     keys.push(public_key);
@@ -501,6 +535,40 @@ mod tests {
   }
 
   #[test]
+  fn refuses_a_psbt_that_puts_the_fingerprint_of_the_device_on_another_key() {
+    // The script and the paths are the vault's, so only the key under the fingerprint of the
+    // device is wrong: it is the key of the cosigner, derived at the same path.
+    let mut case = case();
+    let secp = Secp256k1::new();
+    let software_xprv = case.fixture.keys.software_xprv;
+    for input in &mut case.psbt.inputs {
+      let (device_key, (_, path)) = input
+        .bip32_derivation
+        .iter()
+        .find(|(_, (fingerprint, _))| *fingerprint == case.fingerprint)
+        .map(|(key, source)| (*key, source.clone()))
+        .expect("a key of the device");
+      let cosigner_key = software_xprv
+        .derive_priv(&secp, &path)
+        .expect("the path derives")
+        .private_key
+        .public_key(&secp);
+      assert_ne!(cosigner_key, device_key);
+      assert!(input.bip32_derivation.contains_key(&cosigner_key));
+      input.bip32_derivation.remove(&device_key);
+      input
+        .bip32_derivation
+        .insert(cosigner_key, (case.fingerprint, path));
+    }
+    let error = precheck_error(&case, &case.psbt);
+    assert!(
+      error.message.contains("not the key of the BitBox02"),
+      "{}",
+      error.message
+    );
+  }
+
+  #[test]
   fn refuses_a_psbt_of_another_vault_with_the_same_device() {
     // The same three keys in another order: the other wallet that a sorted multisig would give.
     let case = case();
@@ -535,8 +603,9 @@ mod tests {
     let case = case();
     for input in &case.psbt.inputs {
       let (_, path) = our_key(input, case.fingerprint).expect("a key of the device");
+      let steps = address_steps(&case.vault, path).expect("an address of the vault");
       assert_eq!(
-        vault_witness_script(&case.vault, path).as_ref(),
+        vault_witness_script(&case.vault, &steps).as_ref(),
         input.witness_script.as_ref()
       );
     }

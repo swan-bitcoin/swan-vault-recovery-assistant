@@ -419,9 +419,8 @@ mod tests {
 
   #[test]
   fn keeps_descriptor_order_and_finds_the_device_wherever_it_is() {
-    for (device, index) in [("8c24a510", 1), ("DCBF0CAF", 2)] {
-      let artifact = build(&webapp_descriptor("/0/*"), None, &device.to_lowercase())
-        .expect("the policy is built");
+    for (device, index) in [("8c24a510", 1), ("dcbf0caf", 2)] {
+      let artifact = build(&webapp_descriptor("/0/*"), None, device).expect("the policy is built");
       assert_eq!(artifact.our_key_index, index);
       let xpubs: Vec<Xpub> = artifact.keys.iter().map(|key| key.xpub).collect();
       assert_eq!(
@@ -433,6 +432,19 @@ mod tests {
         ]
       );
     }
+  }
+
+  #[test]
+  fn reads_a_fingerprint_in_the_descriptor_in_upper_case() {
+    // The device reports its fingerprint in lower case. The descriptor is what the user pasted.
+    let descriptor = webapp_descriptor("/0/*").replace("[dcbf0caf/", "[DCBF0CAF/");
+    assert!(descriptor.contains("[DCBF0CAF/"));
+    let artifact = build(&descriptor, None, "dcbf0caf").expect("the policy is built");
+    assert_eq!(artifact.our_key_index, 2);
+    assert_eq!(
+      artifact.keys[2].root_fingerprint,
+      Some(fingerprint("dcbf0caf"))
+    );
   }
 
   #[test]

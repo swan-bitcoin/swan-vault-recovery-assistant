@@ -1470,17 +1470,6 @@ html {
   overflow: hidden;
   scrollbar-gutter: stable;
 }
-.progress {
-  position: relative;
-  width: 100%;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  overflow: hidden;
-  height: 0.5rem;
-  border-radius: var(--rounded-box, 1rem);
-  background-color: var(--fallback-bc, oklch(var(--bc) / 0.2));
-}
 .radio {
   flex-shrink: 0;
   --chkbg: var(--bc);
@@ -1555,14 +1544,6 @@ html {
   font-size: 0.75rem;
   line-height: 1rem;
   color: var(--fallback-bc, oklch(var(--bc) / 0.6));
-}
-.steps {
-  display: inline-grid;
-  grid-auto-flow: column;
-  overflow: hidden;
-  overflow-x: auto;
-  counter-reset: step;
-  grid-auto-columns: 1fr;
 }
 .steps .step {
   display: grid;
@@ -2499,44 +2480,6 @@ details.collapse summary::-webkit-details-marker {
     opacity: 0;
   }
 }
-.progress::-moz-progress-bar {
-  border-radius: var(--rounded-box, 1rem);
-  background-color: currentColor;
-}
-.progress:indeterminate {
-  --progress-color: var(--fallback-bc, oklch(var(--bc) / 1));
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--progress-color) -1%,
-    var(--progress-color) 10%,
-    transparent 10%,
-    transparent 90%
-  );
-  background-size: 200%;
-  background-position-x: 15%;
-  animation: progress-loading 5s ease-in-out infinite;
-}
-.progress::-webkit-progress-bar {
-  border-radius: var(--rounded-box, 1rem);
-  background-color: transparent;
-}
-.progress::-webkit-progress-value {
-  border-radius: var(--rounded-box, 1rem);
-  background-color: currentColor;
-}
-.progress:indeterminate::-moz-progress-bar {
-  background-color: transparent;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--progress-color) -1%,
-    var(--progress-color) 10%,
-    transparent 10%,
-    transparent 90%
-  );
-  background-size: 200%;
-  background-position-x: 15%;
-  animation: progress-loading 5s ease-in-out infinite;
-}
 @keyframes progress-loading {
   50% {
     background-position-x: -115%;
@@ -2685,74 +2628,6 @@ details.collapse summary::-webkit-details-marker {
 }
 .steps .step[data-content]:after {
   content: attr(data-content);
-}
-.steps .step-neutral + .step-neutral:before,
-.steps .step-neutral:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-n, oklch(var(--n) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-nc, oklch(var(--nc) / var(--tw-text-opacity)));
-}
-.steps .step-primary + .step-primary:before,
-.steps .step-primary:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-p, oklch(var(--p) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-pc, oklch(var(--pc) / var(--tw-text-opacity)));
-}
-.steps .step-secondary + .step-secondary:before,
-.steps .step-secondary:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-s, oklch(var(--s) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-sc, oklch(var(--sc) / var(--tw-text-opacity)));
-}
-.steps .step-accent + .step-accent:before,
-.steps .step-accent:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-a, oklch(var(--a) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-ac, oklch(var(--ac) / var(--tw-text-opacity)));
-}
-.steps .step-info + .step-info:before {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-in, oklch(var(--in) / var(--tw-bg-opacity)));
-}
-.steps .step-info:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-in, oklch(var(--in) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-inc, oklch(var(--inc) / var(--tw-text-opacity)));
-}
-.steps .step-success + .step-success:before {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-su, oklch(var(--su) / var(--tw-bg-opacity)));
-}
-.steps .step-success:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-su, oklch(var(--su) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-suc, oklch(var(--suc) / var(--tw-text-opacity)));
-}
-.steps .step-warning + .step-warning:before {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-bg-opacity)));
-}
-.steps .step-warning:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-wa, oklch(var(--wa) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-wac, oklch(var(--wac) / var(--tw-text-opacity)));
-}
-.steps .step-error + .step-error:before {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-er, oklch(var(--er) / var(--tw-bg-opacity)));
-}
-.steps .step-error:after {
-  --tw-bg-opacity: 1;
-  background-color: var(--fallback-er, oklch(var(--er) / var(--tw-bg-opacity)));
-  --tw-text-opacity: 1;
-  color: var(--fallback-erc, oklch(var(--erc) / var(--tw-text-opacity)));
 }
 .tabs-lifted > .tab:focus-visible {
   border-end-end-radius: 0;
@@ -3552,9 +3427,6 @@ details.collapse summary::-webkit-details-marker {
 }
 .collapse {
   visibility: collapse;
-}
-.fixed {
-  position: fixed;
 }
 .absolute {
   position: absolute;

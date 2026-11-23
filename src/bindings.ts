@@ -96,7 +96,7 @@ untrusted_pending: string;
  * Confirmed and immediately spendable balance
  */
 confirmed: string }
-export type Bitbox02Progress = { step: "connecting" } | { step: "unlock" } | { step: "confirm-pairing"; code: string } | { step: "checking-registration" } | { step: "register" } | { step: "sign" }
+export type Bitbox02Progress = { step: "connecting" } | { step: "unlock" } | { step: "confirm-pairing"; code: string } | { step: "checking-registration" } | { step: "register"; name: string } | { step: "sign" }
 export type Descriptors = { receive: string; change: string | null; auto_change: boolean }
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null; outbound: string; sent_to_self: boolean }
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"

@@ -685,28 +685,19 @@ function parseBitbox02Error(e) {
   const match = ERROR_TYPE.exec(errorType)
   return match ? { code: match[1], message } : null
 }
-function getBitbox02ErrorText({ code, message }) {
-  switch (code) {
-    case 'user-abort':
-      return 'Looks like you refused to sign this transaction on your BitBox02. If this was a mistake, you can try again.'
-    case 'pairing-rejected':
-      return 'Looks like you rejected the pairing code on your BitBox02. If this was a mistake, you can try again.'
-    default:
-      return message
-  }
-}
 const WAITING = 'Waiting for your BitBox02…'
-function getBitbox02StepMessage(progress) {
-  switch (progress.step) {
+const WALLET_NAME = 'swan_vault'
+function getBitbox02StepMessage(update) {
+  switch (update.step) {
     case 'connecting':
       return { loading: 'Connecting to your BitBox02…' }
     case 'unlock':
-      return { loading: WAITING, bubble: 'Enter your password on the BitBox02.' }
+      return { loading: WAITING, bubble: 'Unlock your BitBox02. Enter your password on the device if it asks.' }
     case 'confirm-pairing':
       return {
         loading: WAITING,
         bubble: 'Check that the code below is the same as the code on your BitBox02. Then confirm on the device.',
-        code: progress.code,
+        code: update.code,
       }
     case 'checking-registration':
       return { loading: 'Checking that your BitBox02 knows this wallet…' }
@@ -714,10 +705,34 @@ function getBitbox02StepMessage(progress) {
       return {
         loading: WAITING,
         bubble:
-          'This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named swan_vault with its keys. Compare each key with your recovery kit, then confirm on the device.',
+          update.name === WALLET_NAME
+            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device.`
+            : `The name ${WALLET_NAME} is already used for another wallet on this BitBox02. SVRA registers this wallet as ${update.name}. The device shows the wallet with its keys. Compare each key with your recovery kit again, then confirm on the device.`,
       }
     case 'sign':
       return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
+  }
+}
+let isPending = false
+const isBitbox02SessionPending = () => isPending
+async function runBitbox02Session(start, show) {
+  const ownsSession = !isPending
+  isPending = true
+  let isSettled = false
+  const shown = /* @__PURE__ */ new Set()
+  const onProgress = new Channel()
+  onProgress.onmessage = (update) => {
+    if (isSettled) return
+    const key = update.step === 'register' ? `register:${update.name}` : update.step
+    if (shown.has(key)) return
+    shown.add(key)
+    show(update)
+  }
+  try {
+    return await start(onProgress)
+  } finally {
+    isSettled = true
+    if (ownsSession) isPending = false
   }
 }
 function getDeviceName(device) {
@@ -1080,8 +1095,8 @@ const toggleChangeInput = () => DOM.containers.change.classList.toggle('hidden',
 const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidden', DOM.checkboxes.electrum.checked)
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
-function showBitbox02Step(progress) {
-  const { loading, bubble, code } = getBitbox02StepMessage(progress)
+function showBitbox02Step(update) {
+  const { loading, bubble, code } = getBitbox02StepMessage(update)
   if (bubble) {
     const content = document.createElement('div')
     const text = document.createElement('p')
@@ -1097,16 +1112,6 @@ function showBitbox02Step(progress) {
   }
   showTempLoadingMessage(loading)
 }
-function signWithBitbox02(psbt, network, descriptors) {
-  const shownSteps = /* @__PURE__ */ new Set()
-  const onProgress = new Channel()
-  onProgress.onmessage = (progress) => {
-    if (shownSteps.has(progress.step)) return
-    shownSteps.add(progress.step)
-    showBitbox02Step(progress)
-  }
-  return commands.signBitbox02(psbt, network, descriptors, onProgress)
-}
 const createTryAgainActions = (retryCount) =>
   createConversationActions({
     content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
@@ -1121,6 +1126,7 @@ const createTryAgainActions = (retryCount) =>
     },
   })
 async function sign({ retryCount = 0 } = {}) {
+  if (isBitbox02SessionPending()) return
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   try {
@@ -1177,7 +1183,10 @@ async function sign({ retryCount = 0 } = {}) {
     }
     let response
     if (isBitbox02) {
-      response = await signWithBitbox02(psbt, network, descriptors)
+      response = await runBitbox02Session(
+        (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
+        showBitbox02Step
+      )
     } else {
       await sleep(9e3)
       showTempLoadingMessage('Waiting for you to sign the transaction')
@@ -1187,14 +1196,14 @@ async function sign({ retryCount = 0 } = {}) {
     const { psbt: responsePsbt, message, signed, fingerprint } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
-      content: isBitbox02 && !signed ? `${message} Unplug the BitBox02 and connect the other device.` : message,
+      content: message,
       //footer: new Date().toLocaleString(),
       dangerouslySetInnerHTML: true,
     })
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      updateSignHistory(device, fingerprint)
+      updateSignHistory(device, isBitbox02 ? fingerprint : void 0)
     }
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
     await sleep(600)
@@ -1232,7 +1241,7 @@ async function sign({ retryCount = 0 } = {}) {
   } catch (e) {
     const bitbox02Error = parseBitbox02Error(e)
     const bitbox02Text = bitbox02Error
-      ? getBitbox02ErrorText(bitbox02Error)
+      ? bitbox02Error.message
       : e instanceof DeviceError && e.deviceType === 'bitbox02'
         ? e.message
         : null

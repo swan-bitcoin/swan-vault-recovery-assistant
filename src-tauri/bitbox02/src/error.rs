@@ -17,7 +17,8 @@ pub enum ErrorKind {
   UnsupportedDescriptor,
   /// The connected device holds none of the keys in the descriptor.
   KeyNotInVault,
-  /// The device already holds a different vault under [`crate::POLICY_NAME`].
+  /// The device already holds a different wallet under [`crate::POLICY_NAME`] and under the
+  /// fallback name of this vault.
   PolicyNameTaken,
   /// The PSBT lacks data the device needs, or does not belong to this vault.
   InvalidPsbt,
@@ -27,6 +28,8 @@ pub enum ErrorKind {
   InvalidSignature,
   /// The USB or encrypted channel failed.
   Communication,
+  /// A BitBox02 session is already running in this app.
+  Busy,
   /// Anything else.
   Other,
 }
@@ -48,6 +51,7 @@ impl ErrorKind {
       ErrorKind::TransactionMismatch => "transaction-mismatch",
       ErrorKind::InvalidSignature => "invalid-signature",
       ErrorKind::Communication => "communication",
+      ErrorKind::Busy => "busy",
       ErrorKind::Other => "other",
     }
   }

@@ -5,6 +5,7 @@ use bitbox_api::runtime::TokioRuntime;
 use bitbox_api::{BitBox, NoiseConfigNoCache};
 use hidapi::HidApi;
 use std::ffi::CString;
+use std::sync::{Mutex, MutexGuard, TryLockError};
 
 /// USB vendor id of every BitBox02 (Microchip, the maker of its microcontroller).
 const VENDOR_ID: u16 = 0x03eb;
@@ -37,6 +38,36 @@ const MODELS: [(&str, &str, &str); 4] = [
 ];
 
 const NOT_FOUND_MESSAGE: &str = "No BitBox02 found. Connect the BitBox02 and unlock it. Close the BitBoxApp, because only one program can use the BitBox02 at a time.";
+
+/// Held for the whole of one device session. A second session on the same device would wait for
+/// the first one without end, because the vendor library asks again each time the device answers
+/// that it is busy.
+static SESSION: Mutex<()> = Mutex::new(());
+
+fn try_begin_session(lock: &Mutex<()>) -> Result<MutexGuard<'_, ()>, Error> {
+  match lock.try_lock() {
+    Ok(guard) => Ok(guard),
+    // The lock guards no data, so a session that panicked leaves nothing broken behind.
+    Err(TryLockError::Poisoned(poisoned)) => Ok(poisoned.into_inner()),
+    Err(TryLockError::WouldBlock) => Err(Error::new(
+      ErrorKind::Busy,
+      "A BitBox02 session is already running in SVRA. Finish it on the BitBox02, or unplug the BitBox02 to end it, then try again.",
+    )),
+  }
+}
+
+/// The device was listed, but the operating system refused to open it.
+fn open_error() -> Error {
+  let mut message = String::from(
+    "SVRA found the BitBox02 but cannot open it. Close the BitBoxApp, because only one program can use the BitBox02 at a time, then try again.",
+  );
+  if cfg!(target_os = "linux") {
+    message.push_str(
+      " If the BitBoxApp is closed, your user may lack the right to open the device. See the Linux part of the SVRA README for the udev rule.",
+    );
+  }
+  Error::new(ErrorKind::Communication, message)
+}
 
 /// A BitBox02 found on USB. Finding it does not talk to the device.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,20 +187,20 @@ fn select_device(devices: &[DetectedDevice]) -> Result<usize, Error> {
 /// Opens the one connected BitBox02 and runs [`crate::sign_psbt`] on it.
 ///
 /// This call blocks until the user finishes on the device. Call it from a thread that may block,
-/// and keep the whole call on that one thread.
+/// and keep the whole call on that one thread. It returns [`ErrorKind::Busy`] when another call
+/// is still running.
 pub fn sign_psbt_usb(
   request: SignRequest<'_>,
   on_progress: &mut dyn FnMut(Progress),
 ) -> Result<SignOutcome, Error> {
+  let _session = try_begin_session(&SESSION)?;
   on_progress(Progress::Connecting);
 
   let api = HidApi::new().map_err(|_| list_error())?;
   let mut found = find_devices(&api);
   let devices: Vec<DetectedDevice> = found.iter().map(|found| found.device.clone()).collect();
   let chosen = found.swap_remove(select_device(&devices)?);
-  let hid_device = api
-    .open_path(&chosen.path)
-    .map_err(|_| Error::new(ErrorKind::DeviceNotFound, NOT_FOUND_MESSAGE))?;
+  let hid_device = api.open_path(&chosen.path).map_err(|_| open_error())?;
 
   // One thread runs the device library, the HID reads and the progress callback. The device
   // library sleeps through the runtime, so the time driver must be on.
@@ -273,5 +304,76 @@ mod tests {
   #[test]
   fn one_firmware_device_is_chosen() {
     assert_eq!(select_device(&[device(false)]).ok(), Some(0));
+  }
+
+  #[test]
+  fn a_second_session_is_refused_until_the_first_one_ends() {
+    let lock = Mutex::new(());
+    let first = try_begin_session(&lock).expect("the first session starts");
+    let error = try_begin_session(&lock).expect_err("the second session is refused");
+    assert_eq!(error.kind, ErrorKind::Busy);
+    assert!(
+      error.message.contains("already running"),
+      "{}",
+      error.message
+    );
+    drop(first);
+    assert!(try_begin_session(&lock).is_ok());
+  }
+
+  #[test]
+  fn a_session_that_panicked_does_not_block_the_next_one() {
+    let lock = Mutex::new(());
+    let _ = std::thread::scope(|scope| {
+      scope
+        .spawn(|| {
+          let _guard = lock.lock();
+          panic!("the session panics while it holds the lock");
+        })
+        .join()
+    });
+    assert!(lock.is_poisoned());
+    assert!(try_begin_session(&lock).is_ok());
+  }
+
+  #[test]
+  fn sign_psbt_usb_refuses_to_start_while_a_session_runs() {
+    let psbt = bitcoin::psbt::Psbt::from_unsigned_tx(bitcoin::Transaction {
+      version: bitcoin::transaction::Version::TWO,
+      lock_time: bitcoin::absolute::LockTime::ZERO,
+      input: vec![],
+      output: vec![],
+    })
+    .expect("an empty PSBT");
+    let request = SignRequest {
+      network: bitcoin::Network::Testnet,
+      receive_descriptor: "",
+      change_descriptor: None,
+      psbt,
+    };
+    let mut events = 0;
+    let running = try_begin_session(&SESSION).expect("no other test holds the session");
+    let result = sign_psbt_usb(request, &mut |_| events += 1);
+    drop(running);
+    let error = match result {
+      Ok(_) => panic!("a session started while another one was running"),
+      Err(error) => error,
+    };
+    assert_eq!(error.kind, ErrorKind::Busy);
+    assert_eq!(events, 0, "a refused session must not report progress");
+  }
+
+  #[test]
+  fn an_open_failure_is_a_communication_error_and_not_a_missing_device() {
+    let error = open_error();
+    assert_eq!(error.kind, ErrorKind::Communication);
+    assert!(error.message.contains("found"), "{}", error.message);
+    assert!(error.message.contains("BitBoxApp"), "{}", error.message);
+    assert_eq!(
+      error.message.contains("udev"),
+      cfg!(target_os = "linux"),
+      "{}",
+      error.message
+    );
   }
 }

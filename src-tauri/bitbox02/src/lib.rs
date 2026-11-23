@@ -14,7 +14,8 @@ mod usb;
 pub use error::{Error, ErrorKind};
 pub use policy::{build_policy, PolicyArtifact};
 pub use session::{
-  sign_psbt, Progress, SignOutcome, SignRequest, MIN_FIRMWARE_VERSION, POLICY_NAME,
+  fallback_policy_name, sign_psbt, Progress, SignOutcome, SignRequest, MIN_FIRMWARE_VERSION,
+  POLICY_NAME,
 };
 #[cfg(feature = "usb")]
 pub use usb::{scan, sign_psbt_usb, DetectedDevice};

@@ -24,7 +24,10 @@ use std::path::Path;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Mutex, MutexGuard};
 use support::{account_path, master_key, sign_with, simulator_xprv, Vault};
-use svra_bitbox02::{sign_psbt, Error, ErrorKind, Progress, SignOutcome, SignRequest, POLICY_NAME};
+use svra_bitbox02::{
+  build_policy, fallback_policy_name, sign_psbt, Error, ErrorKind, Progress, SignOutcome,
+  SignRequest, POLICY_NAME,
+};
 
 /// One simulator at a time, because all of them listen on the same port.
 static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
@@ -107,13 +110,79 @@ fn label(progress: &Progress) -> &'static str {
     Progress::Unlock => "unlock",
     Progress::ConfirmPairing { .. } => "confirm-pairing",
     Progress::CheckingRegistration => "checking-registration",
-    Progress::Register => "register",
+    Progress::Register { .. } => "register",
     Progress::Sign => "sign",
   }
 }
 
 fn labels(events: &[Progress]) -> Vec<&'static str> {
   events.iter().map(label).collect()
+}
+
+/// The names that the registration prompts showed, in order.
+fn register_names(events: &[Progress]) -> Vec<&str> {
+  events
+    .iter()
+    .filter_map(|event| match event {
+      Progress::Register { name } => Some(name.as_str()),
+      _ => None,
+    })
+    .collect()
+}
+
+/// The name that SVRA falls back to for the vault.
+fn fallback_name(vault: &Vault) -> String {
+  let artifact = build_policy(
+    &vault.receive_descriptor,
+    Some(&vault.change_descriptor),
+    vault.device_fingerprint,
+  )
+  .expect("the policy is built");
+  fallback_policy_name(&artifact)
+}
+
+/// Registers a wallet of two keys under `name`, as another program or another vault would. The
+/// device key comes first and the other key has no origin. `seed_byte` makes the wallets differ.
+async fn register_other_wallet(name: &str, seed_byte: u8) {
+  let secp = Secp256k1::new();
+  let path = account_path(NetworkKind::Test);
+  let account = simulator_xprv()
+    .derive_priv(&secp, &path)
+    .expect("the account derives");
+  let other_account = master_key(seed_byte, NetworkKind::Test)
+    .derive_priv(&secp, &path)
+    .expect("the account derives");
+  let keys = [
+    KeyOriginInfo {
+      root_fingerprint: Some(support::fingerprint_of(&simulator_xprv())),
+      keypath: Some((&path).into()),
+      xpub: Xpub::from_priv(&secp, &account),
+    },
+    KeyOriginInfo {
+      root_fingerprint: None,
+      keypath: None,
+      xpub: Xpub::from_priv(&secp, &other_account),
+    },
+  ];
+  let config = bitbox_api::btc::make_script_config_policy("wsh(multi(2,@0/**,@1/**))", &keys);
+  let paired = connect()
+    .await
+    .unlock_and_pair()
+    .await
+    .expect("unlock and pair")
+    .wait_confirm()
+    .await
+    .expect("confirm the pairing");
+  paired
+    .btc_register_script_config(
+      BtcCoin::Tbtc,
+      &config,
+      None,
+      XPubType::AutoXpubTpub,
+      Some(name),
+    )
+    .await
+    .expect("the simulator registers the other wallet");
 }
 
 /// One call of `sign_psbt` on a new connection, with the progress events it reported.
@@ -187,6 +256,7 @@ fn signs_registers_and_reuses_the_registration() {
         .any(|event| matches!(event, Progress::ConfirmPairing { code } if !code.is_empty())),
       "the pairing code is empty"
     );
+    assert_eq!(register_names(&events), [POLICY_NAME]);
     assert!(first.registered, "the first call must register the vault");
     assert!(first.signed, "the first call must sign");
     assert_eq!(first.fingerprint, vault.device_fingerprint);
@@ -271,62 +341,68 @@ fn refuses_a_vault_without_a_key_of_the_device() {
   });
 }
 
-/// A device that holds another wallet under the name `swan_vault` refuses a second one.
+/// The device refuses a second wallet under the name `swan_vault`, and it says so only after the
+/// user confirmed the keys. SVRA then registers the vault under a name of its own.
 #[test]
-fn reports_a_name_that_another_wallet_holds() {
+fn registers_under_a_fallback_name_when_another_wallet_holds_the_name() {
   let _turn = one_at_a_time();
   let _simulator = Simulator::start();
   run(async {
     seed_simulator().await;
-
-    // Register another policy, of two keys, under the name that the vault uses.
-    {
-      let secp = Secp256k1::new();
-      let path = account_path(NetworkKind::Test);
-      let account = simulator_xprv()
-        .derive_priv(&secp, &path)
-        .expect("the account derives");
-      let other_account = master_key(0x42, NetworkKind::Test)
-        .derive_priv(&secp, &path)
-        .expect("the account derives");
-      let keys = [
-        KeyOriginInfo {
-          root_fingerprint: Some(support::fingerprint_of(&simulator_xprv())),
-          keypath: Some((&path).into()),
-          xpub: Xpub::from_priv(&secp, &account),
-        },
-        KeyOriginInfo {
-          root_fingerprint: None,
-          keypath: None,
-          xpub: Xpub::from_priv(&secp, &other_account),
-        },
-      ];
-      let config = bitbox_api::btc::make_script_config_policy("wsh(multi(2,@0/**,@1/**))", &keys);
-      let paired = connect()
-        .await
-        .unlock_and_pair()
-        .await
-        .expect("unlock and pair")
-        .wait_confirm()
-        .await
-        .expect("confirm the pairing");
-      paired
-        .btc_register_script_config(
-          BtcCoin::Tbtc,
-          &config,
-          None,
-          XPubType::AutoXpubTpub,
-          Some(POLICY_NAME),
-        )
-        .await
-        .expect("the simulator registers the other wallet");
-    }
+    register_other_wallet(POLICY_NAME, 0x61).await;
 
     let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
+    let unsigned = vault.sweep_psbt();
+    let fallback = fallback_name(&vault);
+
+    let (result, events) = sign(&vault, Network::Testnet, unsigned.clone()).await;
+    let first = result.expect("the vault is registered under the fallback name and signed");
+    assert_eq!(
+      labels(&events),
+      [
+        "unlock",
+        "confirm-pairing",
+        "checking-registration",
+        "register",
+        "register",
+        "sign"
+      ]
+    );
+    assert_eq!(register_names(&events), [POLICY_NAME, fallback.as_str()]);
+    assert!(first.registered && first.signed);
+    assert_signed_by_the_device_only(&unsigned, &first.psbt, &vault);
+    let mut both = first.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
+
+    // The device finds the vault by its hash, so the next run does not register again.
+    let (result, events) = sign(&vault, Network::Testnet, unsigned.clone()).await;
+    let second = result.expect("the second signing works");
+    assert_eq!(
+      labels(&events),
+      ["unlock", "confirm-pairing", "checking-registration", "sign"]
+    );
+    assert!(second.signed && !second.registered);
+    assert_signed_by_the_device_only(&unsigned, &second.psbt, &vault);
+  });
+}
+
+/// Another wallet holds the fallback name too, so there is no name left to try.
+#[test]
+fn refuses_a_vault_when_both_names_are_held_by_other_wallets() {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
     let psbt = vault.sweep_psbt();
+    let fallback = fallback_name(&vault);
+    register_other_wallet(POLICY_NAME, 0x61).await;
+    register_other_wallet(&fallback, 0x62).await;
+
     let (result, events) = sign(&vault, Network::Testnet, psbt).await;
     let error = match result {
-      Ok(_) => panic!("the device registered a second wallet under the same name"),
+      Ok(_) => panic!("the device registered a third wallet under a name that is taken"),
       Err(error) => error,
     };
     assert_eq!(error.kind, ErrorKind::PolicyNameTaken, "{}", error.message);
@@ -336,18 +412,105 @@ fn reports_a_name_that_another_wallet_holds() {
         "unlock",
         "confirm-pairing",
         "checking-registration",
+        "register",
         "register"
       ]
     );
+    assert_eq!(register_names(&events), [POLICY_NAME, fallback.as_str()]);
   });
 }
 
-/// Regtest needs firmware 9.21.0. In the firmware source of 9.27.0, `check_enabled` in
-/// `policies.rs` lets only `Btc` and `Tbtc` use a wallet policy, so the device is expected to
-/// refuse the vault here. The test takes both outcomes, so that it keeps passing when a firmware
-/// adds regtest policies, and then it checks the signing as in the testnet test.
+/// The production path: mainnet keys are xpubs on `m/48'/0'/0'/2'`, and the device is asked for
+/// the `Btc` coin.
 #[test]
-fn handles_regtest() {
+fn signs_a_mainnet_vault() {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::new(&simulator_xprv(), Network::Bitcoin);
+    assert!(
+      vault.receive_descriptor.contains("/48'/0'/0'/2']xpub"),
+      "{}",
+      vault.receive_descriptor
+    );
+    let unsigned = vault.sweep_psbt();
+
+    let (result, events) = sign(&vault, Network::Bitcoin, unsigned.clone()).await;
+    let first = result.expect("the mainnet vault is registered and signed");
+    assert_eq!(
+      labels(&events),
+      [
+        "unlock",
+        "confirm-pairing",
+        "checking-registration",
+        "register",
+        "sign"
+      ]
+    );
+    assert!(first.registered && first.signed);
+    assert_signed_by_the_device_only(&unsigned, &first.psbt, &vault);
+    let mut both = first.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
+
+    let (result, events) = sign(&vault, Network::Bitcoin, unsigned.clone()).await;
+    let second = result.expect("the second signing works");
+    assert_eq!(
+      labels(&events),
+      ["unlock", "confirm-pairing", "checking-registration", "sign"]
+    );
+    assert!(second.signed && !second.registered);
+  });
+}
+
+/// Signs a vault that has the key of the device at position `slot` of the descriptor. The policy
+/// keeps the order of the descriptor, so a signer that assumed a position would sign for another
+/// wallet.
+fn signs_with_the_device_key_at(slot: usize) {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::with_device_at(&simulator_xprv(), Network::Testnet, slot);
+    let artifact = build_policy(
+      &vault.receive_descriptor,
+      Some(&vault.change_descriptor),
+      vault.device_fingerprint,
+    )
+    .expect("the policy is built");
+    assert_eq!(artifact.our_key_index, slot);
+    let unsigned = vault.sweep_psbt();
+
+    let (result, _) = sign(&vault, Network::Testnet, unsigned.clone()).await;
+    let outcome = result.expect("the vault is registered and signed");
+    assert!(outcome.registered && outcome.signed);
+    assert_signed_by_the_device_only(&unsigned, &outcome.psbt, &vault);
+    let mut both = outcome.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
+  });
+}
+
+#[test]
+fn signs_when_the_device_key_is_first() {
+  signs_with_the_device_key_at(0);
+}
+
+#[test]
+fn signs_when_the_device_key_is_second() {
+  signs_with_the_device_key_at(1);
+}
+
+#[test]
+fn signs_when_the_device_key_is_last() {
+  signs_with_the_device_key_at(2);
+}
+
+/// The firmware accepts wallet policies for `Btc` and `Tbtc` only, so SVRA asks for `Tbtc` on
+/// regtest. The vault signs like a testnet vault.
+#[test]
+fn signs_a_regtest_vault_with_the_testnet_coin() {
   let _turn = one_at_a_time();
   let _simulator = Simulator::start();
   run(async {
@@ -356,31 +519,21 @@ fn handles_regtest() {
     let unsigned = vault.sweep_psbt();
 
     let (result, events) = sign(&vault, Network::Regtest, unsigned.clone()).await;
-    match result {
-      Ok(outcome) => {
-        println!("this simulator signs wallet policies on regtest");
-        assert!(outcome.signed && outcome.registered);
-        assert_signed_by_the_device_only(&unsigned, &outcome.psbt, &vault);
-        let mut both = outcome.psbt;
-        sign_with(&vault.keys.software_xprv, &mut both);
-        vault.finalize_and_verify(both);
-      }
-      Err(error) => {
-        println!("this simulator refuses wallet policies on regtest: {error}");
-        match error.kind {
-          ErrorKind::FirmwareTooOld => {}
-          ErrorKind::Other => assert!(
-            error.message.contains("regtest"),
-            "the message names regtest: {}",
-            error.message
-          ),
-          other => panic!("unexpected error {other:?}: {}", error.message),
-        }
-        assert!(
-          !labels(&events).contains(&"sign"),
-          "nothing may be signed after the refusal"
-        );
-      }
-    }
+    let outcome = result.expect("the regtest vault is registered and signed");
+    assert_eq!(
+      labels(&events),
+      [
+        "unlock",
+        "confirm-pairing",
+        "checking-registration",
+        "register",
+        "sign"
+      ]
+    );
+    assert!(outcome.registered && outcome.signed);
+    assert_signed_by_the_device_only(&unsigned, &outcome.psbt, &vault);
+    let mut both = outcome.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
   });
 }
