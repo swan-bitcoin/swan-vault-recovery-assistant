@@ -19,7 +19,10 @@ export function getBitbox02StepMessage(update: Bitbox02Progress): Bitbox02StepMe
     case 'connecting':
       return { loading: 'Connecting to your BitBox02…' }
     case 'unlock':
-      return { loading: WAITING, bubble: 'Unlock your BitBox02. Enter your password on the device if it asks.' }
+      return {
+        loading: WAITING,
+        bubble: 'Unlock your BitBox02. Enter your password on the device if it asks. To stop, unplug the BitBox02.',
+      }
     case 'confirm-pairing':
       return {
         loading: WAITING,
@@ -31,10 +34,11 @@ export function getBitbox02StepMessage(update: Bitbox02Progress): Bitbox02StepMe
     case 'register':
       return {
         loading: WAITING,
+        // an unexpected registration can mean that the pasted descriptor is not the customer's vault, so both texts say when to stop
         bubble:
           update.name === WALLET_NAME
-            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device.`
-            : `The name ${WALLET_NAME} is already used for another wallet on this BitBox02. SVRA registers this wallet as ${update.name}. The device shows the wallet with its keys. Compare each key with your recovery kit again, then confirm on the device.`,
+            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device. If this BitBox02 was not reset and has signed for this vault before, stop and check the descriptor against your recovery kit.`
+            : `This BitBox02 already holds a different wallet named ${WALLET_NAME}. This is expected only if you used this device for another Swan vault. If not, stop and check the descriptor against your recovery kit. To continue, compare each key with your recovery kit again, then confirm on the device, where the wallet shows as ${update.name}.`,
       }
     case 'sign':
       return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }

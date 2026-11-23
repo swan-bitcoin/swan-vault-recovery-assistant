@@ -232,7 +232,7 @@ impl ParsedVault {
         return Err(Error::new(
           ErrorKind::KeyNotInVault,
           format!(
-            "The connected BitBox02 (fingerprint {our_root_fingerprint}) does not hold a key of this vault. Connect the BitBox02 that holds one of the vault keys."
+            "The connected BitBox02 (fingerprint {our_root_fingerprint}) does not hold a key of this vault. Connect the BitBox02 that holds one of the vault keys. A BitBox02 with the optional passphrase has a different key for each passphrase, so check the passphrase. To sign with another device, unplug this BitBox02."
           ),
         ))
       }
@@ -677,7 +677,14 @@ mod tests {
       ErrorKind::KeyNotInVault,
     );
     assert!(error.message.contains("deadbeef"), "{}", error.message);
-    assert!(error.message.contains("BitBox02"), "{}", error.message);
+    assert!(error.message.contains("passphrase"), "{}", error.message);
+    assert!(
+      error
+        .message
+        .contains("To sign with another device, unplug this BitBox02."),
+      "{}",
+      error.message
+    );
   }
 
   #[test]

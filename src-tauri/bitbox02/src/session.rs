@@ -158,7 +158,7 @@ pub async fn sign_psbt<R: Runtime>(
   let pairing = device
     .unlock_and_pair()
     .await
-    .map_err(|error| map_device_error(error, Step::Connect))?;
+    .map_err(|error| map_device_error(error, Step::Unlock))?;
   if let Some(code) = pairing.get_pairing_code() {
     on_progress(Progress::ConfirmPairing { code });
   }

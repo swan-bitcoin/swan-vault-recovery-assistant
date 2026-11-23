@@ -253,6 +253,7 @@ class DeviceError extends Error {
   }
 }
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
+const isBitbox02 = (device) => device.type === 'bitbox02'
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -274,13 +275,12 @@ function getDeviceMessage(val) {
   }
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
   devices.forEach((device, index, arr) => {
-    const isBitbox02 = device.type === 'bitbox02'
-    message = message.concat(`${isBitbox02 ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
+    message = message.concat(`${isBitbox02(device) ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
     if (device.error) {
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
-    } else if (isBitbox02) {
+    } else if (isBitbox02(device)) {
       message = message.concat('(the fingerprint shows after the device is unlocked)')
     } else {
       message = message.concat('with no fingerprint')
@@ -292,6 +292,11 @@ function getDeviceMessage(val) {
   if (devices.length > 1) {
     message = message.concat(']')
   }
+  if (devices.some(isBitbox02)) {
+    message = message.concat(
+      '. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
+    )
+  }
   return message
 }
 function getDevicePrompt(val) {
@@ -300,6 +305,9 @@ function getDevicePrompt(val) {
     return 'Make sure your device is connected. Perhaps try a different cable.'
   }
   if (devices.length === 1) {
+    if (isBitbox02(devices[0]) && devices[0].error) {
+      return 'This BitBox02 cannot sign yet. Read the error above first.'
+    }
     return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'

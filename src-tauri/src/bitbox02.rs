@@ -69,7 +69,7 @@ fn devices_json(devices: &[DetectedDevice]) -> Result<String, SvraError> {
       });
       if device.bootloader {
         entry["error"] = json!(
-          "The BitBox02 is in bootloader mode. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp."
+          "The BitBox02 is in bootloader mode. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp. To sign with another device, unplug this BitBox02."
         );
         entry["code"] = json!(HWI_DEVICE_NOT_READY);
       }

@@ -51,8 +51,9 @@ jobs:
   rust-test:
     name: rust tests
     runs-on: ubuntu-latest
-    # This job compiles third-party build scripts and runs a downloaded binary, so it gets no
-    # token and leaves none on disk.
+    # This job compiles third-party build scripts and runs a downloaded binary. Its GITHUB_TOKEN
+    # is read-only, and neither that token nor the token for the private actions stays in the git
+    # config of a checkout.
     permissions:
       contents: read
     env:

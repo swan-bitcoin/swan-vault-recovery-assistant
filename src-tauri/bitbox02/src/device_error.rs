@@ -10,8 +10,10 @@ use bitbox_api::pb::BtcCoin;
 /// different steps.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Step {
-  /// Opening the device, unlocking it and the first query.
+  /// Opening the device and its first query.
   Connect,
+  /// The unlock request, which waits for the password, and the pairing handshake that follows.
+  Unlock,
   /// Confirming the pairing code.
   Pair,
   /// Reading the device info and the fingerprint.
@@ -33,14 +35,25 @@ fn error(kind: ErrorKind, message: impl Into<String>) -> Error {
   Error::new(kind, message)
 }
 
-fn communication_error(step: Step) -> Error {
-  let message = match step {
-    Step::Connect => format!(
-      "SVRA cannot talk to the BitBox02. Close the BitBoxApp, because only one program can use the BitBox02. {RESTART_ADVICE}"
+fn lost_contact() -> Error {
+  error(
+    ErrorKind::Communication,
+    format!(
+      "SVRA lost contact with the BitBox02. If the BitBoxApp is open, close it. {RESTART_ADVICE}"
     ),
-    _ => format!("SVRA lost contact with the BitBox02. {RESTART_ADVICE}"),
-  };
-  error(ErrorKind::Communication, message)
+  )
+}
+
+fn communication_error(step: Step) -> Error {
+  match step {
+    Step::Connect | Step::Unlock => error(
+      ErrorKind::Communication,
+      format!(
+        "SVRA cannot talk to the BitBox02. Close the BitBoxApp, because only one program can use the BitBox02. {RESTART_ADVICE}"
+      ),
+    ),
+    _ => lost_contact(),
+  }
 }
 
 fn invalid_input(step: Step) -> Error {
@@ -53,7 +66,7 @@ fn invalid_input(step: Step) -> Error {
       ErrorKind::InvalidPsbt,
       "The BitBox02 refused the transaction. Check that the transaction and the descriptors come from the same vault, and that the PSBT holds the full previous transactions.",
     ),
-    Step::Connect | Step::Pair | Step::Query => error(
+    Step::Connect | Step::Unlock | Step::Pair | Step::Query => error(
       ErrorKind::Other,
       format!("The BitBox02 refused a request. {RESTART_ADVICE}"),
     ),
@@ -109,9 +122,10 @@ pub(crate) fn map_device_error(device_error: DeviceError, step: Step) -> Error {
         "The BitBox02 could not store the vault. Its list of registered wallets may be full, because it holds 25. {RESET_ADVICE}"
       ),
     ),
-    // The library turns every failure of the unlock request into this error, so here it means
-    // that the device went away.
-    DeviceError::Unknown if matches!(step, Step::Connect) => communication_error(step),
+    // The library turns every failure of the unlock request into this error. The request waits
+    // for the password, and the device cannot cancel that wait, so unplugging is the normal way
+    // out and this error means that the device went away.
+    DeviceError::Unknown if matches!(step, Step::Unlock) => lost_contact(),
     DeviceError::BitBox(BitBoxError::InvalidInput) => invalid_input(step),
     DeviceError::BitBox(BitBoxError::Memory) => error(
       ErrorKind::Other,
@@ -289,9 +303,42 @@ mod tests {
   fn an_unknown_error_while_connecting_is_a_lost_connection() {
     // The device library returns it when the unlock request fails, for example when the user
     // unplugs the device.
-    let mapped = map(DeviceError::Unknown, Step::Connect);
+    let mapped = map(DeviceError::Unknown, Step::Unlock);
     assert_eq!(mapped.kind, ErrorKind::Communication);
-    assert!(mapped.message.contains("BitBox02"), "{}", mapped.message);
+    assert!(
+      mapped
+        .message
+        .starts_with("SVRA lost contact with the BitBox02."),
+      "{}",
+      mapped.message
+    );
+  }
+
+  #[test]
+  fn an_unknown_error_outside_the_unlock_step_is_not_a_lost_connection() {
+    let mapped = map(DeviceError::Unknown, Step::Connect);
+    assert_eq!(mapped.kind, ErrorKind::Other);
+  }
+
+  #[test]
+  fn a_failed_pairing_handshake_asks_to_close_the_bitbox_app() {
+    let mapped = map(DeviceError::Noise, Step::Unlock);
+    assert_eq!(mapped.kind, ErrorKind::Communication);
+    assert!(mapped.message.contains("BitBoxApp"), "{}", mapped.message);
+  }
+
+  #[test]
+  fn a_lost_connection_asks_to_close_the_bitbox_app_and_to_unplug() {
+    let mapped = map(DeviceError::Noise, Step::Sign(BtcCoin::Btc));
+    assert_eq!(mapped.kind, ErrorKind::Communication);
+    assert!(
+      mapped
+        .message
+        .contains("If the BitBoxApp is open, close it."),
+      "{}",
+      mapped.message
+    );
+    assert!(mapped.message.contains("Unplug"), "{}", mapped.message);
   }
 
   #[test]

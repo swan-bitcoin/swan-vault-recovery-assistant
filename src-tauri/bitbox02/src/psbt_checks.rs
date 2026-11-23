@@ -2,11 +2,11 @@
 
 use crate::error::{Error, ErrorKind};
 use crate::policy::Vault;
-use bitcoin::bip32::{ChildNumber, DerivationPath, Fingerprint};
+use bitcoin::bip32::{ChildNumber, DerivationPath, Fingerprint, KeySource};
 use bitcoin::blockdata::script::Builder;
 use bitcoin::hashes::Hash;
 use bitcoin::opcodes::all::OP_CHECKMULTISIG;
-use bitcoin::psbt::{Input, Psbt, PsbtSighashType};
+use bitcoin::psbt::{Input, Output, Psbt, PsbtSighashType};
 use bitcoin::secp256k1::{Message, PublicKey as SecpPublicKey, Secp256k1};
 use bitcoin::sighash::{EcdsaSighashType, SighashCache};
 use bitcoin::{PublicKey, ScriptBuf, TxIn, TxOut};
@@ -54,14 +54,39 @@ fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<
   Ok(spent)
 }
 
-/// The key of the device in an input: the first key with its fingerprint, as the vendor
-/// library picks it.
-fn our_key(input: &Input, fingerprint: Fingerprint) -> Option<(SecpPublicKey, &DerivationPath)> {
-  input
-    .bip32_derivation
+/// The key of the device among the key origins of an input or an output: the first key with its
+/// fingerprint, as the vendor library picks it.
+fn key_of_device(
+  key_origins: &BTreeMap<SecpPublicKey, KeySource>,
+  fingerprint: Fingerprint,
+) -> Option<(SecpPublicKey, &DerivationPath)> {
+  key_origins
     .iter()
     .find(|(_, (key_fingerprint, _))| *key_fingerprint == fingerprint)
     .map(|(public_key, (_, path))| (*public_key, path))
+}
+
+/// The key of the device in an input.
+fn our_key(input: &Input, fingerprint: Fingerprint) -> Option<(SecpPublicKey, &DerivationPath)> {
+  key_of_device(&input.bip32_derivation, fingerprint)
+}
+
+/// True when an input holds a taproot field. The vendor library reads the taproot key origins
+/// before the BIP-32 ones, so such a field decides which key and path the device gets.
+fn input_has_taproot_fields(input: &Input) -> bool {
+  input.tap_key_sig.is_some()
+    || !input.tap_script_sigs.is_empty()
+    || !input.tap_scripts.is_empty()
+    || !input.tap_key_origins.is_empty()
+    || input.tap_internal_key.is_some()
+    || input.tap_merkle_root.is_some()
+}
+
+/// The same for an output.
+fn output_has_taproot_fields(output: &Output) -> bool {
+  output.tap_internal_key.is_some()
+    || output.tap_tree.is_some()
+    || !output.tap_key_origins.is_empty()
 }
 
 /// The keychain and the address index of `path`, when `path` is the account keypath of the
@@ -134,6 +159,11 @@ pub(crate) fn precheck(
   let mut keys = Vec::with_capacity(psbt.inputs.len());
   for (index, (tx_input, input)) in psbt.unsigned_tx.input.iter().zip(&psbt.inputs).enumerate() {
     let number = index + 1;
+    if input_has_taproot_fields(input) {
+      return Err(invalid_psbt(format!(
+        "Input {number} has taproot fields, but a Swan vault is not a taproot wallet. The PSBT is damaged, or it comes from another wallet."
+      )));
+    }
     let spent = spent_output(number, tx_input, input)?;
 
     let witness_script = input.witness_script.as_ref().ok_or_else(|| {
@@ -185,7 +215,44 @@ pub(crate) fn precheck(
     }
     keys.push(public_key);
   }
+  check_outputs(psbt, fingerprint, vault)?;
   Ok(keys)
+}
+
+/// Checks the outputs that claim to belong to the device. The device does not show such an output
+/// as a payment, so its script must be the vault's script at the key path that the PSBT gives.
+fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result<(), Error> {
+  if psbt.outputs.len() != psbt.unsigned_tx.output.len() {
+    return Err(invalid_psbt(
+      "The PSBT does not have one output record for each transaction output. The PSBT is damaged.",
+    ));
+  }
+  for (index, (tx_output, output)) in psbt
+    .unsigned_tx
+    .output
+    .iter()
+    .zip(&psbt.outputs)
+    .enumerate()
+  {
+    let number = index + 1;
+    if output_has_taproot_fields(output) {
+      return Err(invalid_psbt(format!(
+        "Output {number} has taproot fields, but a Swan vault is not a taproot wallet. The PSBT is damaged, or it comes from another wallet."
+      )));
+    }
+    let Some((_, path)) = key_of_device(&output.bip32_derivation, fingerprint) else {
+      continue;
+    };
+    let vault_script = address_steps(vault, path)
+      .and_then(|steps| vault_witness_script(vault, &steps))
+      .map(|witness_script| ScriptBuf::new_p2wsh(&witness_script.wscript_hash()));
+    if vault_script.as_ref() != Some(&tx_output.script_pubkey) {
+      return Err(invalid_psbt(format!(
+        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path. The BitBox02 would not show it as a payment. The PSBT is damaged, or someone changed it."
+      )));
+    }
+  }
+  Ok(())
 }
 
 /// Checks the signature of `key` on one input of `psbt` against the BIP-143 hash of the
@@ -307,6 +374,7 @@ mod tests {
   use crate::test_support::{
     descriptor, fingerprint_of, master_key, sign_with, simulator_xprv, Vault as Fixture, ORDERS,
   };
+  use bitcoin::bip32::KeySource;
   use bitcoin::{absolute::LockTime, transaction, Amount, Network, NetworkKind, Transaction};
 
   struct Case {
@@ -566,6 +634,112 @@ mod tests {
       "{}",
       error.message
     );
+  }
+
+  /// The key of the device in input 0 and its key origin.
+  fn device_key_origin(case: &Case) -> (SecpPublicKey, KeySource) {
+    case.psbt.inputs[0]
+      .bip32_derivation
+      .iter()
+      .find(|(_, (fingerprint, _))| *fingerprint == case.fingerprint)
+      .map(|(key, source)| (*key, source.clone()))
+      .expect("a key of the device")
+  }
+
+  #[test]
+  fn refuses_taproot_fields_on_an_input() {
+    let case = case();
+    let (device_key, source) = device_key_origin(&case);
+    let x_only = device_key.x_only_public_key().0;
+    let mut psbt = case.psbt.clone();
+    psbt.inputs[1].tap_internal_key = Some(x_only);
+    let error = precheck_error(&case, &psbt);
+    assert!(error.message.contains("Input 2"), "{}", error.message);
+    assert!(error.message.contains("taproot"), "{}", error.message);
+
+    // The device fingerprint under a taproot key origin is what the vendor library reads first.
+    let mut psbt = case.psbt.clone();
+    psbt.inputs[0]
+      .tap_key_origins
+      .insert(x_only, (vec![], source));
+    let error = precheck_error(&case, &psbt);
+    assert!(error.message.contains("taproot"), "{}", error.message);
+  }
+
+  #[test]
+  fn refuses_taproot_fields_on_an_output() {
+    let mut case = case();
+    let (device_key, source) = device_key_origin(&case);
+    case.psbt.outputs[0].tap_internal_key = Some(device_key.x_only_public_key().0);
+    let error = precheck_error(&case, &case.psbt);
+    assert!(error.message.contains("Output 1"), "{}", error.message);
+    assert!(error.message.contains("taproot"), "{}", error.message);
+
+    case.psbt.outputs[0].tap_internal_key = None;
+    case.psbt.outputs[0]
+      .tap_key_origins
+      .insert(device_key.x_only_public_key().0, (vec![], source));
+    let error = precheck_error(&case, &case.psbt);
+    assert!(error.message.contains("taproot"), "{}", error.message);
+  }
+
+  #[test]
+  fn refuses_an_output_that_claims_a_vault_address_but_pays_elsewhere() {
+    // The sweep pays to a key of the cosigner. Listing the key path of the device on that output
+    // would make the device treat it as an address of the wallet and not show it.
+    let mut case = case();
+    let (device_key, source) = device_key_origin(&case);
+    case.psbt.outputs[0]
+      .bip32_derivation
+      .insert(device_key, source);
+    let error = precheck_error(&case, &case.psbt);
+    assert!(error.message.contains("Output 1"), "{}", error.message);
+    assert!(
+      error.message.contains("not the vault's script"),
+      "{}",
+      error.message
+    );
+  }
+
+  #[test]
+  fn refuses_an_output_with_a_key_path_that_is_not_in_the_vault() {
+    let mut case = case();
+    let (device_key, (fingerprint, path)) = device_key_origin(&case);
+    let mut numbers = path.to_u32_vec();
+    numbers[2] += 1;
+    let moved: DerivationPath = numbers
+      .into_iter()
+      .map(ChildNumber::from)
+      .collect::<Vec<_>>()
+      .into();
+    case.psbt.unsigned_tx.output[0].script_pubkey = case.psbt.inputs[0]
+      .witness_utxo
+      .clone()
+      .expect("a utxo")
+      .script_pubkey;
+    case.psbt.outputs[0]
+      .bip32_derivation
+      .insert(device_key, (fingerprint, moved));
+    let error = precheck_error(&case, &case.psbt);
+    assert!(error.message.contains("Output 1"), "{}", error.message);
+  }
+
+  #[test]
+  fn accepts_an_output_that_is_an_address_of_the_vault() {
+    // Sweeping to an address of the same wallet: the output lists the key path of the device,
+    // and its script is the vault's script at that path.
+    let mut case = case();
+    let (device_key, source) = device_key_origin(&case);
+    case.psbt.unsigned_tx.output[0].script_pubkey = case.psbt.inputs[0]
+      .witness_utxo
+      .clone()
+      .expect("a utxo")
+      .script_pubkey;
+    case.psbt.outputs[0]
+      .bip32_derivation
+      .insert(device_key, source);
+    case.psbt.outputs[0].witness_script = case.psbt.inputs[0].witness_script.clone();
+    precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
   }
 
   #[test]

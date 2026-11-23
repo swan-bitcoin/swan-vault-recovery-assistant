@@ -3,8 +3,8 @@ use crate::error::{Error, ErrorKind};
 use crate::session::{sign_psbt, Progress, SignOutcome, SignRequest};
 use bitbox_api::runtime::TokioRuntime;
 use bitbox_api::{BitBox, NoiseConfigNoCache};
-use hidapi::HidApi;
-use std::ffi::CString;
+use hidapi::{HidApi, HidDevice};
+use std::ffi::{CStr, CString};
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
 /// USB vendor id of every BitBox02 (Microchip, the maker of its microcontroller).
@@ -37,7 +37,7 @@ const MODELS: [(&str, &str, &str); 4] = [
   ),
 ];
 
-const NOT_FOUND_MESSAGE: &str = "No BitBox02 found. Connect the BitBox02 and unlock it. Close the BitBoxApp, because only one program can use the BitBox02 at a time.";
+const NOT_FOUND_MESSAGE: &str = "No BitBox02 found. Connect the BitBox02. Close the BitBoxApp, because only one program can use the BitBox02 at a time.";
 
 /// Held for the whole of one device session. A second session on the same device would wait for
 /// the first one without end, because the vendor library asks again each time the device answers
@@ -67,6 +67,12 @@ fn open_error() -> Error {
     );
   }
   Error::new(ErrorKind::Communication, message)
+}
+
+/// Opens a device that the scan listed. A failure here is not a missing device, so it has its own
+/// error.
+fn open_device(api: &HidApi, path: &CStr) -> Result<HidDevice, Error> {
+  api.open_path(path).map_err(|_| open_error())
 }
 
 /// A BitBox02 found on USB. Finding it does not talk to the device.
@@ -172,7 +178,7 @@ fn select_device(devices: &[DetectedDevice]) -> Result<usize, Error> {
   if devices.iter().any(|device| device.bootloader) {
     return Err(Error::new(
       ErrorKind::Bootloader,
-      "The BitBox02 is in bootloader mode and has no firmware running. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp.",
+      "The BitBox02 is in bootloader mode and has no firmware running. Unplug it and plug it in again to start it normally, or install the firmware with the BitBoxApp. To sign with another device, unplug this BitBox02.",
     ));
   }
   if devices.len() > 1 {
@@ -200,7 +206,7 @@ pub fn sign_psbt_usb(
   let mut found = find_devices(&api);
   let devices: Vec<DetectedDevice> = found.iter().map(|found| found.device.clone()).collect();
   let chosen = found.swap_remove(select_device(&devices)?);
-  let hid_device = api.open_path(&chosen.path).map_err(|_| open_error())?;
+  let hid_device = open_device(&api, &chosen.path)?;
 
   // One thread runs the device library, the HID reads and the progress callback. The device
   // library sleeps through the runtime, so the time driver must be on.
@@ -286,12 +292,21 @@ mod tests {
     let error = select_device(&[]).expect_err("no device");
     assert_eq!(error.kind, ErrorKind::DeviceNotFound);
     assert!(error.message.contains("BitBoxApp"));
+    assert!(error.message.contains("Connect the BitBox02."));
+    assert!(!error.message.contains("unlock"), "{}", error.message);
   }
 
   #[test]
   fn a_bootloader_device_is_reported_as_a_bootloader() {
     let error = select_device(&[device(true)]).expect_err("bootloader");
     assert_eq!(error.kind, ErrorKind::Bootloader);
+    assert!(
+      error
+        .message
+        .contains("To sign with another device, unplug this BitBox02."),
+      "{}",
+      error.message
+    );
   }
 
   #[test]
@@ -364,8 +379,15 @@ mod tests {
   }
 
   #[test]
-  fn an_open_failure_is_a_communication_error_and_not_a_missing_device() {
-    let error = open_error();
+  fn a_device_that_cannot_be_opened_is_a_communication_error_and_not_a_missing_device() {
+    // No device has this path, so the operating system refuses to open it, as it does for a
+    // BitBox02 that the BitBoxApp holds or that the user may not open.
+    let api = HidApi::new().expect("the HID library starts");
+    let path = CString::new("/dev/svra-no-such-hidraw").expect("a path without a nul byte");
+    let error = match open_device(&api, &path) {
+      Ok(_) => panic!("a device that does not exist was opened"),
+      Err(error) => error,
+    };
     assert_eq!(error.kind, ErrorKind::Communication);
     assert!(error.message.contains("found"), "{}", error.message);
     assert!(error.message.contains("BitBoxApp"), "{}", error.message);

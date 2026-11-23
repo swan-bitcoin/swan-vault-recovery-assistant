@@ -191,14 +191,30 @@ async fn sign(
   network: Network,
   psbt: Psbt,
 ) -> (Result<SignOutcome, Error>, Vec<Progress>) {
+  sign_with_descriptors(
+    &vault.receive_descriptor,
+    Some(&vault.change_descriptor),
+    network,
+    psbt,
+  )
+  .await
+}
+
+/// Like [`sign`], with the descriptors that the user pasted.
+async fn sign_with_descriptors(
+  receive_descriptor: &str,
+  change_descriptor: Option<&str>,
+  network: Network,
+  psbt: Psbt,
+) -> (Result<SignOutcome, Error>, Vec<Progress>) {
   let device = connect().await;
   let mut events = Vec::new();
   let result = sign_psbt(
     device,
     SignRequest {
       network,
-      receive_descriptor: &vault.receive_descriptor,
-      change_descriptor: Some(&vault.change_descriptor),
+      receive_descriptor,
+      change_descriptor,
       psbt,
     },
     &mut |progress| events.push(progress),
@@ -535,5 +551,101 @@ fn signs_a_regtest_vault_with_the_testnet_coin() {
     let mut both = outcome.psbt;
     sign_with(&vault.keys.software_xprv, &mut both);
     vault.finalize_and_verify(both);
+  });
+}
+
+/// The other key signed first, as when the vault is signed with a Jade and then with the BitBox02.
+/// The device must keep that signature, add its own, and leave a PSBT that finalizes.
+#[test]
+fn adds_its_signature_to_a_psbt_that_the_other_key_signed_first() {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
+    let mut psbt = vault.sweep_psbt();
+    sign_with(&vault.keys.software_xprv, &mut psbt);
+    let software_signatures: Vec<_> = psbt
+      .inputs
+      .iter()
+      .map(|input| input.partial_sigs.clone())
+      .collect();
+
+    let (result, _) = sign(&vault, Network::Testnet, psbt.clone()).await;
+    let outcome = result.expect("the device signs the half-signed PSBT");
+    assert!(outcome.signed && outcome.registered);
+    for (input, software) in outcome.psbt.inputs.iter().zip(&software_signatures) {
+      assert_eq!(input.partial_sigs.len(), 2);
+      for (key, signature) in software {
+        assert_eq!(input.partial_sigs.get(key), Some(signature));
+      }
+    }
+    let transaction = vault.finalize_and_verify(outcome.psbt);
+    assert_eq!(transaction.input.len(), psbt.inputs.len());
+  });
+}
+
+/// The user may paste only the receive descriptor. The sweep still spends a change UTXO, and the
+/// policy covers both keychains.
+#[test]
+fn signs_a_change_input_when_only_the_receive_descriptor_is_given() {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
+    let unsigned = vault.sweep_psbt();
+    let spends_change = unsigned.inputs.iter().any(|input| {
+      input.bip32_derivation.values().any(|(fingerprint, path)| {
+        *fingerprint == vault.device_fingerprint && path.to_u32_vec()[4] == 1
+      })
+    });
+    assert!(spends_change, "the sweep must spend a change input");
+
+    let (result, _) = sign_with_descriptors(
+      &vault.receive_descriptor,
+      None,
+      Network::Testnet,
+      unsigned.clone(),
+    )
+    .await;
+    let outcome = result.expect("the receive descriptor is enough");
+    assert!(outcome.registered && outcome.signed);
+    assert_signed_by_the_device_only(&unsigned, &outcome.psbt, &vault);
+    let mut both = outcome.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
+  });
+}
+
+/// One multipath descriptor `/<0;1>/*` stands for both keychains. It gives the same policy as the
+/// pair of descriptors, so the device finds the registration that the multipath run made.
+#[test]
+fn signs_with_one_multipath_descriptor() {
+  let _turn = one_at_a_time();
+  let _simulator = Simulator::start();
+  run(async {
+    seed_simulator().await;
+    let mut vault = Vault::new(&simulator_xprv(), Network::Testnet);
+    let unsigned = vault.sweep_psbt();
+
+    let (result, _) = sign_with_descriptors(
+      &vault.multipath_descriptor,
+      None,
+      Network::Testnet,
+      unsigned.clone(),
+    )
+    .await;
+    let outcome = result.expect("the multipath descriptor is enough");
+    assert!(outcome.registered && outcome.signed);
+    assert_signed_by_the_device_only(&unsigned, &outcome.psbt, &vault);
+    let mut both = outcome.psbt;
+    sign_with(&vault.keys.software_xprv, &mut both);
+    vault.finalize_and_verify(both);
+
+    let (result, events) = sign(&vault, Network::Testnet, unsigned.clone()).await;
+    let second = result.expect("the pair of descriptors signs too");
+    assert!(second.signed && !second.registered);
+    assert!(!labels(&events).contains(&"register"));
   });
 }

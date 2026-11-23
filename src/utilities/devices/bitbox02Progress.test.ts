@@ -6,9 +6,9 @@ describe('getBitbox02StepMessage()', () => {
     expect(getBitbox02StepMessage({ step: 'connecting' })).toStrictEqual({ loading: 'Connecting to your BitBox02…' })
   })
 
-  it('should tell the user to enter the password', () => {
+  it('should tell the user to enter the password, and how to stop', () => {
     expect(getBitbox02StepMessage({ step: 'unlock' }).bubble).toBe(
-      'Unlock your BitBox02. Enter your password on the device if it asks.'
+      'Unlock your BitBox02. Enter your password on the device if it asks. To stop, unplug the BitBox02.'
     )
   })
 
@@ -32,14 +32,20 @@ describe('getBitbox02StepMessage()', () => {
     expect(bubble).toContain('normal after a reset')
     expect(bubble).toContain('wallet named swan_vault')
     expect(bubble).toContain('recovery kit')
-    expect(bubble).not.toContain('already used')
+    expect(bubble).toContain(
+      'If this BitBox02 was not reset and has signed for this vault before, stop and check the descriptor against your recovery kit.'
+    )
+    expect(bubble).not.toContain('already holds')
   })
 
   it('should say that swan_vault is taken when the backend sends another name', () => {
     const { bubble, loading } = getBitbox02StepMessage({ step: 'register', name: 'swan_vault_1a2b3c4d' })
-    expect(bubble).toContain('The name swan_vault is already used for another wallet on this BitBox02.')
-    expect(bubble).toContain('registers this wallet as swan_vault_1a2b3c4d')
-    expect(bubble).toContain('Compare each key with your recovery kit again, then confirm on the device.')
+    expect(bubble).toContain('This BitBox02 already holds a different wallet named swan_vault.')
+    expect(bubble).toContain('expected only if you used this device for another Swan vault')
+    expect(bubble).toContain('If not, stop and check the descriptor against your recovery kit.')
+    expect(bubble).toContain(
+      'compare each key with your recovery kit again, then confirm on the device, where the wallet shows as swan_vault_1a2b3c4d.'
+    )
     expect(loading).toBe('Waiting for your BitBox02…')
   })
 

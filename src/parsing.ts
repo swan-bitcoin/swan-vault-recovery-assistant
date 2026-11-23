@@ -34,6 +34,8 @@ export class DeviceError extends Error {
 
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 
+const isBitbox02 = (device: Device) => device.type === 'bitbox02'
+
 export function getDevice(val: unknown): Device {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
@@ -58,16 +60,15 @@ export function getDeviceMessage(val: unknown): string {
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
 
   devices.forEach((device, index, arr) => {
-    const isBitbox02 = device.type === 'bitbox02'
     // Sanitize device.model to prevent XSS
-    message = message.concat(`${isBitbox02 ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
+    message = message.concat(`${isBitbox02(device) ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
     if (device.error) {
       // Sanitize device.error to prevent XSS
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       // Sanitize device.fingerprint to prevent XSS
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
-    } else if (isBitbox02) {
+    } else if (isBitbox02(device)) {
       // a BitBox02 gives its fingerprint only after it is paired and unlocked
       message = message.concat('(the fingerprint shows after the device is unlocked)')
     } else {
@@ -81,6 +82,12 @@ export function getDeviceMessage(val: unknown): string {
   if (devices.length > 1) {
     message = message.concat(']')
   }
+  if (devices.some(isBitbox02)) {
+    // the backend does not ask HWI while a BitBox02 is on USB, so another device stays hidden
+    message = message.concat(
+      '. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
+    )
+  }
   return message
 }
 
@@ -90,6 +97,10 @@ export function getDevicePrompt(val: unknown): string {
     return 'Make sure your device is connected. Perhaps try a different cable.'
   }
   if (devices.length === 1) {
+    // a BitBox02 in bootloader mode cannot sign, so the usual hint would mislead
+    if (isBitbox02(devices[0]) && devices[0].error) {
+      return 'This BitBox02 cannot sign yet. Read the error above first.'
+    }
     return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'

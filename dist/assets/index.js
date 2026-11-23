@@ -692,7 +692,10 @@ function getBitbox02StepMessage(update) {
     case 'connecting':
       return { loading: 'Connecting to your BitBox02…' }
     case 'unlock':
-      return { loading: WAITING, bubble: 'Unlock your BitBox02. Enter your password on the device if it asks.' }
+      return {
+        loading: WAITING,
+        bubble: 'Unlock your BitBox02. Enter your password on the device if it asks. To stop, unplug the BitBox02.',
+      }
     case 'confirm-pairing':
       return {
         loading: WAITING,
@@ -704,20 +707,39 @@ function getBitbox02StepMessage(update) {
     case 'register':
       return {
         loading: WAITING,
+        // an unexpected registration can mean that the pasted descriptor is not the customer's vault, so both texts say when to stop
         bubble:
           update.name === WALLET_NAME
-            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device.`
-            : `The name ${WALLET_NAME} is already used for another wallet on this BitBox02. SVRA registers this wallet as ${update.name}. The device shows the wallet with its keys. Compare each key with your recovery kit again, then confirm on the device.`,
+            ? `This BitBox02 does not know this wallet yet. This is normal after a reset or on a replacement device. The device now shows the wallet named ${update.name} with its keys. Compare each key with your recovery kit, then confirm on the device. If this BitBox02 was not reset and has signed for this vault before, stop and check the descriptor against your recovery kit.`
+            : `This BitBox02 already holds a different wallet named ${WALLET_NAME}. This is expected only if you used this device for another Swan vault. If not, stop and check the descriptor against your recovery kit. To continue, compare each key with your recovery kit again, then confirm on the device, where the wallet shows as ${update.name}.`,
       }
     case 'sign':
       return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
   }
 }
-let isPending = false
-const isBitbox02SessionPending = () => isPending
-async function runBitbox02Session(start, show) {
-  const ownsSession = !isPending
-  isPending = true
+const BITBOX02_BUSY_MESSAGE =
+  'A BitBox02 session is still open. Finish it on the BitBox02, or unplug the BitBox02 to stop it.'
+let current = null
+const isBitbox02SessionPending = () => (current == null ? void 0 : current.bitbox02Pending) === true
+function startSignRun() {
+  if (current) return null
+  const state = { bitbox02Pending: false }
+  current = state
+  const release = () => {
+    if (current === state) current = null
+  }
+  return {
+    deviceFound: (deviceType) => {
+      if (deviceType === 'bitbox02') state.bitbox02Pending = true
+      else release()
+    },
+    sessionEnded: () => {
+      state.bitbox02Pending = false
+    },
+    release,
+  }
+}
+async function runBitbox02Session(run, start, show) {
   let isSettled = false
   const shown = /* @__PURE__ */ new Set()
   const onProgress = new Channel()
@@ -732,7 +754,7 @@ async function runBitbox02Session(start, show) {
     return await start(onProgress)
   } finally {
     isSettled = true
-    if (ownsSession) isPending = false
+    run.sessionEnded()
   }
 }
 function getDeviceName(device) {
@@ -1112,6 +1134,13 @@ function showBitbox02Step(update) {
   }
   showTempLoadingMessage(loading)
 }
+function refuseWhileBitbox02SessionPending() {
+  if (!isBitbox02SessionPending()) return false
+  addToConversation(
+    createConversationBubble({ content: BITBOX02_BUSY_MESSAGE, footer: /* @__PURE__ */ new Date().toLocaleString() })
+  )
+  return true
+}
 const createTryAgainActions = (retryCount) =>
   createConversationActions({
     content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
@@ -1121,12 +1150,21 @@ const createTryAgainActions = (retryCount) =>
       ;(_a = parent.querySelector('#get-device-and-sign-again-btn')) == null
         ? void 0
         : _a.addEventListener('click', () => {
+            if (refuseWhileBitbox02SessionPending()) return
             sign({ retryCount: retryCount + 1 })
           })
     },
   })
 async function sign({ retryCount = 0 } = {}) {
-  if (isBitbox02SessionPending()) return
+  const run = startSignRun()
+  if (!run) return
+  try {
+    await signWithDevice(run, retryCount)
+  } finally {
+    run.release()
+  }
+}
+async function signWithDevice(run, retryCount) {
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   try {
@@ -1134,6 +1172,7 @@ async function sign({ retryCount = 0 } = {}) {
     await sleep(400)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
+    run.deviceFound(device.type)
     hideTempMessage()
     const isBitbox02 = device.type === 'bitbox02'
     const deviceInstructionBubbles = [
@@ -1184,6 +1223,7 @@ async function sign({ retryCount = 0 } = {}) {
     let response
     if (isBitbox02) {
       response = await runBitbox02Session(
+        run,
         (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
         showBitbox02Step
       )
@@ -1230,6 +1270,7 @@ async function sign({ retryCount = 0 } = {}) {
           ;(_a = parent.querySelector('button')) == null
             ? void 0
             : _a.addEventListener('click', () => {
+                if (refuseWhileBitbox02SessionPending()) return
                 sign()
               })
         },
@@ -1420,6 +1461,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
+    if (refuseWhileBitbox02SessionPending()) return
     const userBubble = createConversationBubble({
       content: 'Sign this transaction (PSBT)',
       isUserSpeaking: true,

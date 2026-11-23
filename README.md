@@ -115,20 +115,20 @@ SVRA has been tested with:
 
 - Jade
 - Jade Plus
-- BitBox02 Nova Bitcoin-only
 - Coldcard MK4
 - Coldcard Q
 - Trezor
 
 ### BitBox02
 
-SVRA can sign a Swan Vault recovery with a BitBox02 Nova Bitcoin-only. It differs from Jade in these ways:
+SVRA can sign a Swan Vault recovery with a BitBox02 Nova Bitcoin-only. BitBox02 signing is tested against the vendor's firmware simulator (firmware 9.26.5 and 9.27.0). A run on a physical BitBox02 Nova is still to be done. It differs from Jade in these ways:
 
 - SVRA talks to the BitBox02 directly with the vendor's open-source [`bitbox-api`](https://github.com/BitBoxSwiss/bitbox-api-rs) library. It does not use HWI, because HWI cannot sign the key order of a Swan Vault.
-- The first time, and after a device reset, SVRA asks the BitBox02 to register the wallet. The name is normally `swan_vault`. If the device already holds another wallet named `swan_vault`, SVRA registers this wallet as `swan_vault_` followed by 8 characters, and tells you. The device shows each key. Compare each key with your recovery kit and confirm it on the device.
+- The first time, and after a device reset, SVRA asks the BitBox02 to register the wallet. The name is normally `swan_vault`. If the device already holds another wallet named `swan_vault`, SVRA registers this wallet as `swan_vault_` followed by 8 characters, and tells you. This is expected only if you used the device for another Swan vault. The device shows each key. Compare each key with your recovery kit and confirm it on the device. If the BitBox02 was not reset and has signed for this vault before, it already knows the wallet. A registration prompt then means that the descriptor may not be your vault: stop and check the descriptor against your recovery kit.
+- With a BitBox02, SVRA signs only Swan Vault descriptors (unsorted `wsh(multi(...))`). Other wallets on a BitBox02, such as single-key wallets or `sortedmulti`, are not supported, because SVRA no longer sends a BitBox02 to HWI.
 - SVRA shows a pairing code on every run. Check that it is the same as the code on the BitBox02, then confirm on the device. SVRA stores no pairing data on your computer.
-- Close the BitBoxApp first. Only one program can use the device at a time. SVRA also runs one BitBox02 session at a time: finish on the device, or unplug it, before you start another.
-- The BitBox02 needs firmware 9.15.0 or newer. The BitBox02 Nova Bitcoin-only is the tested model. Other BitBox02 models are not blocked, but they are untested.
+- Close the BitBoxApp first. If two programs use the device at the same time, the session can fail midway. SVRA also runs one BitBox02 session at a time. To stop a session that waits on the device, for example for your password, unplug the BitBox02.
+- The BitBox02 needs firmware 9.15.0 or newer. SVRA does not block other BitBox02 models, but it has not been tested with them.
 - On a test network (testnet, signet or regtest), the BitBox02 shows testnet-format addresses. This includes regtest.
 - Connect one device at a time. While a BitBox02 is connected, SVRA lists only the BitBox02. To sign with another device, unplug the BitBox02 first.
 

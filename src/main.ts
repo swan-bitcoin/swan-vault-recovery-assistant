@@ -26,6 +26,7 @@ import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 import { createConversationActions } from './utilities/createConversationActions'
 import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
 import {
+  BITBOX02_BUSY_MESSAGE,
   getBitbox02Device,
   getBitbox02StepMessage,
   isBitbox02SessionPending,
@@ -33,6 +34,8 @@ import {
   getDeviceName,
   parseBitbox02Error,
   runBitbox02Session,
+  startSignRun,
+  type SignRun,
 } from './utilities/devices'
 import { createConversationImage } from './utilities/createConversationImage'
 import { CircularTickIcon } from './icons/circularTick'
@@ -414,20 +417,39 @@ function showBitbox02Step(update: Bitbox02Progress) {
   showTempLoadingMessage(loading)
 }
 
+// Every action that starts a sign run calls this first. Returns true when the action must do nothing else.
+function refuseWhileBitbox02SessionPending() {
+  if (!isBitbox02SessionPending()) return false
+
+  addToConversation(createConversationBubble({ content: BITBOX02_BUSY_MESSAGE, footer: new Date().toLocaleString() }))
+  return true
+}
+
 const createTryAgainActions = (retryCount: number) =>
   createConversationActions({
     content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
     dangerouslySetInnerHTML: true,
     onAppended: (parent) => {
       parent.querySelector('#get-device-and-sign-again-btn')?.addEventListener('click', () => {
+        if (refuseWhileBitbox02SessionPending()) return
         sign({ retryCount: retryCount + 1 })
       })
     },
   })
 
 async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
-  if (isBitbox02SessionPending()) return
+  const run = startSignRun()
+  // a second run would race the first one for the device
+  if (!run) return
 
+  try {
+    await signWithDevice(run, retryCount)
+  } finally {
+    run.release()
+  }
+}
+
+async function signWithDevice(run: SignRun, retryCount: number) {
   const { psbt, descriptors, network } = getUserInputs()
   require(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
 
@@ -441,6 +463,8 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
 
     // the device object comes from HWI, which could be untrusted if using a malicious version, so we should make sure XSS and other exploits are not possible.
     const device = getDevice(enumeration)
+    // HWI devices go on as before; only a BitBox02 keeps the guard
+    run.deviceFound(device.type)
 
     hideTempMessage()
 
@@ -497,6 +521,7 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
     if (isBitbox02) {
       // the backend reports each stage itself, so there is no timed wait
       response = await runBitbox02Session(
+        run,
         (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
         showBitbox02Step
       )
@@ -553,6 +578,7 @@ async function sign({ retryCount = 0 }: { retryCount?: number } = {}) {
         dangerouslySetInnerHTML: true,
         onAppended: (parent) => {
           parent.querySelector('button')?.addEventListener('click', () => {
+            if (refuseWhileBitbox02SessionPending()) return
             sign()
           })
         },
@@ -791,6 +817,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
+    if (refuseWhileBitbox02SessionPending()) return
+
     const userBubble = createConversationBubble({
       content: 'Sign this transaction (PSBT)',
       isUserSpeaking: true,
