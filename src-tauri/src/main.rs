@@ -572,11 +572,14 @@ async fn estimate_fee(
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
 
-  // HWI is skipped when a BitBox02 is connected. HWI opens the BitBox02 during its own listing,
-  // starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the only
-  // program that talks to the device.
-  if let Some(response) = bitbox02::enumerate().await {
-    return response;
+  // HWI is not asked when the scan finds a BitBox02. HWI opens the BitBox02 during its own
+  // listing, starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the
+  // only program that talks to the device. When the scan misses a BitBox02 and HWI lists it, SVRA
+  // takes the device over and drops HWI's answer for it.
+  let devices = bitbox02::enumerate().await;
+  if !devices.is_empty() {
+    return serde_json::to_string(&devices)
+      .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
   }
 
   let network: HwiNetwork = network.into();
@@ -603,6 +606,10 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
 
   #[cfg(debug_assertions)]
   println!("{:?}", response);
+
+  if let Some(listing) = bitbox02::adopt_hwi_listing(&response) {
+    return Ok(listing);
+  }
 
   Ok(response)
 }
@@ -985,11 +992,8 @@ async fn open_github_url() -> Result<(), SvraError> {
   Ok(())
 }
 
-/**
- * entrypoint
- */
-
-fn main() {
+/// The commands and the settings that the bindings and the app both use.
+fn specta_builder() -> tauri_specta::Builder {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
@@ -1012,14 +1016,49 @@ fn main() {
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
-  let specta_builder = specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw);
+  specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw)
+}
+
+// tauri-specta writes this line for a command that takes a `Channel`. The bindings import the
+// same name from `@tauri-apps/api/core`, so the line makes `tsc` fail.
+#[cfg(any(debug_assertions, test))]
+const CHANNEL_TYPE_LINE: &str = "export type TAURI_CHANNEL<TSend> = null";
+
+/// Runs after the exporter has written the file. The exporter ignores an error from this
+/// function, so a test checks the result.
+#[cfg(any(debug_assertions, test))]
+fn remove_channel_type(path: &std::path::Path) -> std::io::Result<()> {
+  let text = std::fs::read_to_string(path)?;
+  let cleaned: String = text
+    .split_inclusive('\n')
+    .filter(|line| line.strip_suffix('\n').unwrap_or(line) != CHANNEL_TYPE_LINE)
+    .collect();
+  if cleaned != text {
+    std::fs::write(path, cleaned)?;
+  }
+  Ok(())
+}
+
+#[cfg(any(debug_assertions, test))]
+fn export_bindings(
+  specta_builder: &tauri_specta::Builder,
+  path: impl AsRef<std::path::Path>,
+) -> Result<(), specta_typescript::ExportError> {
+  specta_builder.export(
+    specta_typescript::Typescript::default().formatter(remove_channel_type),
+    path,
+  )
+}
+
+/**
+ * entrypoint
+ */
+
+fn main() {
+  let specta_builder = specta_builder();
 
   #[cfg(debug_assertions)]
-  specta_builder
-    .export(
-      specta_typescript::Typescript::default(),
-      "../src/bindings.ts",
-    )
+  export_bindings(&specta_builder, "../src/bindings.ts")
     .expect("Failed to export typescript bindings");
 
   tauri::Builder::default()
@@ -1032,4 +1071,37 @@ fn main() {
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod bindings_tests {
+  use super::*;
+
+  #[test]
+  fn the_exported_bindings_equal_the_committed_file() {
+    let dir = std::env::temp_dir().join(format!("svra-bindings-test-{}", std::process::id()));
+    let path = dir.join("bindings.ts");
+    let exported = export_bindings(&specta_builder(), &path);
+    let generated = std::fs::read(&path);
+    let _ = std::fs::remove_dir_all(&dir);
+    exported.expect("the bindings export");
+    let generated = String::from_utf8(generated.expect("the exported file is readable"))
+      .expect("the exported file is UTF-8");
+
+    assert!(
+      !generated
+        .lines()
+        .any(|line| line.starts_with("export type TAURI_CHANNEL")),
+      "the exported bindings still declare TAURI_CHANNEL"
+    );
+
+    let committed =
+      std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings.ts"))
+        .expect("src/bindings.ts is readable");
+    assert!(
+      generated == committed,
+      "src/bindings.ts is not the output of the generator. Run the app in a debug build once \
+       (`pnpm tauri dev`) and commit src/bindings.ts."
+    );
+  }
 }
