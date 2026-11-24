@@ -574,10 +574,12 @@ async fn estimate_fee(
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
 
-  // HWI is skipped when a BitBox02 or a Trezor Safe 7 is connected. HWI opens a BitBox02 during
-  // its own listing, starts an encrypted session and reads the BitBoxApp pairing file, and it
-  // sends the old Trezor protocol to a Safe 7. SVRA must be the only program that talks to these
-  // devices. Both scans run, and a device of each kind shows in the list.
+  // HWI is not asked when a scan finds a BitBox02 or a Trezor Safe 7. HWI opens a BitBox02
+  // during its own listing, starts an encrypted session and reads the BitBoxApp pairing file, and
+  // it sends the old Trezor protocol to a Safe 7. SVRA must be the only program that talks to
+  // these devices. Both scans run, and a device of each kind shows in the list. When a scan
+  // misses a BitBox02 and HWI lists it, SVRA takes the device over and drops HWI's answer for it.
+  // When HWI lists a Trezor, SVRA looks for a Safe 7 once more.
   let (bitbox02_devices, trezor_devices) =
     tokio::join!(bitbox02::enumerate(), trezor::enumerate());
   let devices: Vec<serde_json::Value> =
@@ -615,6 +617,16 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
 
   #[cfg(debug_assertions)]
   println!("{:?}", response);
+
+  if let Some(listing) = bitbox02::adopt_hwi_listing(&response) {
+    return Ok(listing);
+  }
+
+  // The scan above can miss a Safe 7. HWI lists every Trezor model as `trezor`, so SVRA looks for
+  // a Safe 7 once more before it shows HWI's answer. A Trezor of another model stays with HWI.
+  if let Some(listing) = trezor::rescan_after_hwi(&response).await {
+    return Ok(listing);
+  }
 
   Ok(response)
 }

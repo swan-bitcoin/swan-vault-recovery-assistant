@@ -46,7 +46,8 @@ pub use session::{
 pub use transport::{Transport, TransportError, PACKET_LEN};
 #[cfg(feature = "usb")]
 pub use usb::{
-  after_scan, scan, session_running, sign_psbt_usb, AfterScan, DetectedDevice, BUSY_MESSAGE,
+  after_scan, scan, scan_report, session_running, sign_psbt_usb, AfterScan, DetectedDevice,
+  ScanReport, BUSY_MESSAGE,
 };
 
 #[cfg(test)]

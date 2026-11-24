@@ -17,7 +17,7 @@ pub use session::{
   POLICY_NAME,
 };
 #[cfg(feature = "usb")]
-pub use usb::{scan, sign_psbt_usb, DetectedDevice};
+pub use usb::{scan, scan_report, sign_psbt_usb, DetectedDevice, ScanReport};
 
 #[cfg(test)]
 #[path = "../tests/support/mod.rs"]

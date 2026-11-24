@@ -83,12 +83,55 @@ pub fn session_running() -> bool {
 
 /// Lists the Trezor Safe 7 devices on USB, in the JSON shape of `hwi enumerate`. Returns no
 /// entries when there is no device or the scan fails, so that a failed scan hides neither a
-/// BitBox02 nor the devices that HWI finds.
+/// BitBox02 nor the devices that HWI finds. A debug build prints what the scan saw when it finds
+/// no Safe 7, and why it failed when it fails.
 pub async fn enumerate() -> Vec<Value> {
-  match tokio::task::spawn_blocking(svra_trezor::scan).await {
-    Ok(Ok(devices)) => device_entries(&devices),
-    _ => Vec::new(),
+  match tokio::task::spawn_blocking(svra_trezor::scan_report).await {
+    Ok(Ok(report)) => {
+      if cfg!(debug_assertions) && report.devices.is_empty() {
+        eprintln!("Trezor Safe 7 scan found no Safe 7: {report}");
+      }
+      device_entries(&report.devices)
+    }
+    Ok(Err(error)) => {
+      if cfg!(debug_assertions) {
+        eprintln!("Trezor Safe 7 scan failed: {}", error.message);
+      }
+      Vec::new()
+    }
+    Err(error) => {
+      if cfg!(debug_assertions) {
+        eprintln!("Trezor Safe 7 scan task failed: {error}");
+      }
+      Vec::new()
+    }
   }
+}
+
+/// True when the text of `hwi enumerate` is a list with at least one Trezor. HWI reports every
+/// Trezor model as `trezor`, so the answer does not say whether the device is a Safe 7.
+pub fn hwi_lists_a_trezor(hwi_listing: &str) -> bool {
+  match serde_json::from_str::<Value>(hwi_listing) {
+    Ok(Value::Array(entries)) => entries.iter().any(|entry| entry["type"] == "trezor"),
+    _ => false,
+  }
+}
+
+/// Looks for a Safe 7 once more when HWI lists a Trezor. Returns the list of the Safe 7 devices
+/// that the second scan finds, as JSON. Returns `None` when HWI lists no Trezor, without a scan,
+/// and when the second scan finds no Safe 7: then the Trezor is another model, and HWI keeps it.
+pub async fn rescan_after_hwi(hwi_listing: &str) -> Option<String> {
+  if !hwi_lists_a_trezor(hwi_listing) {
+    return None;
+  }
+  let entries = enumerate().await;
+  if entries.is_empty() {
+    return None;
+  }
+  if cfg!(debug_assertions) {
+    eprintln!("The first scan missed a Trezor Safe 7 that the second scan found.");
+  }
+  serde_json::to_string(&entries).ok()
 }
 
 fn device_entries(devices: &[DetectedDevice]) -> Vec<Value> {
@@ -248,6 +291,62 @@ mod tests {
   fn there_is_one_entry_for_each_device() {
     assert!(device_entries(&[]).is_empty());
     assert_eq!(device_entries(&[detected(false), detected(true)]).len(), 2);
+  }
+
+  // What `hwi enumerate` prints for a Trezor that it cannot open.
+  const HWI_TREZOR_WITH_ERROR: &str = r#"[{"type": "trezor", "model": "trezor_t", "path": "webusb:003:1:1:4", "needs_pin_sent": false, "needs_passphrase_sent": false, "error": "Could not open client or get fingerprint information: Trezor is in bootloader mode", "code": -12}]"#;
+  const HWI_TREZOR_READY: &str = r#"[{"type": "trezor", "model": "trezor_t", "label": "", "path": "webusb:003:1:1:4", "fingerprint": "8f4c9a21", "needs_pin_sent": false, "needs_passphrase_sent": false}]"#;
+  const HWI_JADE: &str = r#"[{"type": "jade", "model": "jade", "path": "/dev/cu.usbserial-1420", "needs_pin_sent": false, "needs_passphrase_sent": false, "fingerprint": "0c3e5d7a"}]"#;
+
+  #[test]
+  fn hwi_lists_a_trezor_that_it_could_not_open() {
+    assert!(hwi_lists_a_trezor(HWI_TREZOR_WITH_ERROR));
+  }
+
+  #[test]
+  fn hwi_lists_a_trezor_that_it_opened() {
+    assert!(hwi_lists_a_trezor(HWI_TREZOR_READY));
+  }
+
+  #[test]
+  fn hwi_lists_a_trezor_among_other_devices() {
+    let listing = format!(
+      "[{}, {}]",
+      &HWI_JADE[1..HWI_JADE.len() - 1],
+      &HWI_TREZOR_READY[1..HWI_TREZOR_READY.len() - 1]
+    );
+    assert!(hwi_lists_a_trezor(&listing));
+  }
+
+  #[test]
+  fn hwi_lists_no_trezor_in_a_list_with_only_a_jade() {
+    assert!(!hwi_lists_a_trezor(HWI_JADE));
+  }
+
+  #[test]
+  fn hwi_lists_no_trezor_in_an_empty_list() {
+    assert!(!hwi_lists_a_trezor("[]"));
+  }
+
+  #[test]
+  fn hwi_lists_no_trezor_in_text_that_is_not_json() {
+    assert!(!hwi_lists_a_trezor(""));
+    assert!(!hwi_lists_a_trezor("Traceback (most recent call last):"));
+  }
+
+  #[test]
+  fn hwi_lists_no_trezor_in_a_json_object() {
+    // HWI prints an object for some failures.
+    assert!(!hwi_lists_a_trezor(
+      r#"{"error": "Unable to open device", "code": -1, "type": "trezor"}"#
+    ));
+  }
+
+  #[tokio::test]
+  async fn no_rescan_runs_when_hwi_lists_no_trezor() {
+    for listing in [HWI_JADE, "[]", "not json"] {
+      assert_eq!(rescan_after_hwi(listing).await, None);
+    }
   }
 
   #[test]

@@ -14,6 +14,7 @@ use crate::session::{sign_psbt, SignOutcome, SignRequest, Ui};
 use crate::transport::{Transport, TransportError, PACKET_LEN};
 use nusb::transfer::{Buffer, In, Interrupt, Out, TransferError};
 use nusb::{Device, DeviceInfo, Endpoint, Interface, MaybeFuture};
+use std::fmt;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::time::{Duration, Instant};
 
@@ -161,48 +162,142 @@ struct Found {
   info: DeviceInfo,
 }
 
-fn find_devices() -> Result<Vec<Found>, Error> {
-  let devices = nusb::list_devices().wait().map_err(|_| list_error())?;
-  Ok(
-    devices
-      // Only the Trezor ids are asked for their strings.
-      .filter(|info| {
-        info.vendor_id() == VENDOR_ID
-          && matches!(
-            info.product_id(),
-            FIRMWARE_PRODUCT_ID | BOOTLOADER_PRODUCT_ID
-          )
-      })
-      .filter_map(|info| {
-        let product = product_string(&info);
-        let bootloader = classify(
-          info.vendor_id(),
-          info.product_id(),
-          info.manufacturer_string(),
-          product.as_deref(),
-        )?;
-        Some(Found {
-          device: DetectedDevice {
-            model: MODEL.to_string(),
-            path: format!("{}:{}", info.bus_id(), info.device_address()),
-            bootloader,
-          },
-          info,
-        })
-      })
-      .collect(),
+/// What one listing of the USB bus found, with the handles that open the devices.
+struct Listing {
+  found: Vec<Found>,
+  seen: Vec<String>,
+  usb_devices: usize,
+}
+
+/// What a listing of the USB bus found. The app prints it when no Safe 7 shows up, so that a
+/// missed scan leaves a trace of what the system listed instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanReport {
+  /// The Safe 7 devices, the same list that [`scan`] returns.
+  pub devices: Vec<DetectedDevice>,
+  /// One line for each USB device that has the Trezor vendor id and a Trezor product id,
+  /// whether or not the scan took it for a Safe 7.
+  pub seen: Vec<String>,
+  /// The number of USB devices that the system listed.
+  pub usb_devices: usize,
+}
+
+impl fmt::Display for ScanReport {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(
+      f,
+      "{} USB devices; with the Trezor vendor id and a Trezor product id: ",
+      self.usb_devices
+    )?;
+    if self.seen.is_empty() {
+      write!(f, "none")
+    } else {
+      write!(f, "[{}]", self.seen.join(", "))
+    }
+  }
+}
+
+/// The text of one line in [`ScanReport::seen`]. The verdict is the result of [`classify`].
+fn seen_line(
+  product_id: u16,
+  manufacturer: Option<&str>,
+  product: Option<&str>,
+  verdict: Option<bool>,
+) -> String {
+  let text = |value: Option<&str>| match value {
+    Some(value) => format!("{value:?}"),
+    None => String::from("(none)"),
+  };
+  let taken_for = match verdict {
+    Some(false) => "Safe 7",
+    Some(true) => "Safe 7 bootloader",
+    None => "another Trezor",
+  };
+  format!(
+    "pid {product_id:04x} manufacturer {} product {}: {taken_for}",
+    text(manufacturer),
+    text(product),
   )
+}
+
+fn list_devices() -> Result<Listing, Error> {
+  let devices: Vec<DeviceInfo> = nusb::list_devices()
+    .wait()
+    .map_err(|_error| {
+      // The message for the user does not carry the cause, so a debug build prints it.
+      #[cfg(debug_assertions)]
+      eprintln!("The USB library cannot list the devices: {_error}");
+      list_error()
+    })?
+    .collect();
+  let usb_devices = devices.len();
+  let mut found = Vec::new();
+  let mut seen = Vec::new();
+  for info in devices {
+    // Only the Trezor ids are asked for their strings.
+    if info.vendor_id() != VENDOR_ID
+      || !matches!(
+        info.product_id(),
+        FIRMWARE_PRODUCT_ID | BOOTLOADER_PRODUCT_ID
+      )
+    {
+      continue;
+    }
+    let product = product_string(&info);
+    let verdict = classify(
+      info.vendor_id(),
+      info.product_id(),
+      info.manufacturer_string(),
+      product.as_deref(),
+    );
+    seen.push(seen_line(
+      info.product_id(),
+      info.manufacturer_string(),
+      product.as_deref(),
+      verdict,
+    ));
+    if let Some(bootloader) = verdict {
+      found.push(Found {
+        device: DetectedDevice {
+          model: MODEL.to_string(),
+          path: format!("{}:{}", info.bus_id(), info.device_address()),
+          bootloader,
+        },
+        info,
+      });
+    }
+  }
+  Ok(Listing {
+    found,
+    seen,
+    usb_devices,
+  })
+}
+
+fn find_devices() -> Result<Vec<Found>, Error> {
+  Ok(list_devices()?.found)
+}
+
+/// Lists the connected Trezor Safe 7 devices from their USB descriptors, with a report of what
+/// the listing saw. Other Trezor models are not in `devices`, so that the hardware wallet tool
+/// keeps handling them.
+pub fn scan_report() -> Result<ScanReport, Error> {
+  let listing = list_devices()?;
+  Ok(ScanReport {
+    devices: listing
+      .found
+      .into_iter()
+      .map(|found| found.device)
+      .collect(),
+    seen: listing.seen,
+    usb_devices: listing.usb_devices,
+  })
 }
 
 /// Lists the connected Trezor Safe 7 devices from their USB descriptors. Other Trezor models are
 /// not listed, so that the hardware wallet tool keeps handling them.
 pub fn scan() -> Result<Vec<DetectedDevice>, Error> {
-  Ok(
-    find_devices()?
-      .into_iter()
-      .map(|found| found.device)
-      .collect(),
-  )
+  Ok(scan_report()?.devices)
 }
 
 /// Picks the one device to use. Returns its index.
@@ -422,6 +517,83 @@ mod tests {
     );
     // A BitBox02.
     assert_eq!(classify(0x03eb, 0x2403, None, Some("BitBox02")), None);
+  }
+
+  #[test]
+  fn a_seen_line_names_a_safe_7_firmware_device() {
+    assert_eq!(
+      seen_line(
+        0x53c1,
+        Some("Trezor Company"),
+        Some("Trezor Safe 7"),
+        Some(false)
+      ),
+      r#"pid 53c1 manufacturer "Trezor Company" product "Trezor Safe 7": Safe 7"#
+    );
+  }
+
+  #[test]
+  fn a_seen_line_names_a_safe_7_bootloader() {
+    assert_eq!(
+      seen_line(
+        0x53c0,
+        Some("Trezor Company"),
+        Some("Trezor Safe 7"),
+        Some(true)
+      ),
+      r#"pid 53c0 manufacturer "Trezor Company" product "Trezor Safe 7": Safe 7 bootloader"#
+    );
+  }
+
+  #[test]
+  fn a_seen_line_names_another_trezor() {
+    assert_eq!(
+      seen_line(0x53c1, Some("SatoshiLabs"), Some("TREZOR"), None),
+      r#"pid 53c1 manufacturer "SatoshiLabs" product "TREZOR": another Trezor"#
+    );
+  }
+
+  #[test]
+  fn a_seen_line_marks_the_strings_that_the_system_gives_none_of() {
+    assert_eq!(
+      seen_line(0x53c1, None, None, None),
+      "pid 53c1 manufacturer (none) product (none): another Trezor"
+    );
+  }
+
+  #[test]
+  fn a_report_prints_its_counts_and_its_lines() {
+    let report = ScanReport {
+      devices: vec![],
+      seen: vec![
+        String::from("pid 53c1 manufacturer (none) product (none): another Trezor"),
+        String::from(
+          r#"pid 53c0 manufacturer "Trezor Company" product "Trezor Safe 7": Safe 7 bootloader"#,
+        ),
+      ],
+      usb_devices: 12,
+    };
+    assert_eq!(
+      report.to_string(),
+      concat!(
+        "12 USB devices; with the Trezor vendor id and a Trezor product id: ",
+        "[pid 53c1 manufacturer (none) product (none): another Trezor, ",
+        r#"pid 53c0 manufacturer "Trezor Company" product "Trezor Safe 7": Safe 7 bootloader]"#
+      )
+    );
+  }
+
+  #[test]
+  fn a_report_with_no_lines_says_none() {
+    let report = ScanReport {
+      devices: vec![],
+      seen: vec![],
+      usb_devices: 3,
+    };
+    assert_eq!(
+      report.to_string(),
+      "3 USB devices; with the Trezor vendor id and a Trezor product id: none"
+    );
   }
 
   #[test]
