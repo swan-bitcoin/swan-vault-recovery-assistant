@@ -101,7 +101,6 @@ export type Descriptors = { receive: string; change: string | null; auto_change:
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null; outbound: string; sent_to_self: boolean }
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"
 export type SvraError = { error_type: string; message: string }
-export type TAURI_CHANNEL<TSend> = null
 export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }
 export type TxIn = { txid: string; vout: number }
 export type TxOut = { address: string | null; script: string; amount: string }
