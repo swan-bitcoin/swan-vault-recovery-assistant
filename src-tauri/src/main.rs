@@ -14,13 +14,11 @@ use std::sync::Arc;
 #[macro_use]
 mod errors;
 mod bitbox02;
-mod trezor;
 use bdk_wallet::psbt::PsbtUtils;
 use bitbox02::Bitbox02Progress;
 use errors::{DescriptorType, SvraError, SvraErrorType};
 mod network;
 use network::{HwiNetwork, Network};
-use trezor::TrezorProgress;
 
 // tauri and other framework imports
 use serde::{Deserialize, Serialize};
@@ -574,23 +572,11 @@ async fn estimate_fee(
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
 
-  // HWI is not asked when a scan finds a BitBox02 or a Trezor Safe 7. HWI opens a BitBox02
-  // during its own listing, starts an encrypted session and reads the BitBoxApp pairing file, and
-  // it sends the old Trezor protocol to a Safe 7. SVRA must be the only program that talks to
-  // these devices. Both scans run, and a device of each kind shows in the list. When a scan
-  // misses a BitBox02 and HWI lists it, SVRA takes the device over and drops HWI's answer for it.
-  // When HWI lists a Trezor, SVRA looks for a Safe 7 once more.
-  let (bitbox02_devices, trezor_devices) =
-    tokio::join!(bitbox02::enumerate(), trezor::enumerate());
-  let devices: Vec<serde_json::Value> =
-    bitbox02_devices.into_iter().chain(trezor_devices).collect();
-  match svra_trezor::after_scan(!devices.is_empty(), trezor::session_running()) {
-    svra_trezor::AfterScan::Devices => {
-      return serde_json::to_string(&devices)
-        .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
-    }
-    svra_trezor::AfterScan::Busy => return Err(trezor::busy_error()),
-    svra_trezor::AfterScan::AskHwi => {}
+  // HWI is skipped when a BitBox02 is connected. HWI opens the BitBox02 during its own listing,
+  // starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the only
+  // program that talks to the device.
+  if let Some(response) = bitbox02::enumerate().await {
+    return response;
   }
 
   let network: HwiNetwork = network.into();
@@ -617,16 +603,6 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
 
   #[cfg(debug_assertions)]
   println!("{:?}", response);
-
-  if let Some(listing) = bitbox02::adopt_hwi_listing(&response) {
-    return Ok(listing);
-  }
-
-  // The scan above can miss a Safe 7. HWI lists every Trezor model as `trezor`, so SVRA looks for
-  // a Safe 7 once more before it shows HWI's answer. A Trezor of another model stays with HWI.
-  if let Some(listing) = trezor::rescan_after_hwi(&response).await {
-    return Ok(listing);
-  }
 
   Ok(response)
 }
@@ -766,15 +742,6 @@ async fn sign(
     ));
   }
 
-  // The same holds for a Trezor Safe 7: HWI cannot speak its protocol. It must go through
-  // `sign_trezor`.
-  if device_type.eq_ignore_ascii_case("trezor_safe7") {
-    return Err(SvraError::new(
-      SvraErrorType::DeviceError,
-      "A Trezor Safe 7 cannot sign through HWI. SVRA signs with the Trezor Safe 7 directly.",
-    ));
-  }
-
   let network = Network::from_str(&network)?;
   let network: HwiNetwork = network.into();
 
@@ -845,39 +812,6 @@ async fn sign_bitbox02(
     on_progress,
   )
   .await
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn sign_trezor(
-  window: tauri::Window,
-  psbt: String,
-  network: String,
-  descriptors: Descriptors,
-  on_progress: tauri::ipc::Channel<TrezorProgress>,
-) -> Result<String, SvraError> {
-  let network = Network::from_str(&network)?;
-  trezor::sign(
-    psbt,
-    network,
-    descriptors.receive,
-    descriptors.change,
-    on_progress,
-    window,
-  )
-  .await
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn submit_trezor_pairing_code(code: String) -> Result<(), SvraError> {
-  trezor::submit_pairing_code(code)
-}
-
-#[tauri::command]
-#[specta::specta]
-async fn cancel_trezor_pairing() -> Result<(), SvraError> {
-  trezor::cancel_pairing()
 }
 
 #[tauri::command]
@@ -1051,13 +985,15 @@ async fn open_github_url() -> Result<(), SvraError> {
   Ok(())
 }
 
-/// The commands and the settings that the bindings and the app both use.
-fn specta_builder() -> tauri_specta::Builder {
+/**
+ * entrypoint
+ */
+
+fn main() {
   let specta_builder: tauri_specta::Builder =
     tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
       address,
       broadcast,
-      cancel_trezor_pairing,
       create_window,
       enumerate,
       estimate_fee,
@@ -1071,68 +1007,24 @@ fn specta_builder() -> tauri_specta::Builder {
       psbt_status,
       sign,
       sign_bitbox02,
-      sign_trezor,
-      submit_trezor_pairing_code,
       sweep,
       wallet,
     ]);
 
   // disable Specta wrapping Results into javascript objects with {status : 'ok' | 'error'}
-  specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw)
-}
-
-// tauri-specta writes this line for a command that takes a `Channel`. The bindings import the
-// same name from `@tauri-apps/api/core`, so the line makes `tsc` fail.
-#[cfg(any(debug_assertions, test))]
-const CHANNEL_TYPE_LINE: &str = "export type TAURI_CHANNEL<TSend> = null";
-
-/// Runs after the exporter has written the file. The exporter ignores an error from this
-/// function, so a test checks the result.
-#[cfg(any(debug_assertions, test))]
-fn remove_channel_type(path: &std::path::Path) -> std::io::Result<()> {
-  let text = std::fs::read_to_string(path)?;
-  let cleaned: String = text
-    .split_inclusive('\n')
-    .filter(|line| line.strip_suffix('\n').unwrap_or(line) != CHANNEL_TYPE_LINE)
-    .collect();
-  if cleaned != text {
-    std::fs::write(path, cleaned)?;
-  }
-  Ok(())
-}
-
-#[cfg(any(debug_assertions, test))]
-fn export_bindings(
-  specta_builder: &tauri_specta::Builder,
-  path: impl AsRef<std::path::Path>,
-) -> Result<(), specta_typescript::ExportError> {
-  specta_builder.export(
-    specta_typescript::Typescript::default().formatter(remove_channel_type),
-    path,
-  )
-}
-
-/**
- * entrypoint
- */
-
-fn main() {
-  let specta_builder = specta_builder();
+  let specta_builder = specta_builder.error_handling(tauri_specta::ErrorHandlingMode::Throw);
 
   #[cfg(debug_assertions)]
-  export_bindings(&specta_builder, "../src/bindings.ts")
+  specta_builder
+    .export(
+      specta_typescript::Typescript::default(),
+      "../src/bindings.ts",
+    )
     .expect("Failed to export typescript bindings");
 
   tauri::Builder::default()
     .plugin(tauri_plugin_clipboard_manager::init())
     .plugin(tauri_plugin_shell::init())
-    .on_window_event(|window, event| {
-      // A session that waits for a pairing code in a closed window has nobody to ask, so it ends
-      // now and does not wait for its ten minutes.
-      if let tauri::WindowEvent::Destroyed = event {
-        trezor::window_closed(window.label());
-      }
-    })
     .invoke_handler(specta_builder.invoke_handler())
     .setup(move |app| {
       specta_builder.mount_events(app);
@@ -1140,37 +1032,4 @@ fn main() {
     })
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
-}
-
-#[cfg(test)]
-mod bindings_tests {
-  use super::*;
-
-  #[test]
-  fn the_exported_bindings_equal_the_committed_file() {
-    let dir = std::env::temp_dir().join(format!("svra-bindings-test-{}", std::process::id()));
-    let path = dir.join("bindings.ts");
-    let exported = export_bindings(&specta_builder(), &path);
-    let generated = std::fs::read(&path);
-    let _ = std::fs::remove_dir_all(&dir);
-    exported.expect("the bindings export");
-    let generated = String::from_utf8(generated.expect("the exported file is readable"))
-      .expect("the exported file is UTF-8");
-
-    assert!(
-      !generated
-        .lines()
-        .any(|line| line.starts_with("export type TAURI_CHANNEL")),
-      "the exported bindings still declare TAURI_CHANNEL"
-    );
-
-    let committed =
-      std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings.ts"))
-        .expect("src/bindings.ts is readable");
-    assert!(
-      generated == committed,
-      "src/bindings.ts is not the output of the generator. Run the app in a debug build once \
-       (`pnpm tauri dev`) and commit src/bindings.ts."
-    );
-  }
 }
