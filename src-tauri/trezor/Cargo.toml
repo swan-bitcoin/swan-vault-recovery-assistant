@@ -21,6 +21,11 @@ subtle = "2.6"
 svra_vault = { path = "../vault" }
 # The device side of the channel is the software device of the tests. The host side is all
 # that the app needs, but the crate builds both.
+# The next two lines are pinned with `=` on purpose. `trezor-thp` is a 0.x protocol crate whose
+# state machine this crate drives, and `trezor-noise-rust-crypto` is the crypto backend that it is
+# built against, so a 0.x release of either may change what they do. Bump them by hand, and only
+# with a green `trezor-test` job: the emulator tests are the only check of the protocol against
+# the real firmware. `tests/emulator-rig/README.md` lists what else to check.
 trezor-noise-rust-crypto = { version = "=0.6.2", default-features = false, features = ["use-x25519", "use-aes-256-gcm", "use-sha2"] }
 trezor-thp = { version = "=0.1.1", features = ["use_std"] }
 x25519-dalek = { version = "2.0.1", default-features = false }

@@ -51,34 +51,15 @@ export function startSignRun(): SignRun | null {
   }
 }
 
-// Each session gets its own filter. It answers true when the update is new and must be shown.
-type UpdateFilter<P> = () => (update: P) => boolean
-
-// an update that the session already showed is not shown again
-const once =
-  <P>(keyOf: (update: P) => string): UpdateFilter<P> =>
-  () => {
-    const shown = new Set<string>()
-    return (update) => {
-      const key = keyOf(update)
-      if (shown.has(key)) return false
-      shown.add(key)
-      return true
-    }
-  }
-
-const showAll: UpdateFilter<unknown> = () => () => true
-
-// `start` calls the backend command with the channel it gets. `show` gets the updates that the filter lets through.
+// `start` calls the backend command with the channel it gets. `show` gets the updates that `isNew` lets through.
 async function runSession<T, P>(
   run: SignRun,
   start: (onProgress: Channel<P>) => Promise<T>,
   show: (update: P) => void,
-  filter: UpdateFilter<P>
+  isNew: (update: P) => boolean = () => true
 ): Promise<T> {
   // the backend can send a message after the command has settled; it must not show a spinner after the result
   let isSettled = false
-  const isNew = filter()
   const onProgress = new Channel<P>()
   onProgress.onmessage = (update) => {
     if (isSettled) return
@@ -93,23 +74,26 @@ async function runSession<T, P>(
   }
 }
 
+// an update that the session already showed is not shown again; each session gets its own set
 // the register message arrives once per wallet name, so the name is part of the key
 export const runBitbox02Session = <T>(
   run: SignRun,
   start: (onProgress: Channel<Bitbox02Progress>) => Promise<T>,
   show: (update: Bitbox02Progress) => void
-) =>
-  runSession(
-    run,
-    start,
-    show,
-    once((update) => (update.step === 'register' ? `register:${update.name}` : update.step))
-  )
+) => {
+  const shown = new Set<string>()
+  return runSession(run, start, show, (update) => {
+    const key = update.step === 'register' ? `register:${update.name}` : update.step
+    if (shown.has(key)) return false
+    shown.add(key)
+    return true
+  })
+}
 
-// No filter: the crate drops the repeats that mean nothing, so a step that comes again is on purpose. Examples are a
-// second unlock and a second passphrase prompt, which the user must see.
+// Every update is shown: the crate drops the repeats that mean nothing, so a step that comes again is on purpose.
+// Examples are a second unlock and a second passphrase prompt, which the user must see.
 export const runTrezorSession = <T>(
   run: SignRun,
   start: (onProgress: Channel<TrezorProgress>) => Promise<T>,
   show: (update: TrezorProgress) => void
-) => runSession(run, start, show, showAll)
+) => runSession(run, start, show)

@@ -191,6 +191,8 @@ jobs:
 
       - name: download the Trezor Safe 7 emulator
         run: |
+          set -E
+          trap 'echo "::error::The emulator download failed, or its SHA-256 changed. src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
           curl -fsSL -o "$TREZOR_EMULATOR" "$TREZOR_EMULATOR_URL"
           echo "$TREZOR_EMULATOR_SHA256  $TREZOR_EMULATOR" | sha256sum -c -
           chmod +x "$TREZOR_EMULATOR"
@@ -204,6 +206,8 @@ jobs:
         # with the pinned one (the set of paths and every NAR hash). It does this before anything
         # goes into /nix/store.
         run: |
+          set -E
+          trap 'echo "::error::Fetching the emulator libraries failed. src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
           pinned=src-tauri/trezor/tests/emulator-rig/nix-closure-x86_64.txt
           mkdir -p "$RUNNER_TEMP/nix-out" "$RUNNER_TEMP/nix-meta"
           docker run --rm \
@@ -233,7 +237,7 @@ jobs:
           # The check runs on the runner. The first lines of both lists are in the output, so that
           # one run shows the real format of `nix-store --query --hash` if it is not the pinned one.
           if ! diff -u "$pinned" "$RUNNER_TEMP/nix-meta/closure.txt" > "$RUNNER_TEMP/nix-meta/closure.diff"; then
-            echo "::error::The closure from cache.nixos.org differs from $pinned (paths or NAR hashes)."
+            echo "::error::The closure from cache.nixos.org differs from $pinned (paths or NAR hashes). src-tauri/trezor/tests/emulator-rig/README.md says how to make the list again."
             echo "Pinned list: $(wc -l < "$pinned") lines. First lines:"
             head -n 3 "$pinned"
             echo "Produced list: $(wc -l < "$RUNNER_TEMP/nix-meta/closure.txt") lines. First lines:"
@@ -256,6 +260,8 @@ jobs:
         # Every download is checked against a hash or a git commit. The model server is pure
         # Python, so the launcher below only sets PYTHONPATH.
         run: |
+          set -E
+          trap 'echo "::error::Installing the Tropic model server failed (a download, a hash, pip or git). src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
           tropic="$RUNNER_TEMP/tropic"
           mkdir -p "$tropic/site" "$tropic/bin" "$RUNNER_TEMP/dl"
           fetch() { curl -fsSL -o "$1" "$2"; echo "$3  $1" | sha256sum -c -; }
@@ -385,6 +391,13 @@ jobs:
             !src-tauri/target/release/hwi
             !src-tauri/target/release/swan_vault_recovery_assistant
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
+
+      - name: test the app glue
+        # The unit tests of the app crate (`src-tauri/src`). They use the profile and the feature of
+        # the build step, so the dependencies are compiled already and only the app crate builds
+        # again. The build step has made `dist` and the HWI binary that the build script needs.
+        working-directory: src-tauri
+        run: cargo test --locked --release --features custom-protocol --bin swan_vault_recovery_assistant
 
       - name: run the tests
         run: SVRA_SCENARIO_SKIP_BUILD=1 xvfb-run -a pnpm test:scenario

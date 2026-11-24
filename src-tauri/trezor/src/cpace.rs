@@ -2,9 +2,24 @@
 //!
 //! The device shows a 6-digit code, and the user types it into the app. Both sides turn the code
 //! and the handshake hash into a curve point (the "generator"), and the shared secret that comes
-//! out proves to the device that the app knows the code. The firmware's `cpace.py` and the THP
-//! specification's "Code Entry" section define the steps. The map from a hash to a curve point
-//! is Elligator 2 for Curve25519, as RFC 9380, section 6.7.1, gives it.
+//! out proves to the device that the app knows the code.
+//!
+//! Where each step is defined (the firmware files are at tag `core/v2.13.1` of trezor-firmware):
+//! - [`generator`] and [`host_tag`] are steps 2 to 7 of the case "the user enters code" in state
+//!   HP4 of `docs/common/thp/specification.md` (the section "Code Entry pairing sequence" shows the
+//!   same as a diagram). The device does the same in state TP2, steps 4 to 7:
+//!   `core/src/trezor/wire/thp/cpace.py`, `Cpace.generate_keys`, and `core/src/apps/thp/pairing.py`,
+//!   `_handle_code_entry_cpace`, for the tag.
+//! - [`code_from_secret`] is how the device makes the code that it shows: state TP2, steps 1 and 2,
+//!   in `core/src/apps/thp/pairing.py`, `_handle_code_entry_is_selected_first_time`.
+//! - [`elligator2`] is the map from 32 bytes to a curve point. The device calls
+//!   `trezor.crypto.elligator2.map_to_curve25519` (in `cpace.py` above), and
+//!   `python/src/trezorlib/thp/curve25519.py`, `elligator2`, is the reference host. Both follow
+//!   RFC 9380, section 6.7.1 (`map_to_curve_elligator2`, with `Z = 2`).
+//!
+//! The checked-in vectors (`tests/support/cpace-vectors.txt`) are the check of `elligator2`,
+//! `generator` and `host_tag`. If you change one of them, do not regenerate the vectors from this
+//! code: the vectors come from trezorlib, and a difference means that this code is wrong.
 
 use crypto_bigint::modular::runtime_mod::{DynResidue, DynResidueParams};
 use crypto_bigint::{Encoding, U256};
@@ -62,8 +77,17 @@ pub(crate) fn elligator2(input: &[u8; 32]) -> [u8; 32] {
 /// The generator of the code: the point that the password blinds. `code` is the ASCII digits.
 /// `handshake_hash` binds the code to this channel.
 pub(crate) fn generator(code: &[u8], handshake_hash: &[u8; 32]) -> [u8; 32] {
+  // The padding below is 111 bytes only for a code of 6 digits, which is what the specification
+  // fixes. The callers check the length of the code, so this cannot fire for a valid code.
+  debug_assert_eq!(code.len(), 6);
   // CPace255's "generator string": each part comes with its length byte, and a run of zeros
-  // fills the first hash block, so that the password sits in a block of its own.
+  // fills the first hash block, so that the password sits in a block of its own. For a 6-digit
+  // code the specification writes the bytes before and after the code as fixed strings:
+  //   prefix  = 0x08 || "CPace255" || 0x06          (length of DSI, DSI, length of the code)
+  //   padding = 0x6f || 0x00 repeated 111 || 0x20   (the 111 zeros end the first SHA-512 block,
+  //                                                  and 0x20 is the length of the handshake hash)
+  // The text that is hashed is prefix || code || padding || handshake_hash || 0x00, where the last
+  // byte is the empty session id.
   const DSI: &[u8] = b"CPace255";
   let padding = HASH_BLOCK_SIZE - (1 + DSI.len() + 1 + code.len() + 1);
   // The text holds the code. The capacity is final, so that the buffer is never copied to a new
@@ -164,7 +188,7 @@ mod tests {
     hex(text).try_into().expect("32 bytes")
   }
 
-  // The vectors come from running `elligator2` and `cpace` of trezorlib 0.20 (the firmware's
+  // The vectors come from running `elligator2` and `cpace` of trezorlib 0.20.2 (the firmware's
   // reference host) on these inputs.
   #[test]
   fn elligator2_matches_the_reference_host() {

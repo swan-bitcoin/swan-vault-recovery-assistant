@@ -3,7 +3,7 @@
 
 use crate::device::Device;
 use crate::device_error::{unexpected_message, Step};
-use crate::error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
+use crate::error::{Error, ErrorKind, BOOTLOADER_MESSAGE, NOT_A_SAFE_7_MESSAGE, NO_WALLET_MESSAGE};
 use crate::link::{QUICK, USER};
 use crate::pairing::MANAGEMENT_SESSION;
 use crate::proto::{
@@ -59,10 +59,7 @@ pub(crate) fn path_numbers(path: &DerivationPath) -> Vec<u32> {
 /// Checks what the device reports about itself.
 pub(crate) fn check_features(features: &Features) -> Result<(), Error> {
   if features.internal_model.as_deref() != Some(SAFE_7_MODEL) {
-    return Err(Error::new(
-      ErrorKind::Other,
-      "The connected Trezor is not a Trezor Safe 7. SVRA signs with a Trezor Safe 7 in this way. Other Trezor models work through the hardware wallet tool, so unplug this one and connect a Trezor Safe 7, or use that tool.",
-    ));
+    return Err(Error::new(ErrorKind::Other, NOT_A_SAFE_7_MESSAGE));
   }
   if features.bootloader_mode == Some(true) || features.firmware_present == Some(false) {
     return Err(Error::new(ErrorKind::Bootloader, BOOTLOADER_MESSAGE));
@@ -81,10 +78,7 @@ pub(crate) fn check_features(features: &Features) -> Result<(), Error> {
     ));
   }
   if features.initialized != Some(true) {
-    return Err(Error::new(
-      ErrorKind::NotInitialized,
-      "This Trezor Safe 7 has no wallet yet. Set it up or restore it in Trezor Suite first, then try again.",
-    ));
+    return Err(Error::new(ErrorKind::NotInitialized, NO_WALLET_MESSAGE));
   }
   Ok(())
 }
@@ -119,11 +113,12 @@ impl<X: Transport> Device<'_, X> {
   /// Creates a wallet session. With `on_device` the device asks the user for the passphrase on
   /// its own screen. Without it the passphrase is empty, which is the standard wallet.
   pub(crate) fn create_session(&mut self, session: u8, on_device: bool) -> Result<(), Error> {
-    let (step, patience) = if on_device {
-      (Step::Passphrase, USER)
+    // Both may wait for the user: the passphrase, or the PIN of a device that locked itself since
+    // the handshake.
+    let step = if on_device {
+      Step::Passphrase
     } else {
-      // The device asks for the PIN here if it locked itself since the handshake.
-      (Step::Query, USER)
+      Step::Query
     };
     let _: Success = self.call(
       session,
@@ -132,7 +127,7 @@ impl<X: Transport> Device<'_, X> {
         on_device: on_device.then_some(true),
         derive_cardano: None,
       },
-      patience,
+      USER,
       step,
       None,
     )?;

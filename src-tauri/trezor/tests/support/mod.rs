@@ -1,8 +1,8 @@
 //! Swan vault fixtures for the tests: keys, descriptors, a funded wallet, the sweep PSBT that SVRA
 //! builds, and a software signer that stands in for a device.
 //!
-//! The unit tests include this file with a `#[path]` attribute and the integration tests with
-//! `mod support;`, so every test builds its vault the same way.
+//! `lib.rs` includes this file with a `#[path]` attribute, so that the unit tests and the emulator
+//! tests build their vault the same way.
 // Each test crate uses a different part of this file.
 #![allow(dead_code)]
 
@@ -193,6 +193,9 @@ pub fn unsorted_order(keys: &VaultKeys, device_slot: Option<usize>) -> [usize; 3
     .expect("one of the orders is unsorted at every funded address")
 }
 
+/// The block height that a synced wallet would be at, and so the lock time of a sweep.
+pub const SWEEP_HEIGHT: u32 = 900_000;
+
 /// A vault wallet with funds, and everything needed to build and sign a sweep.
 pub struct Vault {
   pub network: Network,
@@ -266,7 +269,10 @@ impl Vault {
     }
   }
 
-  /// The PSBT of SVRA's sweep command: drain the wallet to one address.
+  /// The PSBT of SVRA's sweep command: drain the wallet to one address. The app syncs its wallet
+  /// before it builds, and bdk_wallet then sets the lock time to the block height of the chain
+  /// tip. This wallet has no chain, so the height is set by hand: a sweep with lock time 0 would
+  /// leave out a screen that every real sweep shows on the device.
   pub fn sweep_psbt(&mut self) -> Psbt {
     let secp = Secp256k1::new();
     let destination_key = PublicKey::new(self.keys.software_xprv.private_key.public_key(&secp));
@@ -276,6 +282,7 @@ impl Vault {
       &destination_key.wpubkey_hash().expect("compressed key"),
     ));
     builder.fee_rate(FeeRate::from_sat_per_vb(2).expect("a fee rate"));
+    builder.current_height(SWEEP_HEIGHT);
     builder.finish().expect("the sweep is built")
   }
 

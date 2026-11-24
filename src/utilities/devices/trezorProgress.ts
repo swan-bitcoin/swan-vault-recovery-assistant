@@ -42,8 +42,9 @@ export function getTrezorStepMessage(update: TrezorProgress): TrezorStepMessage 
       return {
         loading: WAITING,
         // The Safe 7 shows no multisig warning and no keys. SVRA sends every output as a recipient, also one that returns
-        // to the vault, so the address and amount screens are the check that is left.
-        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. It shows every output as a recipient, with its address and its amount, then the total with the fee. An output that returns to your vault is shown too. Check every address and every amount. If the Trezor shows an address that you do not expect, do not confirm. If all are right, hold the "Hold to sign" button. ${STOP}`,
+        // to the vault, so the address and amount screens are the check that is left. The sweep that SVRA builds is valid
+        // from the current block height, so the Trezor shows a lock-time screen between the outputs and the total.
+        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. First it shows every output as a recipient, with its address and its amount. An output that returns to your vault is shown too. Check every address and every amount. If the Trezor shows an address that you do not expect, do not confirm. Next it shows a lock-time screen. In English, it says "Confirm Locktime" and "Locktime set to blockheight", with a number. This is normal: the transaction is valid from the current block height. Confirm it. Last it shows the total with the fee. If all are right, hold the "Hold to sign" button. ${STOP}`,
       }
   }
 }

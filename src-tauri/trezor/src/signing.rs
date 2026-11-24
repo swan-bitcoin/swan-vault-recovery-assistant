@@ -30,6 +30,13 @@ use svra_vault::{address_steps, vault_public_key, Vault};
 /// The fewest requests that a signing may take. A small transaction has a few dozen.
 const MIN_ROUND_LIMIT: usize = 128;
 
+/// How many requests the limit allows for each input, each output, and each item of a previous
+/// transaction. The firmware signs in seven steps (`step1_process_inputs` to `step7_finish` in
+/// `core/src/apps/bitcoin/sign_tx/bitcoin.py`) and asks for an item again in several of them, so a
+/// real signing needs only a few requests for each item. This is a bound with room to spare, which
+/// stops a device that never says that it is done. It is not a count that the firmware promises.
+const REQUESTS_PER_ITEM: usize = 8;
+
 /// A transaction hash as the device writes it: the bytes of the hex string that block explorers
 /// show, which is the reverse of the order in the serialized transaction.
 type WireHash = [u8; 32];
@@ -94,21 +101,23 @@ fn signature_slots(
   partial_sigs: &BTreeMap<PublicKey, ecdsa::Signature>,
   index: usize,
 ) -> Result<Vec<Vec<u8>>, Error> {
+  // The messages count from 1, as the checks of `svra_vault` do.
+  let number = index + 1;
   let mut slots = vec![Vec::new(); vault.keys.len()];
   let mut placed = 0;
   for (position, slot) in slots.iter_mut().enumerate() {
     let key = vault_public_key(vault, position, steps)
-      .ok_or_else(|| invalid(format!("Input {index} does not belong to the vault.")))?;
+      .ok_or_else(|| invalid(format!("Input {number} does not belong to the vault.")))?;
     if let Some(signature) = partial_sigs.get(&PublicKey::new(key)) {
       if position == vault.our_key_index {
         return Err(invalid(format!(
-          "Input {index} holds a signature of this {} that SVRA cannot use. Either another input has none, or this one is not valid. Create the transaction again with SVRA.",
+          "Input {number} holds a signature of this {} that SVRA cannot use. Either another input has none, or this one is not valid. Create the transaction again with SVRA.",
           vault.device_name()
         )));
       }
       if signature.sighash_type != EcdsaSighashType::All {
         return Err(invalid(format!(
-          "Input {index} holds a signature that does not cover the whole transaction, so the {} cannot sign it.",
+          "Input {number} holds a signature that does not cover the whole transaction, so the {} cannot sign it.",
           vault.device_name()
         )));
       }
@@ -118,7 +127,7 @@ fn signature_slots(
   }
   if placed != partial_sigs.len() {
     return Err(invalid(format!(
-      "Input {index} holds a signature of a key that is not in this vault."
+      "Input {number} holds a signature of a key that is not in this vault."
     )));
   }
   Ok(slots)
@@ -138,13 +147,15 @@ pub(crate) fn prepare(
     return Err(invalid("The transaction has inputs without data."));
   }
   let mut previous = HashMap::new();
-  let mut round_limit = MIN_ROUND_LIMIT + 8 * (transaction.input.len() + transaction.output.len());
+  let mut round_limit =
+    MIN_ROUND_LIMIT + REQUESTS_PER_ITEM * (transaction.input.len() + transaction.output.len());
   let mut inputs = Vec::with_capacity(transaction.input.len());
   for (index, (tx_in, key)) in transaction.input.iter().zip(keys).enumerate() {
     let input = &psbt.inputs[index];
+    let number = index + 1;
     let missing = || {
       invalid(format!(
-        "Input {index} lacks the data that the Trezor Safe 7 needs."
+        "Input {number} lacks the data that the Trezor Safe 7 needs."
       ))
     };
     let (_, path) = input.bip32_derivation.get(key).ok_or_else(missing)?;
@@ -166,7 +177,7 @@ pub(crate) fn prepare(
       multisig: Some(multisig(vault, &steps, signatures)),
       amount,
     });
-    round_limit += 8 * (1 + source.input.len() + source.output.len());
+    round_limit += REQUESTS_PER_ITEM * (1 + source.input.len() + source.output.len());
     previous.insert(wire_hash(source.compute_txid()), source.clone());
   }
 
@@ -175,9 +186,10 @@ pub(crate) fn prepare(
   // edited can hide the whole vault in such an output. A payment is always on the screen.
   let mut outputs = Vec::with_capacity(transaction.output.len());
   for (index, tx_out) in transaction.output.iter().enumerate() {
+    let number = index + 1;
     let address = Address::from_script(&tx_out.script_pubkey, network).map_err(|_| {
       invalid(format!(
-        "Output {index} pays to a script that the Trezor Safe 7 cannot show as an address, so it cannot sign the transaction."
+        "Output {number} pays to a script that the Trezor Safe 7 cannot show as an address, so it cannot sign the transaction."
       ))
     })?;
     outputs.push(TxOutput {
@@ -218,10 +230,6 @@ pub(crate) enum Answer {
   Finished,
 }
 
-fn bad_request() -> Error {
-  unexpected_message()
-}
-
 impl Plan {
   /// Answers one request of the device. Every index and every hash comes from the device, so each
   /// one is checked.
@@ -229,35 +237,41 @@ impl Plan {
     let request_type = request
       .request_type
       .and_then(|value| RequestType::try_from(value).ok())
-      .ok_or_else(bad_request)?;
+      .ok_or_else(unexpected_message)?;
     if request_type == RequestType::Finished {
       return Ok(Answer::Finished);
     }
-    let details = request.details.as_ref().ok_or_else(bad_request)?;
+    let details = request.details.as_ref().ok_or_else(unexpected_message)?;
     let previous = match &details.tx_hash {
       None => None,
       Some(hash) => {
-        let hash: WireHash = hash.as_slice().try_into().map_err(|_| bad_request())?;
-        Some(self.previous.get(&hash).ok_or_else(bad_request)?)
+        let hash: WireHash = hash
+          .as_slice()
+          .try_into()
+          .map_err(|_| unexpected_message())?;
+        Some(self.previous.get(&hash).ok_or_else(unexpected_message)?)
       }
     };
     let index = || {
       details
         .request_index
         .and_then(|index| usize::try_from(index).ok())
-        .ok_or_else(bad_request)
+        .ok_or_else(unexpected_message)
     };
     Ok(match (request_type, previous) {
       (RequestType::Meta, Some(previous)) => Answer::PrevMeta(TxAckPrevMeta {
         tx: PrevTx {
           version: previous.version.0 as u32,
           lock_time: previous.lock_time.to_consensus_u32(),
-          inputs_count: u32::try_from(previous.input.len()).map_err(|_| bad_request())?,
-          outputs_count: u32::try_from(previous.output.len()).map_err(|_| bad_request())?,
+          inputs_count: u32::try_from(previous.input.len()).map_err(|_| unexpected_message())?,
+          outputs_count: u32::try_from(previous.output.len()).map_err(|_| unexpected_message())?,
         },
       }),
       (RequestType::Input, Some(previous)) => {
-        let input = previous.input.get(index()?).ok_or_else(bad_request)?;
+        let input = previous
+          .input
+          .get(index()?)
+          .ok_or_else(unexpected_message)?;
         Answer::PrevInput(TxAckPrevInput {
           tx: TxAckPrevInputWrapper {
             input: PrevInput {
@@ -270,7 +284,10 @@ impl Plan {
         })
       }
       (RequestType::Output, Some(previous)) => {
-        let output = previous.output.get(index()?).ok_or_else(bad_request)?;
+        let output = previous
+          .output
+          .get(index()?)
+          .ok_or_else(unexpected_message)?;
         Answer::PrevOutput(TxAckPrevOutput {
           tx: TxAckPrevOutputWrapper {
             output: PrevOutput {
@@ -282,17 +299,25 @@ impl Plan {
       }
       (RequestType::Input, None) => Answer::Input(TxAckInput {
         tx: TxAckInputWrapper {
-          input: self.inputs.get(index()?).ok_or_else(bad_request)?.clone(),
+          input: self
+            .inputs
+            .get(index()?)
+            .ok_or_else(unexpected_message)?
+            .clone(),
         },
       }),
       (RequestType::Output, None) => Answer::Output(TxAckOutput {
         tx: TxAckOutputWrapper {
-          output: self.outputs.get(index()?).ok_or_else(bad_request)?.clone(),
+          output: self
+            .outputs
+            .get(index()?)
+            .ok_or_else(unexpected_message)?
+            .clone(),
         },
       }),
       // Metadata of the transaction itself, extra data, replacement transactions and payment
       // requests are not part of a vault spend.
-      _ => return Err(bad_request()),
+      _ => return Err(unexpected_message()),
     })
   }
 }
@@ -755,6 +780,7 @@ mod tests {
       "{}",
       error.message
     );
+    assert!(error.message.starts_with("Input 1 "), "{}", error.message);
   }
 
   #[test]
@@ -771,6 +797,8 @@ mod tests {
       "{}",
       error.message
     );
+    // The third input, and the messages count from 1.
+    assert!(error.message.starts_with("Input 3 "), "{}", error.message);
   }
 
   #[test]
@@ -785,7 +813,7 @@ mod tests {
     .expect("the pre-check passes");
     let error = error_of(plan_of(&fixture));
     assert_eq!(error.kind, ErrorKind::InvalidPsbt);
-    assert!(error.message.contains("Output 0"), "{}", error.message);
+    assert!(error.message.contains("Output 1 "), "{}", error.message);
   }
 
   #[test]
@@ -801,7 +829,7 @@ mod tests {
         1 + tx.input.len() + tx.output.len()
       })
       .sum();
-    assert!(plan.round_limit >= 8 * (3 + 1 + previous));
+    assert!(plan.round_limit >= REQUESTS_PER_ITEM * (3 + 1 + previous));
     assert!(plan.round_limit < 10_000);
   }
 

@@ -64,7 +64,7 @@ describe('startSignRun()', () => {
     expect(getPendingDevice()).toBeNull()
   })
 
-  it('should release the guard at once when the device is not a BitBox02', () => {
+  it('should release the guard at once when SVRA does not drive the device itself', () => {
     start().deviceFound('jade')
     expect(getPendingDevice()).toBeNull()
     expect(tryStart()).not.toBeNull()

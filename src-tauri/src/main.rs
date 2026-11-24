@@ -582,13 +582,13 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
     tokio::join!(bitbox02::enumerate(), trezor::enumerate());
   let devices: Vec<serde_json::Value> =
     bitbox02_devices.into_iter().chain(trezor_devices).collect();
-  match trezor::after_scan(devices, trezor::session_running()) {
-    trezor::AfterScan::Devices(devices) => {
+  match svra_trezor::after_scan(!devices.is_empty(), trezor::session_running()) {
+    svra_trezor::AfterScan::Devices => {
       return serde_json::to_string(&devices)
         .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
     }
-    trezor::AfterScan::Busy => return Err(trezor::busy_error()),
-    trezor::AfterScan::AskHwi => {}
+    svra_trezor::AfterScan::Busy => return Err(trezor::busy_error()),
+    svra_trezor::AfterScan::AskHwi => {}
   }
 
   let network: HwiNetwork = network.into();

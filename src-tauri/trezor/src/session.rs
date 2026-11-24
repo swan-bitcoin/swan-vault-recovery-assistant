@@ -16,7 +16,7 @@
 
 use crate::device::Device;
 use crate::device_error::{link_error, unexpected_message};
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, NOT_A_SAFE_7_MESSAGE};
 use crate::keys::{check_features, coin_name, Matched, DEVICE_NAME, SAFE_7_MODEL};
 use crate::link::{
   check_random, discard_stale_packets, Allocated, Failed, Link, LinkError, PROTOCOL_MAJOR, QUICK,
@@ -119,10 +119,7 @@ pub struct SignOutcome {
 /// Checks what the device says about itself before the handshake: the model and the protocol.
 fn check_properties(properties: &ThpDeviceProperties) -> Result<(), Error> {
   if properties.internal_model != SAFE_7_MODEL {
-    return Err(Error::new(
-      ErrorKind::Other,
-      "The connected Trezor is not a Trezor Safe 7. SVRA signs with a Trezor Safe 7 in this way. Other Trezor models work through the hardware wallet tool, so unplug this one and connect a Trezor Safe 7, or use that tool.",
-    ));
+    return Err(Error::new(ErrorKind::Other, NOT_A_SAFE_7_MESSAGE));
   }
   let code_entry = properties
     .pairing_methods
@@ -279,8 +276,8 @@ mod tests {
   use super::*;
   use crate::proto::{SignTx, ThpEndRequest, ThpPairingRequest, Wire};
   use crate::test_device::{Behavior, SignMode, SoftDevice};
-  use crate::test_support::{sign_with, Vault};
-  use bitcoin::bip32::Xpriv;
+  use crate::test_support::{account_path, descriptor, master_key, sign_with, xpub_string, Vault};
+  use bitcoin::bip32::{Xpriv, Xpub};
   use bitcoin::{Network, NetworkKind};
 
   #[derive(Clone, Copy, PartialEq)]
@@ -869,6 +866,53 @@ mod tests {
     let error = error_of(result);
     assert_eq!(error.kind, ErrorKind::KeyNotInVault);
     assert!(error.message.contains("Trezor Safe 7"), "{}", error.message);
+  }
+
+  #[test]
+  fn a_vault_key_with_the_fingerprint_of_the_device_but_another_xpub_is_refused() {
+    let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
+    // The vault names the fingerprint and the path of the device, and the account key of
+    // somebody else.
+    let secp = bitcoin::secp256k1::Secp256k1::new();
+    let stranger = master_key(0x61, NetworkKind::Test)
+      .derive_priv(&secp, &account_path(NetworkKind::Test))
+      .expect("the account derives");
+    let (origin, _) = vault.keys.device.split_once(']').expect("a key origin");
+    let swapped = format!(
+      "{origin}]{}",
+      xpub_string(&Xpub::from_priv(&secp, &stranger), NetworkKind::Test)
+    );
+    let expressions = [
+      swapped.as_str(),
+      vault.keys.software.as_str(),
+      vault.keys.cloud.as_str(),
+    ];
+    let ordered: Vec<&str> = vault.order.iter().map(|slot| expressions[*slot]).collect();
+    let receive = descriptor(&ordered, "/0/*");
+    let change = descriptor(&ordered, "/1/*");
+    let mut ui = TestUi::new(&device, Code::Right);
+    let error = error_of(sign_psbt(
+      device.clone(),
+      SignRequest {
+        network: Network::Testnet,
+        receive_descriptor: &receive,
+        change_descriptor: Some(&change),
+        psbt: vault.sweep_psbt(),
+      },
+      &mut ui,
+    ));
+    assert_eq!(error.kind, ErrorKind::KeyNotInVault);
+    assert!(
+      error.message.contains("is a different key"),
+      "{}",
+      error.message
+    );
+    // The device never saw the transaction.
+    assert!(!device
+      .received()
+      .iter()
+      .any(|(_, kind)| *kind == SignTx::TYPE));
+    assert_eq!(ui.events.last(), Some(&Progress::CheckingKey));
   }
 
   #[test]

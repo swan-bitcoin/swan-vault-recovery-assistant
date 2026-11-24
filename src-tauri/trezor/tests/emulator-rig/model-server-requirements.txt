@@ -1,8 +1,10 @@
-# Model server (ts-tvl) runtime dependencies for CPython 3.10, taken from ts-tvl's poetry.lock
-# at commit c28a7d8865866baf442d53e01559e6d3fa87b9e4, main group, markers resolved for
-# python 3.10 on Linux. Every wheel/sdist hash of each release is listed, so aarch64 and
-# x86_64 both resolve. crcmod 1.7 (source archive only) and tvl itself are installed by
-# install-model-server.sh, each pinned by hash or git commit.
+# Model server (ts-tvl) runtime dependencies, taken from ts-tvl's poetry.lock at commit
+# c28a7d8865866baf442d53e01559e6d3fa87b9e4, main group, markers resolved for CPython 3.10 on Linux.
+# Every wheel and source hash of each release is listed, so aarch64 and x86_64 both resolve.
+# The `trezor-test` job in .github/workflows/test.yml installs this file with
+# `pip --require-hashes`. It runs CPython 3.12 (see README.md in this folder for why that works,
+# and for how to make this file again). crcmod 1.7 and tvl itself are not in it: the job installs
+# them with their own pins.
 annotated-types==0.7.0 \
     --hash=sha256:1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53 \
     --hash=sha256:aff07c09a53a08bc8cfccb9c85b05f1aa9a2a6f23728d790723543408344ce89

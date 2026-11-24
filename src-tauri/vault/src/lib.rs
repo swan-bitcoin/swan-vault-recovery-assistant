@@ -7,10 +7,7 @@
 //! ```no_run
 //! use bitcoin::bip32::Fingerprint;
 //! use bitcoin::psbt::Psbt;
-//! use svra_vault::{
-//!   address_steps, already_signed, key_of_device, parse_vault, precheck, vault_witness_script,
-//!   verify_signed, Error,
-//! };
+//! use svra_vault::{address_steps, already_signed, parse_vault, precheck, verify_signed, Error};
 //!
 //! fn sign(
 //!   receive: &str,
@@ -26,13 +23,7 @@
 //!   }
 //!   for (input, key) in psbt.inputs.iter().zip(&our_keys) {
 //!     let (_, path) = &input.bip32_derivation[key];
-//!     let steps = address_steps(&vault, path).expect("the pre-check passed");
-//!     let _script = vault_witness_script(&vault, &steps);
-//!   }
-//!   for output in &psbt.outputs {
-//!     if let Some((_, path)) = key_of_device(&output.bip32_derivation, fingerprint) {
-//!       let _steps = address_steps(&vault, path);
-//!     }
+//!     let _steps = address_steps(&vault, path).expect("the pre-check passed");
 //!   }
 //!   verify_signed(&psbt, &signed_by_device, &our_keys, &vault)
 //! }
@@ -44,10 +35,7 @@ mod psbt_checks;
 
 pub use descriptor::{parse_vault, ParsedVault, Vault, VaultKey};
 pub use error::{Error, ErrorKind};
-pub use psbt_checks::{
-  address_steps, already_signed, key_of_device, precheck, vault_public_key, vault_witness_script,
-  verify_signed,
-};
+pub use psbt_checks::{address_steps, already_signed, precheck, vault_public_key, verify_signed};
 
 #[cfg(test)]
 #[path = "../tests/support/mod.rs"]

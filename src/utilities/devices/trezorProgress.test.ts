@@ -67,9 +67,14 @@ describe('getTrezorStepMessage()', () => {
   it('should tell the user what the Safe 7 shows when it signs, and not promise a multisig warning or the keys', () => {
     const { bubble } = getTrezorStepMessage({ step: 'sign' })
     expect(bubble).toContain('does not know your vault and does not show its keys')
-    expect(bubble).toContain('every output as a recipient, with its address and its amount, then the total with the fee')
+    expect(bubble).toContain('every output as a recipient, with its address and its amount')
+    expect(bubble).toContain('Next it shows a lock-time screen')
+    expect(bubble).toContain('Last it shows the total with the fee')
     expect(bubble).toContain('An output that returns to your vault is shown too')
     expect(bubble).toContain('hold the "Hold to sign" button')
+    // the order that the Safe 7 shows: outputs, then the lock time, then the total
+    expect(bubble.indexOf('every output as a recipient')).toBeLessThan(bubble.indexOf('lock-time screen'))
+    expect(bubble.indexOf('lock-time screen')).toBeLessThan(bubble.indexOf('the total with the fee'))
     expect(bubble).not.toMatch(/warn|multisig|whatever keys|change/i)
   })
 

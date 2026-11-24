@@ -1,7 +1,7 @@
 //! The one place where the failures of the link and the device become errors that the user can
 //! read.
 
-use crate::error::{Error, ErrorKind};
+use crate::error::{Error, ErrorKind, NO_WALLET_MESSAGE};
 use crate::link::LinkError;
 use crate::proto::{Failure, FailureType};
 use crate::transport::TransportError;
@@ -111,7 +111,7 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
     }
     (Some(FailureType::NotInitialized), _) => error(
       ErrorKind::NotInitialized,
-      "This Trezor Safe 7 has no wallet yet. Set it up or restore it in Trezor Suite first, then try again.",
+      NO_WALLET_MESSAGE,
     ),
     (Some(FailureType::Busy | FailureType::InProgress), _) => error(
       ErrorKind::Communication,
@@ -132,7 +132,10 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
     ),
     // The text of the device only decides which message to show. It is never shown. A key path
     // that the device refuses comes at the key query for an unusual account path, and at the
-    // signing for a coin that does not fit the path.
+    // signing for a coin that does not fit the path. This is the one branch that depends on
+    // firmware wording. If a firmware release changes the text, the user gets the general message
+    // below. The emulator test `a_network_that_does_not_fit_the_vault_is_a_forbidden_key_path`
+    // pins this text for the tested firmware.
     (Some(FailureType::DataError), Step::Query | Step::Sign)
       if failure
         .message

@@ -14,12 +14,9 @@ use svra_trezor::{
 use tauri::ipc::Channel;
 use tauri::Manager;
 
-use crate::errors::{SvraError, SvraErrorType};
+use crate::errors::{HwiErrorType, SvraError, SvraErrorType};
 use crate::extract_txid;
 use crate::network::Network;
-
-// HWI error code for "device is not ready".
-const HWI_DEVICE_NOT_READY: i32 = -12;
 
 // The one place where the window and the device session meet.
 static PAIRING: PairingCodes = PairingCodes::new();
@@ -84,30 +81,6 @@ pub fn session_running() -> bool {
   svra_trezor::session_running()
 }
 
-/// What `enumerate` does after it asked for the BitBox02 and Safe 7 devices.
-#[derive(Debug, PartialEq)]
-pub enum AfterScan {
-  /// Return these devices. HWI is not asked.
-  Devices(Vec<Value>),
-  /// A Safe 7 session runs. Return the busy error.
-  Busy,
-  /// Nothing was found and nothing runs. Ask HWI.
-  AskHwi,
-}
-
-/// Decides what `enumerate` does next. HWI must not look while a Safe 7 session runs: the session
-/// has claimed its device, so the scan may find nothing, and HWI would send the old protocol to
-/// the Safe 7 that the session uses.
-pub fn after_scan(devices: Vec<Value>, session_running: bool) -> AfterScan {
-  if !devices.is_empty() {
-    AfterScan::Devices(devices)
-  } else if session_running {
-    AfterScan::Busy
-  } else {
-    AfterScan::AskHwi
-  }
-}
-
 /// Lists the Trezor Safe 7 devices on USB, in the JSON shape of `hwi enumerate`. Returns no
 /// entries when there is no device or the scan fails, so that a failed scan hides neither a
 /// BitBox02 nor the devices that HWI finds.
@@ -132,7 +105,7 @@ fn device_entries(devices: &[DetectedDevice]) -> Vec<Value> {
       });
       if device.bootloader {
         entry["error"] = json!(BOOTLOADER_MESSAGE);
-        entry["code"] = json!(HWI_DEVICE_NOT_READY);
+        entry["code"] = json!(HwiErrorType::DeviceNotReady as i32);
       }
       entry
     })
@@ -292,27 +265,6 @@ mod tests {
       let value = serde_json::to_value(TrezorProgress::from(progress)).unwrap();
       assert_eq!(value, json!({ "step": step }));
     }
-  }
-
-  #[test]
-  fn a_scan_that_finds_a_device_returns_it_whether_or_not_a_session_runs() {
-    let devices = vec![json!({ "type": "trezor_safe7" })];
-    for running in [false, true] {
-      assert_eq!(
-        after_scan(devices.clone(), running),
-        AfterScan::Devices(devices.clone())
-      );
-    }
-  }
-
-  #[test]
-  fn a_scan_that_finds_nothing_during_a_session_does_not_ask_hwi() {
-    assert_eq!(after_scan(Vec::new(), true), AfterScan::Busy);
-  }
-
-  #[test]
-  fn a_scan_that_finds_nothing_with_no_session_asks_hwi() {
-    assert_eq!(after_scan(Vec::new(), false), AfterScan::AskHwi);
   }
 
   #[test]

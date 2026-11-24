@@ -6,6 +6,14 @@ trezorlib is the reference implementation that the vectors come from. It is not 
 repository: the script imports it from the path in the first argument. The random numbers come
 from a fixed seed, so the same trezorlib gives the same file.
 
+The checked-in file was written with trezorlib 0.20.2 (PyPI package `trezor`). The `thp` folder of
+the `python/src/trezorlib` of the trezor-firmware checkout at commit f4b81b7 gives the same file,
+byte for byte. Only the `E` lines and the exchange of the `C` lines come from trezorlib. The last field of
+each `C` line, the code that the device derives, is computed by this script with `hashlib`
+from the formula in `core/src/apps/thp/pairing.py` (`sha256(0x02 || handshake hash || secret ||
+challenge)`, read as a big-endian number, modulo 1,000,000). It is a second implementation of
+that formula, and not a value of trezorlib.
+
 Lines:
   E <input 32 bytes> <output 32 bytes>
       The Elligator 2 map of the pairing code, as trezorlib computes it. The inputs are the edge

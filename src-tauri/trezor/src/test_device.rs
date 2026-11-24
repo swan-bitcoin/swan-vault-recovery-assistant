@@ -5,8 +5,9 @@
 //! them. No thread, no clock and no socket are involved, so a run is the same every time.
 //!
 //! The device checks what a real one checks and the tests care about: the pairing tag, that the
-//! previous transactions hash to what the inputs say, the amounts, and the multisig structure.
-//! It signs with the same BIP-143 hash that the vault uses.
+//! previous transactions hash to what the inputs say, and the amounts. It reads the multisig
+//! structure only to build the script that it signs, and it does not check that its own key is one
+//! of the nodes. It signs with the same BIP-143 hash that the vault uses.
 
 use crate::cpace;
 use crate::link::Crypto;
@@ -910,8 +911,8 @@ impl Inner {
           EcdsaSighashType::All,
         )
         .expect("a hash");
-      // The device's own key is the node of the multisig whose key is its account key. With the
-      // wrong-key mode it signs with a key that is not in the vault.
+      // The device signs with its key at the path of the input. With the wrong-key mode it signs
+      // with a key that is not in the vault.
       let key = if mode == SignMode::WrongKey {
         Xpriv::new_master(NetworkKind::Test, &[0x99; 32])
           .expect("a key")

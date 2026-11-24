@@ -16,7 +16,7 @@ use crate::device_error::Step;
 use crate::link::USER;
 use crate::proto::{Success, Wire};
 use crate::session::{connect, sign_psbt, CodeEntry, Progress, SignOutcome, SignRequest, Ui};
-use crate::test_support::{sign_with, Vault};
+use crate::test_support::{sign_with, Vault, SWEEP_HEIGHT};
 use crate::transport::{Transport, TransportError};
 use crate::{Error, ErrorKind};
 use bdk_wallet::KeychainKind;
@@ -38,7 +38,10 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------------------------
-// The messages that only the tests use.
+// The messages that only the tests use. `LoadDevice`, `LockDevice` and `ApplySettings` are in
+// `messages-management.proto` of the firmware, and the `DebugLink*` messages are in
+// `messages-debug.proto` (`common/protob`, release 2.13.1). `tests/emulator-rig/check-proto.py`
+// compares them with the .proto files, as it does for `src/proto.rs`.
 
 #[derive(Clone, PartialEq, Message)]
 struct LoadDevice {
@@ -128,7 +131,7 @@ impl Wire for DebugLinkPairingInfo {
 // The processes.
 
 /// The emulator and the model server, and the directory that holds their files. The processes
-/// stop and the directory goes when this value drops.
+/// stop and the directory goes when this value drops, unless the test is failing.
 struct Rig {
   emulator: Child,
   model: Child,
@@ -299,7 +302,12 @@ impl Drop for Rig {
     let _ = self.emulator.wait();
     let _ = self.model.kill();
     let _ = self.model.wait();
-    let _ = std::fs::remove_dir_all(&self.profile);
+    // A test that fails keeps the logs of both processes, because they say what the device did.
+    if std::thread::panicking() {
+      eprintln!("The emulator logs are in {}", self.profile.display());
+    } else {
+      let _ = std::fs::remove_dir_all(&self.profile);
+    }
   }
 }
 
@@ -1271,7 +1279,8 @@ fn cancelling_on_the_code_screen_ends_the_session_at_once_and_the_next_one_works
   );
   let (screen, pressed_at) = ui.pressed.take().expect("the user pressed the code screen");
   let error = error_of(result);
-  // The review measured about 21 seconds and a wrong message on the same device.
+  // The session listens to the device between two polls of the user, so it ends within a second
+  // or two. Five seconds leaves room for a slow runner and stays far below the user's patience.
   println!(
     "the cancel on the code screen ended the session after {:?}",
     pressed_at.elapsed()
@@ -1650,6 +1659,58 @@ fn a_change_output_at_a_high_address_number_is_refused_before_the_device_signs()
     "{:?}",
     emulator.screens()
   );
+}
+
+#[test]
+fn a_sweep_shows_its_screens_in_order() {
+  let (mnemonic, mut vault) = vault_for(None, Network::Testnet);
+  let Some(emulator) = Emulator::start(Emulator::default_script()) else {
+    return;
+  };
+  emulator.load_seed(mnemonic, None, false);
+  let before = emulator.screens().len();
+  let psbt = vault.sweep_psbt();
+  assert_eq!(
+    psbt.unsigned_tx.lock_time.to_consensus_u32(),
+    SWEEP_HEIGHT,
+    "the sweep carries a lock time, as the one in the app does"
+  );
+  let (result, _) = emulator.sign(&mut vault, Some(psbt.clone()), Code::Right);
+  let outcome = result.expect("the session signs");
+  let screens = emulator.screens()[before..].to_vec();
+  // The sign bubble and the README tell the customer this order. The address and the amount of a
+  // recipient are two screens. The lock time comes after the last recipient and before the total.
+  let order: Vec<&str> = screens
+    .iter()
+    .filter_map(|screen| {
+      let text = plain(screen);
+      if text.contains("Recipient #1") {
+        Some("recipient 1")
+      } else if text.contains("Confirm Locktime") {
+        Some("lock time")
+      } else if text.contains("Total amount") {
+        Some("total")
+      } else {
+        None
+      }
+    })
+    .collect();
+  assert_eq!(
+    order,
+    ["recipient 1", "recipient 1", "lock time", "total"],
+    "{screens:?}"
+  );
+  let lock_time = screens
+    .iter()
+    .map(|screen| plain(screen))
+    .find(|text| text.contains("Confirm Locktime"))
+    .expect("the lock-time screen");
+  assert!(
+    lock_time.contains(&format!("Locktime set to blockheight {SWEEP_HEIGHT}")),
+    "{lock_time}"
+  );
+  assert_total(&screens, &psbt);
+  finalize(&vault, outcome);
 }
 
 #[test]

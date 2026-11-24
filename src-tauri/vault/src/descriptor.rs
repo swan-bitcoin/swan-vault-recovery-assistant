@@ -225,16 +225,6 @@ pub fn parse_vault(
 }
 
 impl ParsedVault {
-  /// The number of signatures that spend from the vault.
-  pub fn threshold(&self) -> usize {
-    self.threshold
-  }
-
-  /// The keys, in descriptor order.
-  pub fn keys(&self) -> &[VaultKey] {
-    &self.keys
-  }
-
   /// Finds the connected device's key. `our_root_fingerprint` is the fingerprint of the device's
   /// master key.
   pub fn for_device(self, our_root_fingerprint: Fingerprint) -> Result<Vault, Error> {
@@ -356,13 +346,13 @@ mod tests {
   #[test]
   fn the_parsed_vault_lists_the_keys_and_the_threshold_before_a_device_is_known() {
     let parsed = parse_vault(DEVICE, &webapp_descriptor("/0/*"), None).expect("parsed");
-    assert_eq!(parsed.threshold(), 2);
-    assert_eq!(parsed.keys().len(), 3);
+    assert_eq!(parsed.threshold, 2);
+    assert_eq!(parsed.keys.len(), 3);
     assert_eq!(
-      parsed.keys()[0].origin,
+      parsed.keys[0].origin,
       Some((fingerprint("7737acb8"), DerivationPath::master()))
     );
-    assert_eq!(parsed.keys()[1].xpub, xpub(GHOST_MACHINE_XPUB));
+    assert_eq!(parsed.keys[1].xpub, xpub(GHOST_MACHINE_XPUB));
   }
 
   #[test]

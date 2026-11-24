@@ -77,6 +77,30 @@ pub fn session_running() -> bool {
   matches!(SESSION.try_lock(), Err(TryLockError::WouldBlock))
 }
 
+/// What `enumerate` does when the scans for the BitBox02 and the Safe 7 are done.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AfterScan {
+  /// Return the devices that the scans found. HWI is not asked.
+  Devices,
+  /// A Safe 7 session runs. Return the busy error.
+  Busy,
+  /// Nothing was found and nothing runs. Ask HWI.
+  AskHwi,
+}
+
+/// Decides what `enumerate` does next. HWI must not look while a Safe 7 session runs: the session
+/// has claimed its device, so the scan may find nothing, and HWI would send the old protocol to
+/// the Safe 7 that the session uses.
+pub fn after_scan(found_any: bool, session_running: bool) -> AfterScan {
+  if found_any {
+    AfterScan::Devices
+  } else if session_running {
+    AfterScan::Busy
+  } else {
+    AfterScan::AskHwi
+  }
+}
+
 /// A Trezor Safe 7 found on USB. Finding it sends nothing to the device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DetectedDevice {
@@ -198,6 +222,11 @@ fn select_device(devices: &[DetectedDevice]) -> Result<usize, Error> {
   Ok(0)
 }
 
+/// The section of the README that explains the udev rule. The packaged app has no README file, so
+/// the message carries the link. A test checks that the README has this heading.
+const LINUX_ACCESS_URL: &str =
+  "https://github.com/swan-bitcoin/swan-vault-recovery-assistant#linux-allow-access-to-the-trezor-safe-7";
+
 /// The device was listed, but the operating system refused to open it or to give its interface to
 /// SVRA. The usual cause is another program that holds the interface, such as Trezor Suite.
 fn open_error(kind: nusb::ErrorKind) -> Error {
@@ -207,10 +236,9 @@ fn open_error(kind: nusb::ErrorKind) -> Error {
   if kind == nusb::ErrorKind::Disconnected {
     message = String::from("The Trezor Safe 7 was unplugged. Plug it in again and try again.");
   } else if cfg!(target_os = "linux") {
-    // The packaged app has no README file, so the message carries the link.
-    message.push_str(
-      " If Trezor Suite is closed, your user may lack the right to open the device. Add the udev rule, then plug the Trezor Safe 7 in again. The steps are at https://github.com/swan-bitcoin/swan-vault-recovery-assistant#linux-allow-access-to-the-trezor-safe-7",
-    );
+    message.push_str(&format!(
+      " If Trezor Suite is closed, your user may lack the right to open the device. Add the udev rule, then plug the Trezor Safe 7 in again. The steps are at {LINUX_ACCESS_URL}"
+    ));
   }
   Error::new(ErrorKind::Communication, message)
 }
@@ -521,6 +549,23 @@ mod tests {
   }
 
   #[test]
+  fn a_scan_that_finds_a_device_returns_it_whether_or_not_a_session_runs() {
+    for running in [false, true] {
+      assert_eq!(after_scan(true, running), AfterScan::Devices);
+    }
+  }
+
+  #[test]
+  fn a_scan_that_finds_nothing_during_a_session_does_not_ask_hwi() {
+    assert_eq!(after_scan(false, true), AfterScan::Busy);
+  }
+
+  #[test]
+  fn a_scan_that_finds_nothing_with_no_session_asks_hwi() {
+    assert_eq!(after_scan(false, false), AfterScan::AskHwi);
+  }
+
+  #[test]
   fn a_running_session_is_reported() {
     // Only this test touches the real lock, and it never holds it across a call to a device.
     assert!(!session_running());
@@ -591,16 +636,35 @@ mod tests {
       let error = open_error(kind);
       assert_eq!(error.kind, ErrorKind::Communication);
       assert!(error.message.contains("Trezor Suite"), "{}", error.message);
-      // The frontend and the README agree on this anchor.
       assert_eq!(
-        error
-          .message
-          .contains("#linux-allow-access-to-the-trezor-safe-7"),
+        error.message.contains(LINUX_ACCESS_URL),
         cfg!(target_os = "linux"),
         "{}",
         error.message
       );
     }
+  }
+
+  #[test]
+  fn the_readme_has_the_section_that_the_linux_message_links_to() {
+    // GitHub makes the anchor of a heading from its text: lower case, words joined by hyphens,
+    // and no punctuation.
+    let anchor = LINUX_ACCESS_URL.split_once('#').expect("an anchor").1;
+    let anchors: Vec<String> = include_str!("../../../README.md")
+      .lines()
+      .filter(|line| line.starts_with('#'))
+      .map(|heading| {
+        heading
+          .trim_start_matches('#')
+          .trim()
+          .to_lowercase()
+          .chars()
+          .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-')
+          .map(|c| if c == ' ' { '-' } else { c })
+          .collect()
+      })
+      .collect();
+    assert!(anchors.iter().any(|found| found == anchor), "{anchors:?}");
   }
 
   #[test]

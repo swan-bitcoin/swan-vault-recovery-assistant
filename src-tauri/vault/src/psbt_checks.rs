@@ -76,7 +76,7 @@ fn spent_output<'a>(
 
 /// The key of the device among the key origins of an input or an output: the first key with its
 /// fingerprint, as the vendor libraries pick it.
-pub fn key_of_device(
+pub(crate) fn key_of_device(
   key_origins: &BTreeMap<SecpPublicKey, KeySource>,
   fingerprint: Fingerprint,
 ) -> Option<(SecpPublicKey, &DerivationPath)> {
@@ -144,7 +144,7 @@ pub fn vault_public_key(
 }
 
 /// The witness script that the vault has at `steps`.
-pub fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<ScriptBuf> {
+pub(crate) fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<ScriptBuf> {
   let mut script = Builder::new().push_int(vault.threshold as i64);
   for key_index in 0..vault.keys.len() {
     let key = vault_public_key(vault, key_index, steps)?;
