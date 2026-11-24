@@ -74,9 +74,7 @@ pub fn window_closed(label: &str) {
   PAIRING.cancel_owned_by(label);
 }
 
-/// The error for a scan that finds no Safe 7 while a session runs. The session has claimed the
-/// device, and the operating system may not list a claimed device. HWI must not look then,
-/// because it would send the old protocol to the Safe 7 that the session uses.
+/// The error for a scan that finds no device while a Safe 7 session runs.
 pub fn busy_error() -> SvraError {
   SvraError::new(SvraErrorType::TrezorError, BUSY_MESSAGE)
 }
@@ -86,11 +84,28 @@ pub fn session_running() -> bool {
   svra_trezor::session_running()
 }
 
-/// A page only starts a run when it has no run open, so a code wait that is still open when a run
-/// starts belongs to a page that was reloaded or cleared. Ending it lets its session let go of
-/// the device.
-fn end_orphaned_wait(codes: &PairingCodes) {
-  let _ = codes.cancel();
+/// What `enumerate` does after it asked for the BitBox02 and Safe 7 devices.
+#[derive(Debug, PartialEq)]
+pub enum AfterScan {
+  /// Return these devices. HWI is not asked.
+  Devices(Vec<Value>),
+  /// A Safe 7 session runs. Return the busy error.
+  Busy,
+  /// Nothing was found and nothing runs. Ask HWI.
+  AskHwi,
+}
+
+/// Decides what `enumerate` does next. HWI must not look while a Safe 7 session runs: the session
+/// has claimed its device, so the scan may find nothing, and HWI would send the old protocol to
+/// the Safe 7 that the session uses.
+pub fn after_scan(devices: Vec<Value>, session_running: bool) -> AfterScan {
+  if !devices.is_empty() {
+    AfterScan::Devices(devices)
+  } else if session_running {
+    AfterScan::Busy
+  } else {
+    AfterScan::AskHwi
+  }
 }
 
 /// Lists the Trezor Safe 7 devices on USB, in the JSON shape of `hwi enumerate`. Returns no
@@ -172,8 +187,6 @@ pub async fn sign(
   on_progress: Channel<TrezorProgress>,
   window: tauri::Window,
 ) -> Result<String, SvraError> {
-  end_orphaned_wait(&PAIRING);
-
   // grab the txid before the device sees the PSBT so that we can detect unexpected edits. This is
   // the same check that the HWI path makes.
   let txid = extract_txid(&psbt)?;
@@ -192,7 +205,7 @@ pub async fn sign(
       window,
       wait: None,
     };
-    svra_trezor::sign_psbt_usb(request, &mut ui)
+    svra_trezor::sign_psbt_usb(&PAIRING, request, &mut ui)
   })
   .await
   .map_err(|_| {
@@ -282,20 +295,36 @@ mod tests {
   }
 
   #[test]
-  fn a_run_that_starts_ends_a_code_wait_that_nobody_answers() {
-    let codes = PairingCodes::new();
-    let orphan = codes.begin("main");
-    end_orphaned_wait(&codes);
-    assert_eq!(orphan.poll(Duration::from_millis(5)), CodeEntry::Cancelled);
-    // With no wait open, the call does nothing.
-    end_orphaned_wait(&codes);
+  fn a_scan_that_finds_a_device_returns_it_whether_or_not_a_session_runs() {
+    let devices = vec![json!({ "type": "trezor_safe7" })];
+    for running in [false, true] {
+      assert_eq!(
+        after_scan(devices.clone(), running),
+        AfterScan::Devices(devices.clone())
+      );
+    }
   }
 
   #[test]
-  fn a_scan_that_finds_nothing_during_a_session_says_that_the_session_runs() {
+  fn a_scan_that_finds_nothing_during_a_session_does_not_ask_hwi() {
+    assert_eq!(after_scan(Vec::new(), true), AfterScan::Busy);
+  }
+
+  #[test]
+  fn a_scan_that_finds_nothing_with_no_session_asks_hwi() {
+    assert_eq!(after_scan(Vec::new(), false), AfterScan::AskHwi);
+  }
+
+  #[test]
+  fn the_busy_error_tells_the_user_to_unplug_the_device() {
     let error = busy_error();
     assert_eq!(error.error_type, "TrezorError");
-    assert!(error.message.contains("still waiting"), "{}", error.message);
+    assert!(
+      error.message.contains("earlier signing attempt"),
+      "{}",
+      error.message
+    );
+    assert!(error.message.contains("Unplug"), "{}", error.message);
   }
 
   #[test]

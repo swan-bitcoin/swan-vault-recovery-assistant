@@ -861,12 +861,11 @@ impl Inner {
     let master = self.wallets[&session];
 
     // The transaction, from what the host sent.
-    let output_script = |output: &TxOutput| match &output.multisig {
-      Some(multisig) => ScriptBuf::new_p2wsh(&witness_script(multisig).wscript_hash()),
-      None => Address::from_str(output.address.as_deref().expect("an address"))
+    let output_script = |output: &TxOutput| {
+      Address::from_str(output.address.as_deref().expect("an address"))
         .expect("an address")
         .assume_checked()
-        .script_pubkey(),
+        .script_pubkey()
     };
     let transaction = Transaction {
       version: transaction::Version(state.tx.version.unwrap_or(1) as i32),

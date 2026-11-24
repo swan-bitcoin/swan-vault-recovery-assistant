@@ -9,6 +9,7 @@
 //! macOS, WinUSB on Windows) and has no C library to build.
 
 use crate::error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
+use crate::pairing_codes::PairingCodes;
 use crate::session::{sign_psbt, SignOutcome, SignRequest, Ui};
 use crate::transport::{Transport, TransportError, PACKET_LEN};
 use nusb::transfer::{Buffer, In, Interrupt, Out, TransferError};
@@ -50,7 +51,7 @@ const SESSION_START_WAIT: Duration = Duration::from_secs(2);
 const SESSION_START_STEP: Duration = Duration::from_millis(50);
 
 /// What the user reads when a session holds the device.
-pub const BUSY_MESSAGE: &str = "SVRA is still waiting for your Trezor Safe 7. Finish on the Trezor Safe 7 or in SVRA, or unplug the Trezor Safe 7 to stop. Then try again.";
+pub const BUSY_MESSAGE: &str = "An earlier signing attempt still uses the Trezor Safe 7. Unplug the Trezor Safe 7, plug it in again, then try again.";
 
 fn try_begin_session(lock: &Mutex<()>, wait: Duration) -> Result<MutexGuard<'_, ()>, Error> {
   let started = Instant::now();
@@ -284,22 +285,39 @@ impl Transport for UsbTransport {
   }
 }
 
-/// Opens the one connected Trezor Safe 7 and runs [`crate::sign_psbt`] on it.
-///
-/// This call blocks until the user finishes on the device. Call it from a thread that may block,
-/// and keep the whole call on that one thread. It returns [`ErrorKind::Busy`] when another call
-/// is still running after a short wait for it to end.
-pub fn sign_psbt_usb(request: SignRequest<'_>, ui: &mut dyn Ui) -> Result<SignOutcome, Error> {
-  sign_on_usb(&SESSION, SESSION_START_WAIT, request, ui)
+/// Takes the lock of a new session. The app starts a run only when its page has no run open, so a
+/// code wait that is still open belongs to a page that was reloaded or cleared, and its session
+/// holds the device for nobody. The wait ends first, which makes that session let go, and then
+/// the new session waits for the lock. This order is one function so that a test pins it.
+fn begin_session<'a>(
+  codes: &PairingCodes,
+  lock: &'a Mutex<()>,
+) -> Result<MutexGuard<'a, ()>, Error> {
+  let _ = codes.cancel();
+  try_begin_session(lock, SESSION_START_WAIT)
 }
 
-fn sign_on_usb(
-  lock: &Mutex<()>,
-  wait: Duration,
+/// Opens the one connected Trezor Safe 7 and runs [`crate::sign_psbt`] on it.
+///
+/// `codes` is where the window hands over the pairing code. A code wait that is still open there
+/// when this call starts is ended first. This call blocks until the user finishes on the device.
+/// Call it from a thread that may block, and keep the whole call on that one thread. It returns
+/// [`ErrorKind::Busy`] when another session is still running after a short wait for it to end.
+pub fn sign_psbt_usb(
+  codes: &PairingCodes,
   request: SignRequest<'_>,
   ui: &mut dyn Ui,
 ) -> Result<SignOutcome, Error> {
-  let _session = try_begin_session(lock, wait)?;
+  sign_on_usb(codes, &SESSION, request, ui)
+}
+
+fn sign_on_usb(
+  codes: &PairingCodes,
+  lock: &Mutex<()>,
+  request: SignRequest<'_>,
+  ui: &mut dyn Ui,
+) -> Result<SignOutcome, Error> {
+  let _session = begin_session(codes, lock)?;
   let mut found = find_devices()?;
   let devices: Vec<DetectedDevice> = found.iter().map(|found| found.device.clone()).collect();
   let chosen = found.swap_remove(select_device(&devices)?);
@@ -412,7 +430,7 @@ mod tests {
     let first = try_begin_session(&lock, NO_WAIT).expect("the first session starts");
     let error = try_begin_session(&lock, NO_WAIT).expect_err("the second session is refused");
     assert_eq!(error.kind, ErrorKind::Busy);
-    assert!(error.message.contains("unplug"), "{}", error.message);
+    assert!(error.message.contains("Unplug"), "{}", error.message);
     drop(first);
     assert!(try_begin_session(&lock, NO_WAIT).is_ok());
   }
@@ -448,6 +466,58 @@ mod tests {
     assert_eq!(error.kind, ErrorKind::Busy);
     assert!(started.elapsed() >= Duration::from_millis(120));
     assert!(started.elapsed() < Duration::from_secs(5));
+  }
+
+  #[test]
+  fn a_new_session_ends_the_code_wait_of_an_old_one_and_waits_for_its_lock() {
+    let codes = PairingCodes::new();
+    let lock = Mutex::new(());
+    std::thread::scope(|scope| {
+      let (held, is_held) = std::sync::mpsc::channel();
+      let (codes, lock) = (&codes, &lock);
+      // The old session of a page that was reloaded: it holds the device and waits for a code
+      // that nobody will type. It lets go a moment after its wait ends, as a session does.
+      scope.spawn(move || {
+        let session = try_begin_session(lock, NO_WAIT).expect("the old session starts");
+        let wait = codes.begin("main");
+        held.send(()).expect("the test listens");
+        for _ in 0..50 {
+          if wait.poll(Duration::from_millis(100)) == crate::session::CodeEntry::Cancelled {
+            break;
+          }
+        }
+        std::thread::sleep(Duration::from_millis(300));
+        drop(session);
+      });
+      is_held.recv().expect("the old session holds the lock");
+      let started = Instant::now();
+      // Without the cancel the old session waits for five seconds. Without the wait for the lock
+      // this call is refused at once.
+      let session = begin_session(codes, lock).expect("the new session gets the lock");
+      assert!(started.elapsed() >= Duration::from_millis(250));
+      assert!(started.elapsed() < SESSION_START_WAIT);
+      drop(session);
+    });
+  }
+
+  #[test]
+  fn a_new_session_is_refused_after_its_wait_when_the_old_one_runs_on() {
+    let codes = PairingCodes::new();
+    let lock = Mutex::new(());
+    let _running = try_begin_session(&lock, NO_WAIT).expect("the old session starts");
+    let started = Instant::now();
+    let error = begin_session(&codes, &lock).expect_err("the old session still runs");
+    assert_eq!(error.kind, ErrorKind::Busy);
+    assert!(started.elapsed() >= SESSION_START_WAIT);
+  }
+
+  #[test]
+  fn a_new_session_starts_at_once_when_nothing_runs() {
+    let codes = PairingCodes::new();
+    let lock = Mutex::new(());
+    let started = Instant::now();
+    assert!(begin_session(&codes, &lock).is_ok());
+    assert!(started.elapsed() < Duration::from_millis(500));
   }
 
   #[test]
@@ -505,7 +575,7 @@ mod tests {
     let mut ui = SilentUi(0);
     let lock = Mutex::new(());
     let running = try_begin_session(&lock, NO_WAIT).expect("the lock is free");
-    let result = sign_on_usb(&lock, NO_WAIT, request, &mut ui);
+    let result = sign_on_usb(&PairingCodes::new(), &lock, request, &mut ui);
     drop(running);
     let error = match result {
       Ok(_) => panic!("a session started while another one was running"),

@@ -199,8 +199,8 @@ pub fn sign_psbt<T: Transport>(
   let result = run(&mut device, state, request, coin);
   if let Err(error) = &result {
     // A device that is gone cannot be told. For any other failure the device may still wait for
-    // the user, so tell it to stop.
-    if error.kind != ErrorKind::Communication {
+    // the user, so tell it to stop. That includes the end of the user's ten minutes.
+    if error.kind != ErrorKind::Communication || device.user_timed_out {
       device.abandon();
     }
   }
@@ -263,14 +263,7 @@ fn run<X: Transport>(
     });
   }
 
-  let plan = prepare(
-    &request.psbt,
-    &vault,
-    fingerprint,
-    &our_keys,
-    request.network,
-    coin,
-  )?;
+  let plan = prepare(&request.psbt, &vault, &our_keys, request.network, coin)?;
   let signed = device.sign(session, &request.psbt, &plan)?;
   verify_signed(&request.psbt, &signed, &our_keys, &vault)?;
 
@@ -609,7 +602,7 @@ mod tests {
     let error = error_of(result);
     assert_eq!(error.kind, ErrorKind::PairingRejected);
     assert!(
-      error.message.contains("cancelled on the Trezor"),
+      error.message.contains("stopped the pairing"),
       "{}",
       error.message
     );
@@ -670,7 +663,7 @@ mod tests {
   }
 
   #[test]
-  fn a_user_who_types_nothing_for_ten_minutes_ends_the_session() {
+  fn a_user_who_types_nothing_for_ten_minutes_ends_the_session_and_the_device_is_told_to_stop() {
     let (device, mut vault) = setup(Behavior::default(), Network::Testnet);
     let (result, _) = attempt(&device, &mut vault, None, Code::Never);
     let error = error_of(result);
@@ -680,6 +673,11 @@ mod tests {
       "{}",
       error.message
     );
+    // The device still shows its code, so SVRA tells it to stop.
+    assert!(device
+      .received()
+      .iter()
+      .any(|(_, kind)| *kind == crate::proto::Cancel::TYPE));
   }
 
   #[test]

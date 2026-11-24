@@ -16,9 +16,9 @@ use std::collections::BTreeMap;
 const HARDENED: u32 = 0x8000_0000;
 
 /// The highest address index that an output to the device's own key may have. The BitBox02
-/// firmware refuses a higher one. The Trezor firmware treats an output as change, and does not show
-/// it, up to index 1,000,000. A wallet that looks for its funds with a normal gap limit does not
-/// scan so far, so change at a high index would be hidden from the user and hard to find.
+/// firmware refuses a higher one. A wallet that looks for its funds with a normal gap limit does
+/// not scan so far, so money at a high index is hard to find again. The refusal text writes this
+/// number with a thousands separator.
 const MAX_OWN_ADDRESS_INDEX: u32 = 9_999;
 
 /// The first sentence of every refusal in this file. SVRA builds the transaction with all the data
@@ -239,11 +239,10 @@ pub fn precheck(
   Ok(keys)
 }
 
-/// Checks the outputs that claim to belong to the device. The device does not show such an output
-/// as a payment, so its script must be the vault's script at the key path that the PSBT gives,
-/// and its address number must be one that a wallet finds again.
+/// Checks the outputs that claim to belong to the device. A device may take such an output for
+/// change, so its script must be the vault's script at the key path that the PSBT gives, and its
+/// address number must be one that a wallet finds again.
 fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result<(), Error> {
-  let device = vault.device_name();
   if psbt.outputs.len() != psbt.unsigned_tx.output.len() {
     return Err(invalid_psbt(
       "It does not have one output record for each output.",
@@ -269,7 +268,7 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
     if let Some([_, ChildNumber::Normal { index }]) = steps {
       if index > MAX_OWN_ADDRESS_INDEX {
         return Err(invalid_psbt(format!(
-          "Output {number} pays to address number {index} of the vault. SVRA signs only outputs to address numbers up to {MAX_OWN_ADDRESS_INDEX}, because the {device} may not show such an output, and a wallet may not look for funds at a higher number."
+          "Output {number} pays to address number {index} of the vault. SVRA signs only outputs to address numbers up to 9,999, because a wallet may not find such an output again."
         )));
       }
     }
@@ -278,7 +277,7 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
       .map(|witness_script| ScriptBuf::new_p2wsh(&witness_script.wscript_hash()));
     if vault_script.as_ref() != Some(&tx_output.script_pubkey) {
       return Err(invalid_psbt(format!(
-        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path. The {device} would not show it as a payment."
+        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path."
       )));
     }
   }
@@ -817,6 +816,12 @@ mod tests {
   }
 
   #[test]
+  fn the_refusal_text_names_the_highest_address_number() {
+    // The text of the refusal says "9,999".
+    assert_eq!(MAX_OWN_ADDRESS_INDEX, 9_999);
+  }
+
+  #[test]
   fn accepts_an_own_output_at_the_highest_address_number() {
     let mut case = case();
     pay_to_own_address(&mut case, 1, MAX_OWN_ADDRESS_INDEX);
@@ -843,7 +848,7 @@ mod tests {
         "{}",
         error.message
       );
-      assert!(error.message.contains("up to 9999"), "{}", error.message);
+      assert!(error.message.contains("up to 9,999"), "{}", error.message);
     }
   }
 

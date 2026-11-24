@@ -31,9 +31,11 @@ describe('getTrezorStepMessage()', () => {
     expect(bubble).toContain('PIN')
   })
 
-  it('should give the pairing question as the Trezor shows it', () => {
+  it('should give the pairing question in English, as an example of what the Trezor shows', () => {
     const { bubble } = getTrezorStepMessage({ step: 'confirm-connection' })
-    expect(bubble).toContain('"Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?"')
+    expect(bubble).toContain(
+      'In English, it asks: "Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?"'
+    )
     expect(bubble).toContain('Confirm on the Trezor')
   })
 
@@ -52,11 +54,12 @@ describe('getTrezorStepMessage()', () => {
     expect(message).not.toHaveProperty('bubble')
   })
 
-  it('should ask for the passphrase without saying which wallet was checked', () => {
+  it('should ask for the passphrase without saying which wallet was checked and without advice about it', () => {
     const { bubble } = getTrezorStepMessage({ step: 'passphrase' })
     expect(bubble).toContain('Your Trezor asks for your passphrase. Enter it on the Trezor.')
     expect(bubble).toContain('standard wallet or in a passphrase wallet')
-    expect(bubble).toContain('confirm an empty passphrase')
+    // an empty passphrase helps only a Trezor that always asks, and the bubble cannot tell which one this is
+    expect(bubble).not.toMatch(/empty/i)
     // the device can ask before SVRA has checked the standard wallet
     expect(bubble).not.toContain('holds no key')
   })
@@ -64,9 +67,16 @@ describe('getTrezorStepMessage()', () => {
   it('should tell the user what the Safe 7 shows when it signs, and not promise a multisig warning or the keys', () => {
     const { bubble } = getTrezorStepMessage({ step: 'sign' })
     expect(bubble).toContain('does not know your vault and does not show its keys')
-    expect(bubble).toContain('the address and the amount of each payment, then the total with the fee')
-    expect(bubble).toContain('hold to confirm')
-    expect(bubble).not.toMatch(/warn|multisig|whatever keys/i)
+    expect(bubble).toContain('every output as a recipient, with its address and its amount, then the total with the fee')
+    expect(bubble).toContain('An output that returns to your vault is shown too')
+    expect(bubble).toContain('hold the "Hold to sign" button')
+    expect(bubble).not.toMatch(/warn|multisig|whatever keys|change/i)
+  })
+
+  it('should tell the user to check every address and amount, and not to confirm one that is unexpected', () => {
+    const { bubble } = getTrezorStepMessage({ step: 'sign' })
+    expect(bubble).toContain('Check every address and every amount')
+    expect(bubble).toContain('If the Trezor shows an address that you do not expect, do not confirm')
   })
 
   it('should say how to stop at every step that waits for the user', () => {

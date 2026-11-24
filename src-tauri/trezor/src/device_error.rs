@@ -87,11 +87,11 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
   match (code, step) {
     (Some(FailureType::ActionCancelled), Step::Pair | Step::PairCode) => error(
       ErrorKind::PairingRejected,
-      "The pairing was cancelled on the Trezor Safe 7. Start again, and allow the connection when the Trezor Safe 7 asks.",
+      "The Trezor Safe 7 stopped the pairing. Either you cancelled on it, or it locked itself after some minutes without a touch. Start again, and allow the connection when the Trezor Safe 7 asks.",
     ),
     (Some(FailureType::ActionCancelled), _) => error(
       ErrorKind::UserAbort,
-      "You cancelled on the Trezor Safe 7. Nothing was signed. Start again when you are ready.",
+      "The Trezor Safe 7 stopped the signing. Either you cancelled on it, or it locked itself after some minutes without a touch. Nothing was signed, so start again when you are ready.",
     ),
     // The device rejects a tag that does not fit the code with a data error. Any other failure
     // at this step has its own message below.
@@ -130,16 +130,18 @@ pub(crate) fn failure_error(failure: &Failure, step: Step) -> Error {
         "SVRA lost contact with the Trezor Safe 7. {SUITE_ADVICE} {RESTART_ADVICE}"
       ),
     ),
-    // The text of the device only decides which message to show. It is never shown.
-    (Some(FailureType::DataError), Step::Query)
+    // The text of the device only decides which message to show. It is never shown. A key path
+    // that the device refuses comes at the key query for an unusual account path, and at the
+    // signing for a coin that does not fit the path.
+    (Some(FailureType::DataError), Step::Query | Step::Sign)
       if failure
         .message
         .as_deref()
         .is_some_and(|text| text.contains("Forbidden key path")) =>
     {
       error(
-        ErrorKind::KeyNotInVault,
-        "The Trezor Safe 7 refuses to give the key that your vault uses. Check that the wallet configuration is the one from your Swan Vault Recovery Sheet. If it is, contact Swan support.",
+        ErrorKind::ForbiddenKeyPath,
+        "The Trezor Safe 7 refuses the key path of this wallet configuration. Check that the wallet configuration is the one from your Swan Vault Recovery Sheet. Check also that the network that you selected in SVRA is the network of your vault.",
       )
     }
     (Some(FailureType::NotEnoughFunds), Step::Sign) => error(
@@ -209,18 +211,21 @@ mod tests {
   }
 
   #[test]
-  fn cancelling_while_signing_is_a_user_abort() {
+  fn a_stop_by_the_device_while_signing_names_both_causes() {
     let mapped = failure_error(&failure(FailureType::ActionCancelled, None), Step::Sign);
     assert_eq!(mapped.kind, ErrorKind::UserAbort);
-    assert!(
-      mapped.message.contains("Nothing was signed"),
-      "{}",
-      mapped.message
-    );
+    for phrase in [
+      "cancelled on it",
+      "locked itself",
+      "Nothing was signed",
+      "start again",
+    ] {
+      assert!(mapped.message.contains(phrase), "{}", mapped.message);
+    }
   }
 
   #[test]
-  fn cancelling_the_connection_dialog_is_a_refused_pairing() {
+  fn a_stop_by_the_device_at_the_connection_dialog_is_a_refused_pairing() {
     let mapped = failure_error(&failure(FailureType::ActionCancelled, None), Step::Pair);
     assert_eq!(mapped.kind, ErrorKind::PairingRejected);
     assert!(mapped.message.contains("Start again"), "{}", mapped.message);
@@ -264,14 +269,17 @@ mod tests {
   }
 
   #[test]
-  fn cancelling_on_the_code_screen_is_a_cancelled_pairing() {
+  fn a_stop_by_the_device_on_the_code_screen_names_both_causes() {
     let mapped = failure_error(&failure(FailureType::ActionCancelled, None), Step::PairCode);
     assert_eq!(mapped.kind, ErrorKind::PairingRejected);
-    assert!(
-      mapped.message.contains("cancelled on the Trezor"),
-      "{}",
-      mapped.message
-    );
+    for phrase in [
+      "stopped the pairing",
+      "cancelled on it",
+      "locked itself",
+      "Start again",
+    ] {
+      assert!(mapped.message.contains(phrase), "{}", mapped.message);
+    }
   }
 
   #[test]
@@ -294,12 +302,20 @@ mod tests {
   }
 
   #[test]
-  fn a_forbidden_key_path_is_explained() {
-    let mapped = failure_error(
-      &failure(FailureType::DataError, Some("Forbidden key path")),
-      Step::Query,
-    );
-    assert_eq!(mapped.kind, ErrorKind::KeyNotInVault);
+  fn a_forbidden_key_path_is_its_own_error() {
+    for step in [Step::Query, Step::Sign] {
+      let mapped = failure_error(
+        &failure(FailureType::DataError, Some("Forbidden key path")),
+        step,
+      );
+      // It is not "the key is not in the vault": the session must not ask for a passphrase.
+      assert_eq!(mapped.kind, ErrorKind::ForbiddenKeyPath, "{step:?}");
+      assert!(
+        mapped.message.contains("network that you selected"),
+        "{}",
+        mapped.message
+      );
+    }
   }
 
   #[test]

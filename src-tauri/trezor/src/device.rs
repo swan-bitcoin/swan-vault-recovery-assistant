@@ -2,7 +2,7 @@
 
 use crate::device_error::{failure_error, link_error, unexpected_message, Step};
 use crate::error::Error;
-use crate::link::{timeout_error, Deadline, Link, Raw};
+use crate::link::{timeout_error, Deadline, Link, LinkError, Raw};
 use crate::proto::{ButtonAck, Cancel, Failure, Wire};
 use crate::session::{Progress, Ui};
 use crate::transport::Transport;
@@ -22,6 +22,8 @@ pub(crate) struct Device<'a, X: Transport> {
   session: u8,
   /// The progress that the last button request announced, so that the user hears it once.
   announced: Option<Progress>,
+  /// A wait gave the user the whole of their time and ran out. The device is still there then.
+  pub(crate) user_timed_out: bool,
 }
 
 impl<'a, X: Transport> Device<'a, X> {
@@ -31,14 +33,24 @@ impl<'a, X: Transport> Device<'a, X> {
       ui,
       session: 0,
       announced: None,
+      user_timed_out: false,
     }
+  }
+
+  /// The error for a wait that ran out. The session tells the device to stop after the user's
+  /// whole time, because the device keeps its screen until someone tells it otherwise.
+  pub(crate) fn wait_ran_out(&mut self, patience: Duration) -> Error {
+    let error = timeout_error(patience);
+    self.user_timed_out = error == LinkError::UserTimeout;
+    link_error(error)
   }
 
   /// Waits for the next message of `session`. A wait that runs out is an error.
   fn receive_for(&mut self, session: u8, patience: Duration) -> Result<Raw, Error> {
-    self
-      .listen(session, patience)?
-      .ok_or_else(|| link_error(timeout_error(patience)))
+    match self.listen(session, patience)? {
+      Some(raw) => Ok(raw),
+      None => Err(self.wait_ran_out(patience)),
+    }
   }
 
   /// Listens to the device for at most `wait`, and acknowledges what it sends. Messages of other

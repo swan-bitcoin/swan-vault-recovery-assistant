@@ -4,9 +4,9 @@
 
 use crate::cpace;
 use crate::device::Device;
-use crate::device_error::{failure_error, link_error, unexpected_message, Step};
+use crate::device_error::{failure_error, unexpected_message, Step};
 use crate::error::{Error, ErrorKind};
-use crate::link::{random_bytes, Deadline, LinkError, QUICK, USER};
+use crate::link::{random_bytes, Deadline, QUICK, USER};
 use crate::proto::{
   Failure, ThpCodeEntryChallenge, ThpCodeEntryCommitment, ThpCodeEntryCpaceHostTag,
   ThpCodeEntryCpaceTrezor, ThpCodeEntrySecret, ThpEndRequest, ThpEndResponse, ThpPairingMethod,
@@ -92,7 +92,7 @@ impl<X: Transport> Device<'_, X> {
       }
       patience.silence(look);
       if patience.expired() {
-        return Err(link_error(LinkError::UserTimeout));
+        return Err(self.wait_ran_out(USER));
       }
     }
   }

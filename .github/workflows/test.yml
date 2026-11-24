@@ -135,9 +135,9 @@ jobs:
     # support CPython 3.10 to 3.12, and `ubuntu-latest` is Ubuntu 26.04 now.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # This job compiles third-party build scripts and runs downloaded binaries. Its GITHUB_TOKEN is
-    # read-only, and neither that token nor the token for the private actions stays in the git
-    # config of a checkout.
+    # This job compiles third-party build scripts and runs downloaded binaries, so it holds no
+    # secret: it uses no private action and no token of Swan. Its GITHUB_TOKEN is read-only and
+    # stays out of the git config of the checkout.
     permissions:
       contents: read
     env:
@@ -170,21 +170,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: checkout private actions
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          repository: swan-bitcoin/actions
-          ref: master
-          token: ${{ secrets.GH_PAT_ACTIONS_ACCESS }}
-          path: .github/private-actions
-          persist-credentials: false
-
       - name: set up rust
-        uses: ./.github/private-actions/actions-rs/toolchain
-        with:
-          # Same pinned version as the rust tests job.
-          toolchain: 1.100.0
-          override: true
+        # rustup is on the runner image, so no action and no token are needed. The job needs
+        # neither rustfmt nor clippy, because the rust tests job runs them. Same pinned version as
+        # the rust tests job.
+        run: |
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup default 1.100.0
+          rustc --version
 
       - name: set the paths of the emulator rig
         # The tests read these three variables. They are the same names as on a developer machine.

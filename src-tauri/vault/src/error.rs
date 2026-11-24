@@ -17,6 +17,9 @@ pub enum ErrorKind {
   UnsupportedDescriptor,
   /// The connected device holds none of the keys in the descriptor.
   KeyNotInVault,
+  /// The device refuses to give the key at the path of the vault's key, so the wallet
+  /// configuration and the network do not fit each other.
+  ForbiddenKeyPath,
   /// The device already holds a different wallet under the names the app would register.
   PolicyNameTaken,
   /// The PSBT lacks data the device needs, or does not belong to this vault.

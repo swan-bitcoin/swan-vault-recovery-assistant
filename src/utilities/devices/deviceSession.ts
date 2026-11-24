@@ -67,19 +67,7 @@ const once =
     }
   }
 
-// Only an update that repeats the one before it is dropped. A step that comes back later is an instruction for that
-// moment, such as a second unlock or a second passphrase prompt.
-const notRepeated =
-  <P>(keyOf: (update: P) => string): UpdateFilter<P> =>
-  () => {
-    let last: string | null = null
-    return (update) => {
-      const key = keyOf(update)
-      if (key === last) return false
-      last = key
-      return true
-    }
-  }
+const showAll: UpdateFilter<unknown> = () => () => true
 
 // `start` calls the backend command with the channel it gets. `show` gets the updates that the filter lets through.
 async function runSession<T, P>(
@@ -118,15 +106,10 @@ export const runBitbox02Session = <T>(
     once((update) => (update.step === 'register' ? `register:${update.name}` : update.step))
   )
 
-// The backend sends a step again on purpose when the device asks again, so only a direct repeat is dropped.
+// No filter: the crate drops the repeats that mean nothing, so a step that comes again is on purpose. Examples are a
+// second unlock and a second passphrase prompt, which the user must see.
 export const runTrezorSession = <T>(
   run: SignRun,
   start: (onProgress: Channel<TrezorProgress>) => Promise<T>,
   show: (update: TrezorProgress) => void
-) =>
-  runSession(
-    run,
-    start,
-    show,
-    notRepeated((update) => update.step)
-  )
+) => runSession(run, start, show, showAll)

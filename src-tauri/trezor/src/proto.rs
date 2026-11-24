@@ -257,7 +257,6 @@ pub(crate) enum InputScriptType {
 #[repr(i32)]
 pub(crate) enum OutputScriptType {
   PayToAddress = 0,
-  PayToWitness = 4,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
@@ -381,14 +380,10 @@ pub(crate) struct TxInput {
 pub(crate) struct TxOutput {
   #[prost(string, optional, tag = "1")]
   pub address: Option<String>,
-  #[prost(uint32, repeated, packed = "false", tag = "2")]
-  pub address_n: Vec<u32>,
   #[prost(uint64, required, tag = "3")]
   pub amount: u64,
   #[prost(enumeration = "OutputScriptType", optional, tag = "4")]
   pub script_type: Option<i32>,
-  #[prost(message, optional, tag = "5")]
-  pub multisig: Option<MultisigRedeemScriptType>,
 }
 
 #[derive(Clone, PartialEq, Message)]

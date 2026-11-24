@@ -2,9 +2,9 @@
 //! device then asks for each input and each output, and for each previous transaction that an
 //! input spends, one request at a time. It sends one signature for each input along the way.
 //!
-//! The device keeps no wallet. Every input and every change output carries the three keys of
-//! the vault in the order of the descriptor, and the path that leads from them to the key of the
-//! address. The device checks that one of the three keys is its own.
+//! The device keeps no wallet. Every input carries the three keys of the vault in the order of the
+//! descriptor, and the path that leads from them to the key of the address. The device checks
+//! that one of the three keys is its own. Every output is a payment to an address.
 
 use crate::device::Device;
 use crate::device_error::{unexpected_message, Step};
@@ -19,13 +19,13 @@ use crate::proto::{
 };
 use crate::session::Progress;
 use crate::transport::Transport;
-use bitcoin::bip32::{ChildNumber, Fingerprint};
+use bitcoin::bip32::ChildNumber;
 use bitcoin::psbt::Psbt;
 use bitcoin::secp256k1::{self, ecdsa::Signature as RawSignature};
 use bitcoin::sighash::EcdsaSighashType;
 use bitcoin::{ecdsa, Address, Network, PublicKey, Transaction, Txid};
 use std::collections::{BTreeMap, HashMap};
-use svra_vault::{address_steps, key_of_device, vault_public_key, Vault};
+use svra_vault::{address_steps, vault_public_key, Vault};
 
 /// The fewest requests that a signing may take. A small transaction has a few dozen.
 const MIN_ROUND_LIMIT: usize = 128;
@@ -129,7 +129,6 @@ fn signature_slots(
 pub(crate) fn prepare(
   psbt: &Psbt,
   vault: &Vault,
-  fingerprint: Fingerprint,
   keys: &[secp256k1::PublicKey],
   network: Network,
   coin: &str,
@@ -171,45 +170,20 @@ pub(crate) fn prepare(
     previous.insert(wire_hash(source.compute_txid()), source.clone());
   }
 
+  // Every output goes to the device as a payment to an address, also one that returns to the
+  // vault. The device does not show an output that it knows as change, and a PSBT that someone
+  // edited can hide the whole vault in such an output. A payment is always on the screen.
   let mut outputs = Vec::with_capacity(transaction.output.len());
   for (index, tx_out) in transaction.output.iter().enumerate() {
-    let metadata = psbt
-      .outputs
-      .get(index)
-      .ok_or_else(|| invalid(format!("Output {index} has no data.")))?;
-    // An output that lists a key of the device was checked by the pre-check: it pays to the
-    // vault. The device shows an output that it knows as change, so the app announces only the
-    // change addresses (keychain 1) as such. A payment to an own receive address is a payment.
-    let own = match key_of_device(&metadata.bip32_derivation, fingerprint) {
-      Some((_, path)) => {
-        let steps = address_steps(vault, path)
-          .ok_or_else(|| invalid(format!("Output {index} does not belong to the vault.")))?;
-        Some((path, steps))
-      }
-      None => None,
-    };
-    outputs.push(match own {
-      Some((path, steps)) if steps[0] == (ChildNumber::Normal { index: 1 }) => TxOutput {
-        address: None,
-        address_n: path_numbers(path),
-        amount: tx_out.value.to_sat(),
-        script_type: Some(OutputScriptType::PayToWitness as i32),
-        multisig: Some(multisig(vault, &steps, vec![Vec::new(); vault.keys.len()])),
-      },
-      _ => {
-        let address = Address::from_script(&tx_out.script_pubkey, network).map_err(|_| {
-          invalid(format!(
-            "Output {index} pays to a script that the Trezor Safe 7 cannot show as an address, so it cannot sign the transaction."
-          ))
-        })?;
-        TxOutput {
-          address: Some(address.to_string()),
-          address_n: Vec::new(),
-          amount: tx_out.value.to_sat(),
-          script_type: Some(OutputScriptType::PayToAddress as i32),
-          multisig: None,
-        }
-      }
+    let address = Address::from_script(&tx_out.script_pubkey, network).map_err(|_| {
+      invalid(format!(
+        "Output {index} pays to a script that the Trezor Safe 7 cannot show as an address, so it cannot sign the transaction."
+      ))
+    })?;
+    outputs.push(TxOutput {
+      address: Some(address.to_string()),
+      amount: tx_out.value.to_sat(),
+      script_type: Some(OutputScriptType::PayToAddress as i32),
     });
   }
 
@@ -470,7 +444,6 @@ mod tests {
     prepare(
       &fixture.psbt,
       &fixture.view,
-      fixture.vault.device_fingerprint,
       &fixture.keys,
       Network::Testnet,
       "Testnet",
@@ -620,42 +593,53 @@ mod tests {
           .as_str()
       )
     );
-    assert!(output.multisig.is_none());
-    assert!(output.address_n.is_empty());
+  }
+
+  /// Asserts that every output of the plan is a payment to the address of the matching output of
+  /// the transaction, and that nothing marks it as change.
+  fn assert_all_outputs_are_payments(fixture: &Fixture, plan: &Plan) {
+    let transaction = &fixture.psbt.unsigned_tx;
+    assert_eq!(plan.outputs.len(), transaction.output.len());
+    assert_eq!(
+      plan.sign_tx.outputs_count as usize,
+      transaction.output.len()
+    );
+    for (output, tx_out) in plan.outputs.iter().zip(&transaction.output) {
+      assert_eq!(
+        output.script_type,
+        Some(OutputScriptType::PayToAddress as i32)
+      );
+      assert_eq!(output.amount, tx_out.value.to_sat());
+      assert_eq!(
+        output.address.as_deref(),
+        Some(
+          Address::from_script(&tx_out.script_pubkey, Network::Testnet)
+            .expect("an address")
+            .to_string()
+            .as_str()
+        )
+      );
+    }
   }
 
   #[test]
-  fn the_change_of_the_vault_is_announced_as_change() {
+  fn the_change_of_the_vault_goes_to_the_device_as_a_payment() {
     let fixture = fixture_with(|vault| vault.spend_with_change_psbt(120_000));
-    let plan = plan(&fixture);
-    assert_eq!(plan.outputs.len(), 2);
-    let change: Vec<&TxOutput> = plan
-      .outputs
-      .iter()
-      .filter(|output| output.script_type == Some(OutputScriptType::PayToWitness as i32))
-      .collect();
-    assert_eq!(change.len(), 1);
-    let change = change[0];
-    assert!(change.address.is_none());
-    let multisig = change.multisig.as_ref().expect("a multisig change output");
-    // Keychain 1 is the change keychain.
-    assert_eq!(multisig.address_n[0], 1);
-    assert_eq!(&change.address_n[4..], &multisig.address_n[..]);
-    assert_eq!(multisig.nodes.len(), 3);
-    assert_eq!(multisig.m, 2);
-    // The other output is a payment.
-    assert_eq!(
-      plan
+    assert!(
+      fixture
+        .psbt
         .outputs
         .iter()
-        .filter(|output| output.script_type == Some(OutputScriptType::PayToAddress as i32))
-        .count(),
-      1
+        .any(|output| !output.bip32_derivation.is_empty()),
+      "the change output lists the key of the device"
     );
+    let plan = plan(&fixture);
+    assert_eq!(plan.outputs.len(), 2);
+    assert_all_outputs_are_payments(&fixture, &plan);
   }
 
   #[test]
-  fn a_payment_to_an_own_receive_address_is_a_payment_and_not_change() {
+  fn an_output_to_a_receive_address_of_the_vault_goes_to_the_device_as_a_payment() {
     let fixture = fixture_with(|vault| {
       let own = vault
         .wallet
@@ -666,16 +650,19 @@ mod tests {
       builder.finish().expect("the spend is built")
     });
     let plan = plan(&fixture);
-    let own_receive = plan
-      .outputs
-      .iter()
-      .find(|output| output.amount == 30_000)
-      .expect("the payment");
-    assert_eq!(
-      own_receive.script_type,
-      Some(OutputScriptType::PayToAddress as i32)
-    );
-    assert!(own_receive.address.is_some());
+    assert_all_outputs_are_payments(&fixture, &plan);
+  }
+
+  #[test]
+  fn a_sweep_to_a_change_address_of_the_vault_goes_to_the_device_as_a_payment() {
+    let fixture = fixture_with(|vault| {
+      let mut psbt = vault.sweep_psbt();
+      vault.pay_to_own_address(&mut psbt, 0, KeychainKind::Internal, 9_999);
+      psbt
+    });
+    let plan = plan(&fixture);
+    assert_eq!(plan.outputs.len(), 1);
+    assert_all_outputs_are_payments(&fixture, &plan);
   }
 
   #[test]

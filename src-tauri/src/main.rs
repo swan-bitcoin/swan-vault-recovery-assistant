@@ -582,15 +582,13 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
     tokio::join!(bitbox02::enumerate(), trezor::enumerate());
   let devices: Vec<serde_json::Value> =
     bitbox02_devices.into_iter().chain(trezor_devices).collect();
-  if !devices.is_empty() {
-    return serde_json::to_string(&devices)
-      .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
-  }
-  // A Safe 7 session has claimed its device, and the operating system may not list a claimed
-  // device. Without this check the scan would find nothing, and HWI would send the old protocol
-  // to the device that the session uses.
-  if trezor::session_running() {
-    return Err(trezor::busy_error());
+  match trezor::after_scan(devices, trezor::session_running()) {
+    trezor::AfterScan::Devices(devices) => {
+      return serde_json::to_string(&devices)
+        .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
+    }
+    trezor::AfterScan::Busy => return Err(trezor::busy_error()),
+    trezor::AfterScan::AskHwi => {}
   }
 
   let network: HwiNetwork = network.into();
@@ -1085,7 +1083,8 @@ fn main() {
     .plugin(tauri_plugin_clipboard_manager::init())
     .plugin(tauri_plugin_shell::init())
     .on_window_event(|window, event| {
-      // A session that waits for a pairing code in a closed window would wait forever.
+      // A session that waits for a pairing code in a closed window has nobody to ask, so it ends
+      // now and does not wait for its ten minutes.
       if let tauri::WindowEvent::Destroyed = event {
         trezor::window_closed(window.label());
       }

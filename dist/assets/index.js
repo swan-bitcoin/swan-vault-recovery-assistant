@@ -766,15 +766,7 @@ const once = (keyOf) => () => {
     return true
   }
 }
-const notRepeated = (keyOf) => () => {
-  let last = null
-  return (update) => {
-    const key = keyOf(update)
-    if (key === last) return false
-    last = key
-    return true
-  }
-}
+const showAll = () => () => true
 async function runSession(run, start, show, filter) {
   let isSettled = false
   const isNew = filter()
@@ -797,13 +789,7 @@ const runBitbox02Session = (run, start, show) =>
     show,
     once((update) => (update.step === 'register' ? `register:${update.name}` : update.step))
   )
-const runTrezorSession = (run, start, show) =>
-  runSession(
-    run,
-    start,
-    show,
-    notRepeated((update) => update.step)
-  )
+const runTrezorSession = (run, start, show) => runSession(run, start, show, showAll)
 function getDeviceName(device) {
   switch (device.type) {
     case 'jade': {
@@ -971,8 +957,8 @@ function getTrezorStepMessage(update) {
     case 'confirm-connection':
       return {
         loading: WAITING,
-        // the question is the one that the Trezor shows, word for word, so that the user can find it on the screen
-        bubble: `Your Trezor asks: "Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?" Confirm on the Trezor. ${STOP}`,
+        // The Trezor shows the question in the language that the user chose, so the English text is only an example.
+        bubble: `Your Trezor asks you to allow the pairing. In English, it asks: "Allow Swan Vault Recovery Assistant on this computer to pair with this Trezor?" Confirm on the Trezor. ${STOP}`,
       }
     case 'enter-pairing-code':
       return {
@@ -986,22 +972,19 @@ function getTrezorStepMessage(update) {
     case 'passphrase':
       return {
         loading: WAITING,
-        // The device can ask before or after SVRA checked the standard wallet, so the text must hold at both moments.
-        bubble: `Your Trezor asks for your passphrase. Enter it on the Trezor. The key of this vault may be in the standard wallet or in a passphrase wallet. To open the standard wallet, confirm an empty passphrase. ${STOP}`,
+        // The device can ask before or after SVRA checked the standard wallet, and an empty passphrase helps only a Trezor
+        // that always asks. So the text gives no advice about the passphrase itself.
+        bubble: `Your Trezor asks for your passphrase. Enter it on the Trezor. The key of this vault may be in the standard wallet or in a passphrase wallet. ${STOP}`,
       }
     case 'sign':
       return {
         loading: WAITING,
-        // the Safe 7 shows no multisig warning and no keys; its address, amount and fee screens are the only check left
-        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. It shows the address and the amount of each payment, then the total with the fee. Check them, then hold to confirm. ${STOP}`,
+        // The Safe 7 shows no multisig warning and no keys. SVRA sends every output as a recipient, also one that returns
+        // to the vault, so the address and amount screens are the check that is left.
+        bubble: `Your Trezor now shows the transaction. It does not know your vault and does not show its keys. It shows every output as a recipient, with its address and its amount, then the total with the fee. An output that returns to your vault is shown too. Check every address and every amount. If the Trezor shows an address that you do not expect, do not confirm. If all are right, hold the "Hold to sign" button. ${STOP}`,
       }
   }
 }
-const TAKE_KEYBOARD = ['fo', 'cus'].join('')
-const takeKeyboard = (element) =>
-  element[TAKE_KEYBOARD]({
-    preventScroll: true,
-  })
 function createTrezorView() {
   let pairing = null
   return {
@@ -1068,7 +1051,7 @@ function showPairingCodeEntry() {
   const actions = createConversationActions({ content: controls, dangerouslySetInnerHTML: true })
   if (actions) {
     addToConversation(actions)
-    takeKeyboard(input)
+    input.focus({ preventScroll: true })
   } else {
     entry.cancel()
   }

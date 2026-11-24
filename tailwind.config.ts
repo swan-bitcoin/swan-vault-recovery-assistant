@@ -6,6 +6,9 @@ import type { Config } from 'tailwindcss'
 export default {
   darkMode: ['class'], // unclear whether there will be light/dark-mode
   content: ['./src/**/*.ts', '*.html'],
+  // Tailwind reads every word of the source as a possible class name. The name of the method that gives an element the
+  // keyboard matches a daisyUI class, and it would add unused rules to the bundle. Nothing in the app uses that class.
+  blocklist: ['focus'],
   plugins: [
     animatePlugin,
     daisyUI,

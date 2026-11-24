@@ -286,7 +286,7 @@ describe('runTrezorSession()', () => {
     expect(getPendingDevice()).toBeNull()
   })
 
-  it('should drop only an update that repeats the one before it, and in the order it arrives', async () => {
+  it('should show every update in the order it arrives, also a repeat', async () => {
     const command = deferred<string>()
     const show = vi.fn()
     let channel!: TrezorChannel
@@ -302,15 +302,16 @@ describe('runTrezorSession()', () => {
     channel.onmessage({ step: 'connecting' })
     channel.onmessage({ step: 'connecting' })
     channel.onmessage({ step: 'enter-pairing-code' })
-    channel.onmessage({ step: 'enter-pairing-code' })
     channel.onmessage({ step: 'checking-key' })
     channel.onmessage({ step: 'sign' })
     channel.onmessage({ step: 'sign' })
 
     expect(show.mock.calls.map(([update]) => update)).toStrictEqual([
       { step: 'connecting' },
+      { step: 'connecting' },
       { step: 'enter-pairing-code' },
       { step: 'checking-key' },
+      { step: 'sign' },
       { step: 'sign' },
     ])
 
@@ -360,7 +361,7 @@ describe('runTrezorSession()', () => {
     await session
   })
 
-  it('should not show the same step twice in a row, even after a step in between was dropped', async () => {
+  it('should show the second passphrase prompt that follows the first one at once', async () => {
     const command = deferred<string>()
     const show = vi.fn()
     let channel!: TrezorChannel
@@ -373,17 +374,24 @@ describe('runTrezorSession()', () => {
       show
     )
 
-    for (const step of ['passphrase', 'passphrase', 'checking-key', 'passphrase', 'passphrase'] as const) {
+    // the order that the crate sends when the first passphrase opens a wallet without the key of the vault
+    for (const step of ['checking-key', 'passphrase', 'passphrase', 'checking-key', 'sign'] as const) {
       channel.onmessage({ step })
     }
 
-    expect(show.mock.calls.map(([update]) => update.step)).toStrictEqual(['passphrase', 'checking-key', 'passphrase'])
+    expect(show.mock.calls.map(([update]) => update.step)).toStrictEqual([
+      'checking-key',
+      'passphrase',
+      'passphrase',
+      'checking-key',
+      'sign',
+    ])
 
     command.resolve('done')
     await session
   })
 
-  it('should keep a separate filter for each session', async () => {
+  it('should show the first update of every session', async () => {
     const show = vi.fn()
     for (let i = 0; i < 2; i++) {
       const command = deferred<string>()
