@@ -207,5 +207,12 @@ jobs:
             !src-tauri/target/release/swan_vault_recovery_assistant
           key: ${{ steps.restore-cargo-cache.outputs.cache-primary-key }}
 
+      - name: test the app glue
+        # The unit tests of the app crate (`src-tauri/src`). They use the profile and the feature of
+        # the build step, so the dependencies are compiled already and only the app crate builds
+        # again. The build step has made `dist` and the HWI binary that the build script needs.
+        working-directory: src-tauri
+        run: cargo test --locked --release --features custom-protocol --bin swan_vault_recovery_assistant
+
       - name: run the tests
         run: SVRA_SCENARIO_SKIP_BUILD=1 xvfb-run -a pnpm test:scenario

@@ -572,11 +572,14 @@ async fn estimate_fee(
 async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, SvraError> {
   let network = Network::from_str(&network)?;
 
-  // HWI is skipped when a BitBox02 is connected. HWI opens the BitBox02 during its own listing,
-  // starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the only
-  // program that talks to the device.
-  if let Some(response) = bitbox02::enumerate().await {
-    return response;
+  // HWI is not asked when the scan finds a BitBox02. HWI opens the BitBox02 during its own
+  // listing, starts an encrypted session and reads the BitBoxApp pairing file. SVRA must be the
+  // only program that talks to the device. When the scan misses a BitBox02 and HWI lists it, SVRA
+  // takes the device over and drops HWI's answer for it.
+  let devices = bitbox02::enumerate().await;
+  if !devices.is_empty() {
+    return serde_json::to_string(&devices)
+      .map_err(|e| SvraError::new(SvraErrorType::ParseError, &e.to_string()));
   }
 
   let network: HwiNetwork = network.into();
@@ -603,6 +606,10 @@ async fn enumerate(app: tauri::AppHandle, network: String) -> Result<String, Svr
 
   #[cfg(debug_assertions)]
   println!("{:?}", response);
+
+  if let Some(listing) = bitbox02::adopt_hwi_listing(&response) {
+    return Ok(listing);
+  }
 
   Ok(response)
 }

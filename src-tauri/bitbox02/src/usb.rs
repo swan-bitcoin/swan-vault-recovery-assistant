@@ -3,7 +3,7 @@ use crate::error::{Error, ErrorKind, BOOTLOADER_MESSAGE};
 use crate::session::{sign_psbt, Progress, SignOutcome, SignRequest};
 use bitbox_api::runtime::TokioRuntime;
 use bitbox_api::{BitBox, NoiseConfigNoCache};
-use hidapi::{HidApi, HidDevice};
+use hidapi::{DeviceInfo, HidApi, HidDevice};
 use std::ffi::{CStr, CString};
 use std::sync::{Mutex, MutexGuard, TryLockError};
 
@@ -37,7 +37,7 @@ const MODELS: [(&str, &str, &str); 4] = [
   ),
 ];
 
-const NOT_FOUND_MESSAGE: &str = "No BitBox02 found. Connect the BitBox02. Close the BitBoxApp, because only one program can use the BitBox02 at a time.";
+const NOT_FOUND_MESSAGE: &str = "No BitBox02 found. Connect the BitBox02. Close the BitBoxApp, because only one program can use the BitBox02 at a time. If the BitBox02 is connected, unplug it and plug it in again.";
 
 /// Held for the whole of one device session. A second session on the same device would wait for
 /// the first one without end, because the vendor library asks again each time the device answers
@@ -123,24 +123,30 @@ fn bootloader_model(
     .map(|(model, _, _)| *model)
 }
 
+/// The model of a HID entry that the scan accepts, and whether the device runs its bootloader.
+/// `None` for any other entry.
+fn classify(info: &DeviceInfo) -> Option<(&'static str, bool)> {
+  let product_string = info.product_string()?;
+  // The vendor test lists one device once, not once for each of its USB interfaces.
+  if bitbox_api::usb::is_bitbox02(info) {
+    Some((firmware_model(product_string)?, false))
+  } else {
+    let model = bootloader_model(
+      info.vendor_id(),
+      info.product_id(),
+      info.usage_page(),
+      info.interface_number(),
+      product_string,
+    )?;
+    Some((model, true))
+  }
+}
+
 fn find_devices(api: &HidApi) -> Vec<Found> {
   api
     .device_list()
     .filter_map(|info| {
-      let product_string = info.product_string()?;
-      // The vendor test lists one device once, not once for each of its USB interfaces.
-      let (model, bootloader) = if bitbox_api::usb::is_bitbox02(info) {
-        (firmware_model(product_string)?, false)
-      } else {
-        let model = bootloader_model(
-          info.vendor_id(),
-          info.product_id(),
-          info.usage_page(),
-          info.interface_number(),
-          product_string,
-        )?;
-        (model, true)
-      };
+      let (model, bootloader) = classify(info)?;
       Some(Found {
         device: DetectedDevice {
           model: model.to_string(),
@@ -153,6 +159,105 @@ fn find_devices(api: &HidApi) -> Vec<Found> {
     .collect()
 }
 
+/// What the scan made of one HID entry with the BitBox02 vendor id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Verdict {
+  Firmware,
+  Bootloader,
+  NotAccepted,
+}
+
+/// The text of one entry of [`ScanReport::seen`], from the plain values of the HID entry.
+fn seen_line(
+  product_id: u16,
+  product_string: Option<&str>,
+  usage_page: u16,
+  interface_number: i32,
+  verdict: Verdict,
+) -> String {
+  let product = match product_string {
+    Some(product_string) => format!("\"{product_string}\""),
+    None => "no product string".to_string(),
+  };
+  let verdict = match verdict {
+    Verdict::Firmware => "firmware",
+    Verdict::Bootloader => "bootloader",
+    Verdict::NotAccepted => "not accepted",
+  };
+  format!(
+    "pid {product_id:04x} {product} usage {usage_page:04x} interface {interface_number}: {verdict}"
+  )
+}
+
+/// The result of one USB scan, with what the scan saw. A caller that finds no device can show
+/// [`ScanReport`] to say why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScanReport {
+  /// The devices that the scan accepts. This is what [`scan`] returns.
+  pub devices: Vec<DetectedDevice>,
+  /// One line for each HID entry with the BitBox02 vendor id, accepted or not.
+  pub seen: Vec<String>,
+  /// The number of all HID entries, with any vendor id.
+  pub hid_entries: usize,
+}
+
+impl std::fmt::Display for ScanReport {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "{} HID entries; with the BitBox02 vendor id: ",
+      self.hid_entries
+    )?;
+    if self.seen.is_empty() {
+      write!(f, "none")
+    } else {
+      write!(f, "[{}]", self.seen.join("; "))
+    }
+  }
+}
+
+/// Lists the connected BitBox02 devices from their USB descriptors, and reports what the scan
+/// saw. One USB enumeration fills both.
+pub fn scan_report() -> Result<ScanReport, Error> {
+  let api = HidApi::new().map_err(|_error| {
+    // The message for the user does not carry the cause, so a debug build prints it.
+    #[cfg(debug_assertions)]
+    eprintln!("The HID library cannot list the USB devices: {_error}");
+    list_error()
+  })?;
+  let mut report = ScanReport {
+    devices: Vec::new(),
+    seen: Vec::new(),
+    hid_entries: 0,
+  };
+  for info in api.device_list() {
+    report.hid_entries += 1;
+    let accepted = classify(info);
+    if let Some((model, bootloader)) = accepted {
+      report.devices.push(DetectedDevice {
+        model: model.to_string(),
+        path: info.path().to_string_lossy().into_owned(),
+        bootloader,
+      });
+    }
+    if info.vendor_id() == VENDOR_ID {
+      let verdict = match accepted {
+        Some((_, false)) => Verdict::Firmware,
+        Some((_, true)) => Verdict::Bootloader,
+        None => Verdict::NotAccepted,
+      };
+      report.seen.push(seen_line(
+        info.product_id(),
+        info.product_string(),
+        info.usage_page(),
+        info.interface_number(),
+        verdict,
+      ));
+    }
+  }
+  Ok(report)
+}
+
 fn list_error() -> Error {
   Error::new(
     ErrorKind::Communication,
@@ -162,13 +267,7 @@ fn list_error() -> Error {
 
 /// Lists the connected BitBox02 devices from their USB descriptors.
 pub fn scan() -> Result<Vec<DetectedDevice>, Error> {
-  let api = HidApi::new().map_err(|_| list_error())?;
-  Ok(
-    find_devices(&api)
-      .into_iter()
-      .map(|found| found.device)
-      .collect(),
-  )
+  Ok(scan_report()?.devices)
 }
 
 /// Picks the one device to use. Returns its index.
@@ -293,6 +392,96 @@ mod tests {
     assert_eq!(error.kind, ErrorKind::DeviceNotFound);
     assert!(error.message.contains("BitBoxApp"), "{}", error.message);
     assert!(!error.message.contains("unlock"), "{}", error.message);
+  }
+
+  #[test]
+  fn a_firmware_entry_is_named_as_firmware() {
+    assert_eq!(
+      seen_line(
+        0x2403,
+        Some("BitBox02 Nova BTC-only"),
+        0xffff,
+        0,
+        Verdict::Firmware
+      ),
+      "pid 2403 \"BitBox02 Nova BTC-only\" usage ffff interface 0: firmware"
+    );
+  }
+
+  #[test]
+  fn a_bootloader_entry_is_named_as_a_bootloader() {
+    assert_eq!(
+      seen_line(
+        0x2403,
+        Some("BitBox02 Nova BTC-only bl"),
+        0xffff,
+        0,
+        Verdict::Bootloader
+      ),
+      "pid 2403 \"BitBox02 Nova BTC-only bl\" usage ffff interface 0: bootloader"
+    );
+  }
+
+  #[test]
+  fn an_entry_that_the_scan_does_not_accept_says_so() {
+    // The U2F interface of the same device.
+    assert_eq!(
+      seen_line(
+        0x2403,
+        Some("BitBox02 Nova BTC-only"),
+        0xf1d0,
+        1,
+        Verdict::NotAccepted
+      ),
+      "pid 2403 \"BitBox02 Nova BTC-only\" usage f1d0 interface 1: not accepted"
+    );
+  }
+
+  #[test]
+  fn an_entry_without_a_product_string_says_so() {
+    assert_eq!(
+      seen_line(0x2403, None, 0xffff, 0, Verdict::NotAccepted),
+      "pid 2403 no product string usage ffff interface 0: not accepted"
+    );
+  }
+
+  #[test]
+  fn a_report_prints_the_count_and_the_entries_with_the_vendor_id() {
+    let report = ScanReport {
+      devices: vec![],
+      seen: vec![
+        "pid 2403 \"BitBox02 Nova BTC-only\" usage ffff interface 0: firmware".to_string(),
+        "pid 2403 \"BitBox02 Nova BTC-only\" usage f1d0 interface 1: not accepted".to_string(),
+      ],
+      hid_entries: 12,
+    };
+    assert_eq!(
+      report.to_string(),
+      "12 HID entries; with the BitBox02 vendor id: [pid 2403 \"BitBox02 Nova BTC-only\" usage ffff interface 0: firmware; pid 2403 \"BitBox02 Nova BTC-only\" usage f1d0 interface 1: not accepted]"
+    );
+  }
+
+  #[test]
+  fn a_report_without_an_entry_with_the_vendor_id_says_none() {
+    let report = ScanReport {
+      devices: vec![],
+      seen: vec![],
+      hid_entries: 3,
+    };
+    assert_eq!(
+      report.to_string(),
+      "3 HID entries; with the BitBox02 vendor id: none"
+    );
+  }
+
+  #[test]
+  fn the_not_found_message_tells_the_user_to_plug_the_device_in_again() {
+    let error = select_device(&[]).expect_err("no device");
+    assert!(
+      error.message.contains("unplug it and plug it in again"),
+      "{}",
+      error.message
+    );
   }
 
   #[test]
