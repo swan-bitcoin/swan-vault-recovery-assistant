@@ -1,7 +1,7 @@
-//! Checks on the PSBT before and after the device signs it. They need no device.
+//! Checks on the PSBT before and after a device signs it. They need no device.
 
+use crate::descriptor::Vault;
 use crate::error::{Error, ErrorKind};
-use crate::policy::Vault;
 use bitcoin::bip32::{ChildNumber, DerivationPath, Fingerprint, KeySource};
 use bitcoin::blockdata::script::Builder;
 use bitcoin::hashes::Hash;
@@ -14,6 +14,12 @@ use std::collections::BTreeMap;
 
 /// The first child number of a hardened key.
 const HARDENED: u32 = 0x8000_0000;
+
+/// The highest address index that an output to the device's own key may have. The BitBox02
+/// firmware refuses a higher one. A wallet that looks for its funds with a normal gap limit does
+/// not scan so far, so money at a high index is hard to find again. The refusal text writes this
+/// number with a thousands separator.
+const MAX_OWN_ADDRESS_INDEX: u32 = 9_999;
 
 /// The first sentence of every refusal in this file. SVRA builds the transaction with all the data
 /// that these checks look for, so a failed check means that the transaction came from somewhere
@@ -30,10 +36,15 @@ fn invalid_psbt(reason: impl AsRef<str>) -> Error {
 
 /// The output that an input spends, after the checks that the previous transaction is the one
 /// the input points to. The device needs the whole previous transaction to trust the amount.
-fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<&'a TxOut, Error> {
+fn spent_output<'a>(
+  device: &str,
+  number: usize,
+  tx_input: &TxIn,
+  input: &'a Input,
+) -> Result<&'a TxOut, Error> {
   let previous_transaction = input.non_witness_utxo.as_ref().ok_or_else(|| {
     invalid_psbt(format!(
-      "Input {number} lacks the full previous transaction. The BitBox02 needs it to check the amount."
+      "Input {number} lacks the full previous transaction. The {device} needs it to check the amount."
     ))
   })?;
   if previous_transaction.compute_txid() != tx_input.previous_output.txid {
@@ -64,8 +75,8 @@ fn spent_output<'a>(number: usize, tx_input: &TxIn, input: &'a Input) -> Result<
 }
 
 /// The key of the device among the key origins of an input or an output: the first key with its
-/// fingerprint, as the vendor library picks it.
-fn key_of_device(
+/// fingerprint, as the vendor libraries pick it.
+pub(crate) fn key_of_device(
   key_origins: &BTreeMap<SecpPublicKey, KeySource>,
   fingerprint: Fingerprint,
 ) -> Option<(SecpPublicKey, &DerivationPath)> {
@@ -80,7 +91,7 @@ fn our_key(input: &Input, fingerprint: Fingerprint) -> Option<(SecpPublicKey, &D
   key_of_device(&input.bip32_derivation, fingerprint)
 }
 
-/// True when an input holds a taproot field. The vendor library reads the taproot key origins
+/// True when an input holds a taproot field. The vendor libraries read the taproot key origins
 /// before the BIP-32 ones, so such a field decides which key and path the device gets.
 fn input_has_taproot_fields(input: &Input) -> bool {
   input.tap_key_sig.is_some()
@@ -101,8 +112,8 @@ fn output_has_taproot_fields(output: &Output) -> bool {
 /// The keychain and the address index of `path`, when `path` is the account keypath of the
 /// device followed by a keychain and an address index. `None` when the path does not fit the
 /// vault.
-fn address_steps(vault: &Vault, path: &DerivationPath) -> Option<[ChildNumber; 2]> {
-  let account = vault.artifact.our_account_keypath.to_vec();
+pub fn address_steps(vault: &Vault, path: &DerivationPath) -> Option<[ChildNumber; 2]> {
+  let account = vault.our_account_path.to_u32_vec();
   let numbers = path.to_u32_vec();
   if numbers.len() != account.len() + 2 || !numbers.starts_with(&account) {
     return None;
@@ -119,12 +130,12 @@ fn address_steps(vault: &Vault, path: &DerivationPath) -> Option<[ChildNumber; 2
 }
 
 /// The public key that the vault has for its key number `key_index` at `steps`.
-fn vault_public_key(
+pub fn vault_public_key(
   vault: &Vault,
   key_index: usize,
   steps: &[ChildNumber; 2],
 ) -> Option<SecpPublicKey> {
-  let key = vault.artifact.keys.get(key_index)?;
+  let key = vault.keys.get(key_index)?;
   let child = key
     .xpub
     .derive_pub(&Secp256k1::verification_only(), steps)
@@ -133,15 +144,15 @@ fn vault_public_key(
 }
 
 /// The witness script that the vault has at `steps`.
-fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<ScriptBuf> {
+pub(crate) fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<ScriptBuf> {
   let mut script = Builder::new().push_int(vault.threshold as i64);
-  for key_index in 0..vault.artifact.keys.len() {
+  for key_index in 0..vault.keys.len() {
     let key = vault_public_key(vault, key_index, steps)?;
     script = script.push_key(&PublicKey::new(key));
   }
   Some(
     script
-      .push_int(vault.artifact.keys.len() as i64)
+      .push_int(vault.keys.len() as i64)
       .push_opcode(OP_CHECKMULTISIG)
       .into_script(),
   )
@@ -149,11 +160,12 @@ fn vault_witness_script(vault: &Vault, steps: &[ChildNumber; 2]) -> Option<Scrip
 
 /// Checks that the device can sign every input and that every input belongs to the vault.
 /// Returns the public key of the device for each input.
-pub(crate) fn precheck(
+pub fn precheck(
   psbt: &Psbt,
   fingerprint: Fingerprint,
   vault: &Vault,
 ) -> Result<Vec<SecpPublicKey>, Error> {
+  let device = vault.device_name();
   if psbt.unsigned_tx.input.is_empty() {
     return Err(invalid_psbt(
       "The transaction has no inputs, so there is nothing to sign.",
@@ -173,7 +185,7 @@ pub(crate) fn precheck(
         "Input {number} has taproot fields, but a Swan vault does not use taproot."
       )));
     }
-    let spent = spent_output(number, tx_input, input)?;
+    let spent = spent_output(device, number, tx_input, input)?;
 
     let witness_script = input
       .witness_script
@@ -196,7 +208,7 @@ pub(crate) fn precheck(
 
     let (public_key, path) = our_key(input, fingerprint).ok_or_else(|| {
       invalid_psbt(format!(
-        "Input {number} has no key path for the connected BitBox02 (fingerprint {fingerprint}). Check that this BitBox02 holds a key of your vault."
+        "Input {number} has no key path for the connected {device} (fingerprint {fingerprint}). Check that this {device} holds a key of your vault."
       ))
     })?;
     let steps = address_steps(vault, path);
@@ -215,10 +227,10 @@ pub(crate) fn precheck(
     // make the device look as if it had signed.
     let device_key = steps
       .as_ref()
-      .and_then(|steps| vault_public_key(vault, vault.artifact.our_key_index, steps));
+      .and_then(|steps| vault_public_key(vault, vault.our_key_index, steps));
     if device_key != Some(public_key) {
       return Err(invalid_psbt(format!(
-        "Input {number} lists a key for the connected BitBox02 (fingerprint {fingerprint}) that is not the key of the BitBox02 in the vault."
+        "Input {number} lists a key for the connected {device} (fingerprint {fingerprint}) that is not the key of the {device} in the vault."
       )));
     }
     keys.push(public_key);
@@ -227,8 +239,9 @@ pub(crate) fn precheck(
   Ok(keys)
 }
 
-/// Checks the outputs that claim to belong to the device. The device does not show such an output
-/// as a payment, so its script must be the vault's script at the key path that the PSBT gives.
+/// Checks the outputs that claim to belong to the device. A device may take such an output for
+/// change, so its script must be the vault's script at the key path that the PSBT gives, and its
+/// address number must be one that a wallet finds again.
 fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result<(), Error> {
   if psbt.outputs.len() != psbt.unsigned_tx.output.len() {
     return Err(invalid_psbt(
@@ -251,12 +264,20 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
     let Some((_, path)) = key_of_device(&output.bip32_derivation, fingerprint) else {
       continue;
     };
-    let vault_script = address_steps(vault, path)
+    let steps = address_steps(vault, path);
+    if let Some([_, ChildNumber::Normal { index }]) = steps {
+      if index > MAX_OWN_ADDRESS_INDEX {
+        return Err(invalid_psbt(format!(
+          "Output {number} pays to address number {index} of the vault. SVRA signs only outputs to address numbers up to 9,999, because a wallet may not find such an output again."
+        )));
+      }
+    }
+    let vault_script = steps
       .and_then(|steps| vault_witness_script(vault, &steps))
       .map(|witness_script| ScriptBuf::new_p2wsh(&witness_script.wscript_hash()));
     if vault_script.as_ref() != Some(&tx_output.script_pubkey) {
       return Err(invalid_psbt(format!(
-        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path. The BitBox02 would not show it as a payment."
+        "Output {number} says that it pays to an address of the vault, but its script is not the vault's script at that key path."
       )));
     }
   }
@@ -265,7 +286,12 @@ fn check_outputs(psbt: &Psbt, fingerprint: Fingerprint, vault: &Vault) -> Result
 
 /// Checks the signature of `key` on one input of `psbt` against the BIP-143 hash of the
 /// transaction, with the witness script and the amount from the input.
-fn check_signature(psbt: &Psbt, index: usize, key: &SecpPublicKey) -> Result<(), String> {
+fn check_signature(
+  device: &str,
+  psbt: &Psbt,
+  index: usize,
+  key: &SecpPublicKey,
+) -> Result<(), String> {
   let number = index + 1;
   let input = psbt
     .inputs
@@ -274,7 +300,7 @@ fn check_signature(psbt: &Psbt, index: usize, key: &SecpPublicKey) -> Result<(),
   let signature = input
     .partial_sigs
     .get(&PublicKey::new(*key))
-    .ok_or_else(|| format!("The BitBox02 returned no signature for input {number}."))?;
+    .ok_or_else(|| format!("The {device} returned no signature for input {number}."))?;
   if signature.sighash_type != EcdsaSighashType::All {
     return Err(format!(
       "The signature for input {number} does not use SIGHASH_ALL."
@@ -300,15 +326,16 @@ fn check_signature(psbt: &Psbt, index: usize, key: &SecpPublicKey) -> Result<(),
     .map_err(|_| format!("The signature for input {number} is not valid."))
 }
 
-/// True when every input already holds a valid signature of the device's key.
-pub(crate) fn already_signed(psbt: &Psbt, keys: &[SecpPublicKey]) -> bool {
+/// True when every input already holds a valid signature of the device's key. `keys` is what
+/// [`precheck`] returned.
+pub fn already_signed(psbt: &Psbt, keys: &[SecpPublicKey], vault: &Vault) -> bool {
   // `all()` is true for an empty list, and an empty list of keys must not count as signed.
   !keys.is_empty()
     && keys.len() == psbt.inputs.len()
     && keys
       .iter()
       .enumerate()
-      .all(|(index, key)| check_signature(psbt, index, key).is_ok())
+      .all(|(index, key)| check_signature(vault.device_name(), psbt, index, key).is_ok())
 }
 
 fn unexpected_change() -> Error {
@@ -318,19 +345,21 @@ fn unexpected_change() -> Error {
   )
 }
 
-/// Checks the PSBT that the device library returned. The transaction must be the one that went
+/// Checks the PSBT that the device returned. The transaction must be the one that went
 /// in, only signatures of the device's key may be new, and each of them must verify.
-pub(crate) fn verify_signed(
+pub fn verify_signed(
   original: &Psbt,
   signed: &Psbt,
   keys: &[SecpPublicKey],
+  vault: &Vault,
 ) -> Result<(), Error> {
+  let device = vault.device_name();
   if bitcoin::consensus::serialize(&original.unsigned_tx)
     != bitcoin::consensus::serialize(&signed.unsigned_tx)
   {
     return Err(Error::new(
       ErrorKind::TransactionMismatch,
-      "The BitBox02 returned a different transaction than the one SVRA sent. Do not use the result. Someone may have changed the transaction.",
+      format!("The {device} returned a different transaction than the one SVRA sent. Do not use the result. Someone may have changed the transaction."),
     ));
   }
   if signed.inputs.len() != original.inputs.len() || keys.len() != original.inputs.len() {
@@ -366,7 +395,7 @@ pub(crate) fn verify_signed(
   // Everything except the signatures equals the PSBT that went in, so the script and the amount
   // that each signature is checked against are the ones the caller sent.
   for (index, key) in keys.iter().enumerate() {
-    check_signature(signed, index, key).map_err(|message| {
+    check_signature(device, signed, index, key).map_err(|message| {
       Error::new(
         ErrorKind::InvalidSignature,
         format!("{message} Do not use the result. Contact Swan support."),
@@ -379,12 +408,14 @@ pub(crate) fn verify_signed(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::policy::parse_vault;
+  use crate::descriptor::parse_vault;
   use crate::test_support::{
     descriptor, fingerprint_of, master_key, sign_with, simulator_xprv, Vault as Fixture, ORDERS,
   };
   use bitcoin::bip32::KeySource;
   use bitcoin::{absolute::LockTime, transaction, Amount, Network, NetworkKind, Transaction};
+
+  const DEVICE: &str = "Test device";
 
   struct Case {
     fixture: Fixture,
@@ -400,6 +431,7 @@ mod tests {
     let psbt = fixture.sweep_psbt();
     let fingerprint = fingerprint_of(&simulator_xprv());
     let vault = parse_vault(
+      DEVICE,
       &fixture.receive_descriptor,
       Some(&fixture.change_descriptor),
     )
@@ -650,7 +682,9 @@ mod tests {
     }
     let error = precheck_error(&case, &case.psbt);
     assert!(
-      error.message.contains("not the key of the BitBox02"),
+      error
+        .message
+        .contains(&format!("not the key of the {DEVICE}")),
       "{}",
       error.message
     );
@@ -762,6 +796,62 @@ mod tests {
     precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
   }
 
+  /// Makes output 0 an output to the vault's own address at `keychain` and `index`, with a valid
+  /// script and the key origin of the device, as a wallet that made change would write it.
+  fn pay_to_own_address(case: &mut Case, keychain: u32, index: u32) {
+    let steps = [
+      ChildNumber::Normal { index: keychain },
+      ChildNumber::Normal { index },
+    ];
+    let witness_script = vault_witness_script(&case.vault, &steps).expect("a script");
+    case.psbt.unsigned_tx.output[0].script_pubkey =
+      ScriptBuf::new_p2wsh(&witness_script.wscript_hash());
+    let key = vault_public_key(&case.vault, case.vault.our_key_index, &steps).expect("a key");
+    let path = case.vault.our_account_path.extend(steps);
+    case.psbt.outputs[0].bip32_derivation.clear();
+    case.psbt.outputs[0]
+      .bip32_derivation
+      .insert(key, (case.fingerprint, path));
+    case.psbt.outputs[0].witness_script = Some(witness_script);
+  }
+
+  #[test]
+  fn the_refusal_text_names_the_highest_address_number() {
+    // The text of the refusal says "9,999".
+    assert_eq!(MAX_OWN_ADDRESS_INDEX, 9_999);
+  }
+
+  #[test]
+  fn accepts_an_own_output_at_the_highest_address_number() {
+    let mut case = case();
+    pay_to_own_address(&mut case, 1, MAX_OWN_ADDRESS_INDEX);
+    precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
+    pay_to_own_address(&mut case, 0, MAX_OWN_ADDRESS_INDEX);
+    precheck(&case.psbt, case.fingerprint, &case.vault).expect("the pre-check passes");
+  }
+
+  #[test]
+  fn refuses_an_own_output_above_the_highest_address_number() {
+    // The script and the key origin are right, so only the address number is wrong.
+    for (keychain, index) in [
+      (1, MAX_OWN_ADDRESS_INDEX + 1),
+      (0, MAX_OWN_ADDRESS_INDEX + 1),
+      (1, 500_000),
+      (1, HARDENED - 1),
+    ] {
+      let mut case = case();
+      pay_to_own_address(&mut case, keychain, index);
+      let error = precheck_error(&case, &case.psbt);
+      assert!(error.message.contains("Output 1"), "{}", error.message);
+      assert!(
+        error.message.contains(&format!("number {index} ")),
+        "{}",
+        error.message
+      );
+      assert!(error.message.contains("up to 9,999"), "{}", error.message);
+    }
+  }
+
   #[test]
   fn refuses_a_psbt_of_another_vault_with_the_same_device() {
     // The same three keys in another order: the other wallet that a sorted multisig would give.
@@ -775,7 +865,7 @@ mod tests {
       .iter()
       .map(|position| expressions[*position])
       .collect();
-    let other = parse_vault(&descriptor(&ordered, "/0/*"), None)
+    let other = parse_vault(DEVICE, &descriptor(&ordered, "/0/*"), None)
       .expect("a valid descriptor")
       .for_device(case.fingerprint)
       .expect("the device is in the vault");
@@ -808,14 +898,18 @@ mod tests {
   #[test]
   fn an_unsigned_psbt_is_not_signed() {
     let case = case();
-    assert!(!already_signed(&case.psbt, &device_keys(&case)));
+    assert!(!already_signed(
+      &case.psbt,
+      &device_keys(&case),
+      &case.vault
+    ));
   }
 
   #[test]
   fn a_psbt_with_a_valid_signature_on_every_input_is_signed() {
     let case = case();
     let signed = signed_by_device(&case);
-    assert!(already_signed(&signed, &device_keys(&case)));
+    assert!(already_signed(&signed, &device_keys(&case), &case.vault));
   }
 
   #[test]
@@ -823,7 +917,7 @@ mod tests {
     let case = case();
     let mut signed = signed_by_device(&case);
     signed.inputs[1].partial_sigs.clear();
-    assert!(!already_signed(&signed, &device_keys(&case)));
+    assert!(!already_signed(&signed, &device_keys(&case), &case.vault));
   }
 
   #[test]
@@ -831,7 +925,7 @@ mod tests {
     let case = case();
     let mut psbt = case.psbt.clone();
     sign_with(&case.fixture.keys.software_xprv, &mut psbt);
-    assert!(!already_signed(&psbt, &device_keys(&case)));
+    assert!(!already_signed(&psbt, &device_keys(&case), &case.vault));
   }
 
   #[test]
@@ -843,11 +937,11 @@ mod tests {
     signed.inputs[0]
       .partial_sigs
       .insert(PublicKey::new(keys[0]), other);
-    assert!(!already_signed(&signed, &keys));
+    assert!(!already_signed(&signed, &keys, &case.vault));
   }
 
   fn verify_error(case: &Case, signed: &Psbt) -> Error {
-    match verify_signed(&case.psbt, signed, &device_keys(case)) {
+    match verify_signed(&case.psbt, signed, &device_keys(case), &case.vault) {
       Ok(()) => panic!("the verification passed, but it should fail"),
       Err(error) => error,
     }
@@ -857,7 +951,8 @@ mod tests {
   fn accepts_a_correct_signature_on_every_input() {
     let case = case();
     let signed = signed_by_device(&case);
-    verify_signed(&case.psbt, &signed, &device_keys(&case)).expect("the result is valid");
+    verify_signed(&case.psbt, &signed, &device_keys(&case), &case.vault)
+      .expect("the result is valid");
   }
 
   #[test]
@@ -865,7 +960,8 @@ mod tests {
     let mut case = case();
     sign_with(&case.fixture.keys.software_xprv, &mut case.psbt);
     let signed = signed_by_device(&case);
-    verify_signed(&case.psbt, &signed, &device_keys(&case)).expect("the result is valid");
+    verify_signed(&case.psbt, &signed, &device_keys(&case), &case.vault)
+      .expect("the result is valid");
     assert_eq!(signed.inputs[0].partial_sigs.len(), 2);
   }
 
@@ -874,7 +970,8 @@ mod tests {
     let mut case = case();
     case.psbt = signed_by_device(&case);
     let signed = signed_by_device(&case);
-    verify_signed(&case.psbt, &signed, &device_keys(&case)).expect("the result is valid");
+    verify_signed(&case.psbt, &signed, &device_keys(&case), &case.vault)
+      .expect("the result is valid");
   }
 
   #[test]

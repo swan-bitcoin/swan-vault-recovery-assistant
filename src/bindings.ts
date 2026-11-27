@@ -16,6 +16,9 @@ async address(network: string, descriptors: Descriptors, electrum: string | null
 async broadcast(psbt: string, network: string, descriptors: Descriptors, electrum: string | null) : Promise<null> {
     return await TAURI_INVOKE("broadcast", { psbt, network, descriptors, electrum });
 },
+async cancelTrezorPairing() : Promise<null> {
+    return await TAURI_INVOKE("cancel_trezor_pairing");
+},
 async createWindow(label: string, html: string, title: string, width: number, height: number) : Promise<void> {
     await TAURI_INVOKE("create_window", { label, html, title, width, height });
 },
@@ -54,6 +57,12 @@ async sign(psbt: string, network: string, deviceType: string) : Promise<string> 
 },
 async signBitbox02(psbt: string, network: string, descriptors: Descriptors, onProgress: TAURI_CHANNEL<Bitbox02Progress>) : Promise<string> {
     return await TAURI_INVOKE("sign_bitbox02", { psbt, network, descriptors, onProgress });
+},
+async signTrezor(psbt: string, network: string, descriptors: Descriptors, onProgress: TAURI_CHANNEL<TrezorProgress>) : Promise<string> {
+    return await TAURI_INVOKE("sign_trezor", { psbt, network, descriptors, onProgress });
+},
+async submitTrezorPairingCode(code: string) : Promise<null> {
+    return await TAURI_INVOKE("submit_trezor_pairing_code", { code });
 },
 async sweep(address: string, feeRate: number, network: string, descriptors: Descriptors, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, descriptors, electrum });
@@ -102,6 +111,7 @@ export type PsbtDetails = { psbt: string; txid: string; received: string; sent: 
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"
 export type SvraError = { error_type: string; message: string }
 export type Transaction = { version: number; locktime: number; ins: TxIn[]; outs: TxOut[]; txid: string; received: string; sent: string; fee: string; confirmation_height: number | null }
+export type TrezorProgress = { step: "connecting" } | { step: "unlock" } | { step: "confirm-connection" } | { step: "enter-pairing-code" } | { step: "checking-key" } | { step: "passphrase" } | { step: "sign" }
 export type TxIn = { txid: string; vout: number }
 export type TxOut = { address: string | null; script: string; amount: string }
 export type Wallet = { balance: Balance; transactions: Transaction[] }

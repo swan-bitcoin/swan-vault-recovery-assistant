@@ -100,21 +100,206 @@ jobs:
 
       - name: check formatting
         # The app code in src-tauri/src was never formatted with rustfmt, so only
-        # the BitBox02 crate and the BitBox02 module of the app are checked.
+        # the device crates and the device modules of the app are checked.
         working-directory: src-tauri
         run: |
-          cargo fmt -p svra_bitbox02 -- --check
-          rustfmt --check --edition 2021 src/bitbox02.rs
+          cargo fmt -p svra_bitbox02 -p svra_trezor -p svra_vault -- --check
+          rustfmt --check --edition 2021 src/bitbox02.rs src/trezor.rs
+
+      - name: lint the vault crate
+        working-directory: src-tauri
+        run: cargo clippy --locked -p svra_vault --all-targets -- -D warnings
 
       - name: lint the BitBox02 crate
         working-directory: src-tauri
         run: cargo clippy --locked -p svra_bitbox02 --all-targets --features usb,simulator -- -D warnings
+
+      - name: lint the Trezor crate
+        working-directory: src-tauri
+        run: cargo clippy --locked -p svra_trezor --all-targets --features usb -- -D warnings
+
+      - name: test the vault crate
+        working-directory: src-tauri
+        run: cargo test --locked -p svra_vault
 
       - name: test the BitBox02 crate
         working-directory: src-tauri
         env:
           BITBOX02_SIMULATOR: ${{ runner.temp }}/bitbox02-simulator
         run: cargo test --locked -p svra_bitbox02 --features usb,simulator
+
+  trezor-test:
+    name: trezor tests
+    # Its own job, so that the long setup of the emulator runs in parallel with the BitBox02 tests
+    # and the lints. The job needs Ubuntu 24.04: the pinned Python packages of the model server
+    # support CPython 3.10 to 3.12, and `ubuntu-latest` is Ubuntu 26.04 now.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # This job compiles third-party build scripts and runs downloaded binaries, so it holds no
+    # secret: it uses no private action and no token of Swan. Its GITHUB_TOKEN is read-only and
+    # stays out of the git config of the checkout.
+    permissions:
+      contents: read
+    env:
+      # With this set, an emulator test fails when the emulator is missing. Without it the test
+      # skips, so that a developer who has no emulator sees green.
+      TREZOR_EMULATOR_REQUIRED: '1'
+      # Trezor Safe 7 firmware emulator (firmware 2.13.1, x86-64, a Nix build). The hash is the
+      # only trust anchor: if Trezor replaces the file, the job fails until someone updates the
+      # hash on purpose.
+      TREZOR_EMULATOR_URL: https://data.trezor.io/dev/firmware/releases/emulators-new/T3W1/trezor-emu-core-T3W1-v2.13.1
+      TREZOR_EMULATOR_SHA256: 5e35f4697bf19c5fa09dd2ea8c28fe876a746b424bf2b21dbe7844fcbec1d57c
+      # The emulator is a Nix build, and its libraries must sit at fixed /nix/store paths. This
+      # image only copies them there. It is the index digest of nixos/nix 2.36.0.
+      NIX_IMAGE: nixos/nix@sha256:746280551ddc1c72177d1a597c05eacac86dfaa18d5d649bf86411278bcd5470
+      # Tropic Square's model of the Tropic01 secure element, which the Safe 7 needs. TVL_COMMIT is
+      # the vendor/ts-tvl commit of firmware core/v2.13.1. The config is the one that
+      # trezor-firmware keeps for the model, at the commit of that tag.
+      TVL_COMMIT: c28a7d8865866baf442d53e01559e6d3fa87b9e4
+      TROPIC_MODEL_CONFIG_URL: https://raw.githubusercontent.com/trezor/trezor-firmware/4289e23b317e98ab6a5e8237723e0cd57f44934c/tests/tropic_model/firmware_config/current.yml
+      TROPIC_MODEL_CONFIG_SHA256: deae849d718309600696201a74c6013e772798b74ebd3ded640f02a2264109e3
+      # pip itself comes from this wheel and not from the runner. pip builds nothing here:
+      # crcmod has only a source archive, so the job copies its pure-Python package.
+      PIP_WHEEL_URL: https://files.pythonhosted.org/packages/07/25/ee8c38ae72d66b844ce8eb9711ba905dba21ca1a8a0c960057c41cd23337/pip-26.3-py3-none-any.whl
+      PIP_WHEEL_SHA256: f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13
+      CRCMOD_URL: https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz
+      CRCMOD_SHA256: dc7051a0db5f2bd48665a990d3ec1cc305a466a77358ca4492826f41f283601e
+    steps:
+      - name: checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+
+      - name: set up rust
+        # rustup is on the runner image, so no action and no token are needed. The job needs
+        # neither rustfmt nor clippy, because the rust tests job runs them. Same pinned version as
+        # the rust tests job.
+        run: |
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup default 1.100.0
+          rustc --version
+
+      - name: set the paths of the emulator rig
+        # The tests read these three variables. They are the same names as on a developer machine.
+        # The `runner` context is not available in a job-level `env`, so the paths are set here.
+        run: |
+          {
+            echo "TREZOR_EMULATOR=$RUNNER_TEMP/trezor-emulator"
+            echo "TREZOR_TROPIC_MODEL_SERVER=$RUNNER_TEMP/tropic/bin/model_server"
+            echo "TREZOR_TROPIC_MODEL_CONFIG=$RUNNER_TEMP/tropic/model_config.yml"
+          } >> "$GITHUB_ENV"
+
+      - name: download the Trezor Safe 7 emulator
+        run: |
+          set -E
+          trap 'echo "::error::The emulator download failed, or its SHA-256 changed. src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
+          curl -fsSL -o "$TREZOR_EMULATOR" "$TREZOR_EMULATOR_URL"
+          echo "$TREZOR_EMULATOR_SHA256  $TREZOR_EMULATOR" | sha256sum -c -
+          chmod +x "$TREZOR_EMULATOR"
+
+      - name: fetch the emulator libraries into /nix/store
+        # The binary has /nix/store/... as its ELF interpreter, so the libraries must sit at
+        # exactly these paths. The container fetches them from cache.nixos.org (Nix checks the
+        # signatures) and writes the closure as a list in the format of nix-closure-x86_64.txt. The
+        # five roots are the store paths that `readelf` shows in the RUNPATH and the interpreter of
+        # the emulator. The container has only Nix and coreutils, so the runner compares the list
+        # with the pinned one (the set of paths and every NAR hash). It does this before anything
+        # goes into /nix/store.
+        run: |
+          set -E
+          trap 'echo "::error::Fetching the emulator libraries failed. src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
+          pinned=src-tauri/trezor/tests/emulator-rig/nix-closure-x86_64.txt
+          mkdir -p "$RUNNER_TEMP/nix-out" "$RUNNER_TEMP/nix-meta"
+          docker run --rm \
+            -v "$RUNNER_TEMP/nix-out:/out" \
+            -v "$RUNNER_TEMP/nix-meta:/meta" \
+            "$NIX_IMAGE" sh -eu -c '
+              roots="
+                /nix/store/dkmjavf5yaj6hdcf2ggc6hsj1lp7lwsx-libjpeg-turbo-3.1.4.1
+                /nix/store/b1f0n57qf81mxhj6vfvf91dy3daj9422-sdl3-3.4.16-lib
+                /nix/store/5xgj3frdick5mp4v5lw2pxxwdg0qd740-sdl3-image-3.4.8-lib
+                /nix/store/cxd8d2vg70c3pa31v2473hphaa1v0j44-openssl-3.5.8
+                /nix/store/h4wfwic161kxrr74jlzla5lsm28hgary-glibc-2.44-25"
+              nix-store --realise $roots > /dev/null
+              # Each step writes a file, so that `set -e` sees a failure. In a pipe it would not.
+              nix-store --query --requisites $roots > /tmp/requisites
+              LC_ALL=C sort /tmp/requisites > /tmp/paths
+              test -s /tmp/paths
+              # One line per path: "sha256:<NAR hash> <NAR size> <path>", sorted by path. A plain
+              # assignment stops the script when its command fails.
+              while read -r path; do
+                hash=$(nix-store --query --hash "$path")
+                size=$(nix-store --query --size "$path")
+                printf "%s %s %s\n" "$hash" "$size" "$path"
+              done < /tmp/paths > /meta/closure.txt
+              cp -a $(cat /tmp/paths) /out/
+            '
+          # The check runs on the runner. The first lines of both lists are in the output, so that
+          # one run shows the real format of `nix-store --query --hash` if it is not the pinned one.
+          if ! diff -u "$pinned" "$RUNNER_TEMP/nix-meta/closure.txt" > "$RUNNER_TEMP/nix-meta/closure.diff"; then
+            echo "::error::The closure from cache.nixos.org differs from $pinned (paths or NAR hashes). src-tauri/trezor/tests/emulator-rig/README.md says how to make the list again."
+            echo "Pinned list: $(wc -l < "$pinned") lines. First lines:"
+            head -n 3 "$pinned"
+            echo "Produced list: $(wc -l < "$RUNNER_TEMP/nix-meta/closure.txt") lines. First lines:"
+            head -n 3 "$RUNNER_TEMP/nix-meta/closure.txt"
+            echo "Diff (- pinned, + produced), first 60 lines:"
+            head -n 60 "$RUNNER_TEMP/nix-meta/closure.diff"
+            exit 1
+          fi
+          sudo mkdir -p /nix/store
+          sudo cp -a "$RUNNER_TEMP/nix-out/." /nix/store/
+          sudo rm -rf "$RUNNER_TEMP/nix-out" "$RUNNER_TEMP/nix-meta"
+          # Smoke test: the loader and the libraries resolve. This needs no model server.
+          mkdir -p "$RUNNER_TEMP/smoke"
+          cd "$RUNNER_TEMP/smoke"
+          SDL_VIDEODRIVER=dummy TREZOR_PROFILE_DIR="$PWD" \
+            TREZOR_FLASH_FILENAME=trezor.flash TREZOR_SDCARD_FILENAME=trezor.sdcard \
+            "$TREZOR_EMULATOR" --emulator-properties
+
+      - name: install the Tropic model server
+        # Every download is checked against a hash or a git commit. The model server is pure
+        # Python, so the launcher below only sets PYTHONPATH.
+        run: |
+          set -E
+          trap 'echo "::error::Installing the Tropic model server failed (a download, a hash, pip or git). src-tauri/trezor/tests/emulator-rig/README.md says what to update." >&2' ERR
+          tropic="$RUNNER_TEMP/tropic"
+          mkdir -p "$tropic/site" "$tropic/bin" "$RUNNER_TEMP/dl"
+          fetch() { curl -fsSL -o "$1" "$2"; echo "$3  $1" | sha256sum -c -; }
+          fetch "$RUNNER_TEMP/dl/pip.whl" "$PIP_WHEEL_URL" "$PIP_WHEEL_SHA256"
+          PYTHONPATH="$RUNNER_TEMP/dl/pip.whl" python3 -m pip install \
+            --disable-pip-version-check --no-cache-dir --break-system-packages \
+            --target "$tropic/site" --require-hashes --only-binary=:all: \
+            -r src-tauri/trezor/tests/emulator-rig/model-server-requirements.txt
+          fetch "$RUNNER_TEMP/dl/crcmod.tar.gz" "$CRCMOD_URL" "$CRCMOD_SHA256"
+          mkdir "$RUNNER_TEMP/dl/crcmod"
+          tar xzf "$RUNNER_TEMP/dl/crcmod.tar.gz" -C "$RUNNER_TEMP/dl/crcmod" --strip-components=1
+          cp -R "$RUNNER_TEMP/dl/crcmod/python3/crcmod" "$tropic/site/crcmod"
+          git clone --quiet --filter=blob:none https://github.com/tropicsquare/ts-tvl "$RUNNER_TEMP/dl/ts-tvl"
+          git -C "$RUNNER_TEMP/dl/ts-tvl" checkout --quiet "$TVL_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/dl/ts-tvl" rev-parse HEAD)" = "$TVL_COMMIT"
+          cp -R "$RUNNER_TEMP/dl/ts-tvl/tvl" "$tropic/site/tvl"
+          fetch "$tropic/model_config.yml" "$TROPIC_MODEL_CONFIG_URL" "$TROPIC_MODEL_CONFIG_SHA256"
+          cat > "$tropic/bin/model_server" <<'LAUNCHER'
+          #!/bin/sh
+          HERE=$(cd "$(dirname "$0")/.." && pwd)
+          PYTHONPATH="$HERE/site${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m tvl.server.server "$@"
+          LAUNCHER
+          chmod +x "$tropic/bin/model_server"
+          "$tropic/bin/model_server" tcp --help > /dev/null
+
+      - name: test the Trezor crate
+        # TREZOR_EMULATOR_REQUIRED turns a missing or broken rig into failing tests. The count
+        # below is a second check: the run must have passed at least one emulator test.
+        working-directory: src-tauri
+        run: |
+          set -o pipefail
+          cargo test --locked -p svra_trezor --features usb 2>&1 | tee "$RUNNER_TEMP/trezor-test.log"
+          passed=$(grep -c '^test emulator_tests::.* \.\.\. ok$' "$RUNNER_TEMP/trezor-test.log" || true)
+          echo "emulator tests that passed: $passed"
+          if [ "$passed" -eq 0 ]; then
+            echo "::error::No emulator test ran. The rig is not set up, or the tests were filtered out."
+            exit 1
+          fi
 
   scenario-test:
     name: scenario tests

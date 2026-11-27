@@ -6,7 +6,6 @@
 mod device_error;
 mod error;
 mod policy;
-mod psbt_checks;
 mod session;
 #[cfg(feature = "usb")]
 mod usb;

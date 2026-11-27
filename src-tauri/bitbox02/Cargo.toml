@@ -11,6 +11,7 @@ bitcoin = "0.32"
 hidapi = { version = "2.6", optional = true }
 miniscript = "12"
 semver = "1"
+svra_vault = { path = "../vault" }
 tokio = { version = "1.40.0", features = ["rt", "time"] }
 
 [dev-dependencies]

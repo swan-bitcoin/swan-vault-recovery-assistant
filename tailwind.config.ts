@@ -6,6 +6,10 @@ import type { Config } from 'tailwindcss'
 export default {
   darkMode: ['class'], // unclear whether there will be light/dark-mode
   content: ['./src/**/*.ts', '*.html'],
+  // Tailwind scans all text in `src` for class names, comments too. Each word in the blocklist is a word that the code
+  // needs as an identifier (`input.focus()` in trezorView.ts). Without its entry, Tailwind adds unused daisyUI rules for
+  // that word to the bundle.
+  blocklist: ['focus'],
   plugins: [
     animatePlugin,
     daisyUI,

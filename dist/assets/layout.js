@@ -243,7 +243,21 @@ const MODEL_NAMES = {
   bitbox02_multi: 'BitBox02 Multi',
 }
 function getBitbox02ModelName(model) {
-  return Object.hasOwn(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
+  return Object.prototype.hasOwnProperty.call(MODEL_NAMES, model) ? MODEL_NAMES[model] : 'BitBox02'
+}
+const NAMES = {
+  bitbox02: 'BitBox02',
+  trezor_safe7: 'Trezor Safe 7',
+}
+const isSelfDrivenType = (deviceType) => Object.prototype.hasOwnProperty.call(NAMES, deviceType)
+const getSelfDrivenName = (deviceType) => NAMES[deviceType]
+const getFoundMessage = (deviceType) => {
+  const name = getSelfDrivenName(deviceType)
+  return `Found your ${name}. Keep this window open: it tells you when to look at the ${name}.`
+}
+const getUnplugMessage = (deviceType) => {
+  const name = getSelfDrivenName(deviceType)
+  return `Unplug the ${name} first, because SVRA lists only the ${name} while it is connected. Then connect another device to continue signing the transaction.`
 }
 class DeviceError extends Error {
   constructor(deviceType, message) {
@@ -252,15 +266,26 @@ class DeviceError extends Error {
     this.name = 'DeviceError'
   }
 }
+class MultipleDevicesError extends Error {
+  constructor() {
+    super('Multiple devices found. Please unplug all but one device.')
+    this.name = 'MultipleDevicesError'
+  }
+}
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
-const isBitbox02 = (device) => device.type === 'bitbox02'
+const getSelfDrivenDeviceName = (device) => (isSelfDrivenType(device.type) ? getSelfDrivenName(device.type) : null)
+const isSelfDriven = (device) => getSelfDrivenDeviceName(device) !== null
+function getModelName(device) {
+  if (device.type === 'bitbox02') return getBitbox02ModelName(device.model)
+  return getSelfDrivenDeviceName(device) ?? sanitize(device.model)
+}
 function getDevice(val) {
   const devices = parseDeviceResponse(val)
   if (devices.length === 0) {
     throw new Error('No devices found')
   }
   if (devices.length > 1) {
-    throw new Error('Multiple devices found. Please unplug all but one device.')
+    throw new MultipleDevicesError()
   }
   const device = devices[0]
   if (device.error) {
@@ -275,12 +300,12 @@ function getDeviceMessage(val) {
   }
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
   devices.forEach((device, index, arr) => {
-    message = message.concat(`${isBitbox02(device) ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
+    message = message.concat(`${getModelName(device)} device `)
     if (device.error) {
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
-    } else if (isBitbox02(device)) {
+    } else if (isSelfDriven(device)) {
       message = message.concat('(SVRA reads its fingerprint when you sign)')
     } else {
       message = message.concat('with no fingerprint')
@@ -292,10 +317,12 @@ function getDeviceMessage(val) {
   if (devices.length > 1) {
     message = message.concat(']')
   }
-  if (devices.some(isBitbox02)) {
-    message = message.concat(
-      '. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
-    )
+  const selfDrivenNames = [...new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))]
+  if (selfDrivenNames.length === 1) {
+    const [name] = selfDrivenNames
+    message = message.concat(`. While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`)
+  } else if (selfDrivenNames.length > 1) {
+    message = message.concat(`. While a ${selfDrivenNames.join(' or a ')} is connected, SVRA lists only those devices.`)
   }
   return message
 }
@@ -305,8 +332,8 @@ function getDevicePrompt(val) {
     return 'Make sure your device is connected. Perhaps try a different cable.'
   }
   if (devices.length === 1) {
-    if (isBitbox02(devices[0]) && devices[0].error) {
-      return 'This BitBox02 cannot sign yet. Read the error above first.'
+    if (isSelfDriven(devices[0]) && devices[0].error) {
+      return `This ${getSelfDrivenDeviceName(devices[0])} cannot sign yet. Read the error above first.`
     }
     return 'You may want to sign with this device next...'
   }
@@ -431,19 +458,24 @@ document.addEventListener('DOMContentLoaded', () => {
 export {
   CircularTickIcon as C,
   DOM as D,
+  MultipleDevicesError as M,
   Sats as S,
   sanitize as a,
-  showTempLoadingMessage as b,
+  getSelfDrivenName as b,
   clearStatusIndicators as c,
-  hideTempMessage as d,
-  getDeviceMessage as e,
-  getDevicePrompt as f,
+  showTempLoadingMessage as d,
+  initializeDOM as e,
+  hideTempMessage as f,
   getUserInputs as g,
   handleError as h,
-  initializeDOM as i,
-  getDevice as j,
-  getSignResultAndPsbt as k,
-  getPsbtStatusMessage as l,
-  DeviceError as m,
+  isSelfDrivenType as i,
+  getDeviceMessage as j,
+  getDevicePrompt as k,
+  getDevice as l,
+  getFoundMessage as m,
+  getSignResultAndPsbt as n,
+  getPsbtStatusMessage as o,
+  getUnplugMessage as p,
+  DeviceError as q,
   scrollToLastMessage as s,
 }

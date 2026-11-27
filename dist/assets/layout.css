@@ -3543,6 +3543,9 @@ details.collapse summary::-webkit-details-marker {
 .w-4 {
   width: 1rem;
 }
+.w-40 {
+  width: 10rem;
+}
 .w-5\/12 {
   width: 41.666667%;
 }
@@ -3827,6 +3830,9 @@ details.collapse summary::-webkit-details-marker {
 }
 .leading-normal {
   line-height: 1.5;
+}
+.tracking-widest {
+  letter-spacing: 0.1em;
 }
 .text-error {
   --tw-text-opacity: 1;

@@ -10,6 +10,7 @@ import {
   getDevicePrompt,
   getPsbtStatusMessage,
   getSignResultAndPsbt,
+  MultipleDevicesError,
   sanitize,
 } from './parsing'
 import {
@@ -26,17 +27,26 @@ import { validateAddress, validateDescriptor, validatePsbt } from './validate'
 import { createConversationActions } from './utilities/createConversationActions'
 import { getTransactionCreatedBubbles } from './utilities/getTransactionCreatedBubbles'
 import {
-  BITBOX02_BUSY_MESSAGE,
+  cancelOpenPairingEntry,
+  cancelOrphanedPairing,
   getBitbox02Device,
   getBitbox02StepMessage,
-  isBitbox02SessionPending,
+  getBusyMessage,
   getJadeDevice,
   getDeviceName,
+  getFoundMessage,
+  getPendingDevice,
+  getTrezorSafe7Device,
+  getUnplugMessage,
+  isSelfDrivenType,
   parseBitbox02Error,
+  parseTrezorError,
   runBitbox02Session,
+  runTrezorSession,
   startSignRun,
   type SignRun,
 } from './utilities/devices'
+import { createTrezorView } from './utilities/trezorView'
 import { createConversationImage } from './utilities/createConversationImage'
 import { CircularTickIcon } from './icons/circularTick'
 
@@ -185,8 +195,8 @@ async function broadcast() {
 }
 
 async function enumerate() {
-  // a second USB scan while the session thread reads the BitBox02 is not safe
-  if (refuseWhileBitbox02SessionPending()) return
+  // a second USB scan while the session thread reads the BitBox02 or the Safe 7 is not safe
+  if (refuseWhileDeviceSessionPending()) return
 
   const { network } = getUserInputs()
 
@@ -421,10 +431,13 @@ function showBitbox02Step(update: Bitbox02Progress) {
 }
 
 // Every action that starts a sign run calls this first. Returns true when the action must do nothing else.
-function refuseWhileBitbox02SessionPending() {
-  if (!isBitbox02SessionPending()) return false
+function refuseWhileDeviceSessionPending() {
+  const pendingDevice = getPendingDevice()
+  if (!pendingDevice) return false
 
-  addToConversation(createConversationBubble({ content: BITBOX02_BUSY_MESSAGE, footer: new Date().toLocaleString() }))
+  addToConversation(
+    createConversationBubble({ content: getBusyMessage(pendingDevice), footer: new Date().toLocaleString() })
+  )
   return true
 }
 
@@ -434,7 +447,7 @@ const createTryAgainActions = (retryCount: number) =>
     dangerouslySetInnerHTML: true,
     onAppended: (parent) => {
       parent.querySelector('#get-device-and-sign-again-btn')?.addEventListener('click', () => {
-        if (refuseWhileBitbox02SessionPending()) return
+        if (refuseWhileDeviceSessionPending()) return
         sign({ retryCount: retryCount + 1 })
       })
     },
@@ -466,22 +479,23 @@ async function signWithDevice(run: SignRun, retryCount: number) {
 
     // the device object comes from HWI, which could be untrusted if using a malicious version, so we should make sure XSS and other exploits are not possible.
     const device = getDevice(enumeration)
-    // HWI devices go on as before; only a BitBox02 keeps the guard
+    // HWI devices go on as before; only a device that SVRA drives itself keeps the guard
     run.deviceFound(device.type)
 
     hideTempMessage()
 
     const isBitbox02 = device.type === 'bitbox02'
+    const isTrezorSafe7 = device.type === 'trezor_safe7'
 
     const deviceInstructionBubbles: Array<ConversationBubbleProps & { type: 'bubble' | 'image' }> = [
-      ...(isBitbox02
+      ...(isSelfDrivenType(device.type)
         ? [
             {
-              content: getBitbox02Device(),
+              content: isBitbox02 ? getBitbox02Device() : getTrezorSafe7Device(),
               type: 'image' as const,
             },
             {
-              content: 'Found your BitBox02. Keep this window open: it tells you when to look at the BitBox02.',
+              content: getFoundMessage(device.type),
               footer: new Date().toLocaleString(),
               type: 'bubble' as const,
             },
@@ -528,6 +542,17 @@ async function signWithDevice(run: SignRun, retryCount: number) {
         (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
         showBitbox02Step
       )
+    } else if (isTrezorSafe7) {
+      const view = createTrezorView()
+      try {
+        response = await runTrezorSession(
+          run,
+          (onProgress) => commands.signTrezor(psbt, network, descriptors, onProgress),
+          view.show
+        )
+      } finally {
+        view.end()
+      }
     } else {
       // let them read past messages first.
       // give the device some time to receive the psbt.
@@ -551,8 +576,8 @@ async function signWithDevice(run: SignRun, retryCount: number) {
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      // only the BitBox02 backend reports a fingerprint; HWI devices keep the one from enumeration
-      updateSignHistory(device, isBitbox02 ? fingerprint : undefined)
+      // only the backends of the devices that SVRA drives itself report a fingerprint; HWI devices keep the one from enumeration
+      updateSignHistory(device, isSelfDrivenType(device.type) ? fingerprint : undefined)
     }
 
     // Give feedback via shrimpy
@@ -571,8 +596,8 @@ async function signWithDevice(run: SignRun, retryCount: number) {
       await sleep(4000)
       addToConversation(
         createConversationBubble({
-          content: isBitbox02
-            ? 'Unplug the BitBox02 first, because SVRA lists only the BitBox02 while it is connected. Then connect another device to continue signing the transaction.'
+          content: isSelfDrivenType(device.type)
+            ? getUnplugMessage(device.type)
             : 'Connect another device to continue signing the transaction.',
         })
       )
@@ -581,7 +606,7 @@ async function signWithDevice(run: SignRun, retryCount: number) {
         dangerouslySetInnerHTML: true,
         onAppended: (parent) => {
           parent.querySelector('button')?.addEventListener('click', () => {
-            if (refuseWhileBitbox02SessionPending()) return
+            if (refuseWhileDeviceSessionPending()) return
             sign()
           })
         },
@@ -592,18 +617,16 @@ async function signWithDevice(run: SignRun, retryCount: number) {
       }
     }
   } catch (e: unknown) {
-    // BitBox02 errors arrive as plain objects, and its bootloader error is thrown by getDevice. Both carry text written for users.
-    const bitbox02Error = parseBitbox02Error(e)
-    const bitbox02Text = bitbox02Error
-      ? bitbox02Error.message
-      : e instanceof DeviceError && e.deviceType === 'bitbox02'
-        ? e.message
-        : null
-    if (bitbox02Text) {
+    // Errors of devices that SVRA drives itself arrive as plain objects, and their bootloader error is thrown by getDevice. Both carry text written for users.
+    const deviceErrorText =
+      parseBitbox02Error(e)?.message ??
+      parseTrezorError(e)?.message ??
+      (e instanceof DeviceError && isSelfDrivenType(e.deviceType) ? e.message : null)
+    if (deviceErrorText) {
       const tryAgainActions = createTryAgainActions(retryCount)
 
       hideTempMessage()
-      addToConversation(createConversationBubble({ content: bitbox02Text, footer: new Date().toLocaleString() }), {
+      addToConversation(createConversationBubble({ content: deviceErrorText, footer: new Date().toLocaleString() }), {
         shouldScrollToLastMessage: !tryAgainActions,
       })
 
@@ -635,6 +658,14 @@ async function signWithDevice(run: SignRun, retryCount: number) {
             shouldScrollToLastMessage: !tryAgainActions,
           }
         )
+      }
+
+      if (e instanceof MultipleDevicesError) {
+        hideTempMessage()
+
+        addToConversation(createConversationBubble({ content: e.message, footer: new Date().toLocaleString() }), {
+          shouldScrollToLastMessage: !tryAgainActions,
+        })
       }
 
       // user likely canceled signing
@@ -753,6 +784,9 @@ window.addEventListener('DOMContentLoaded', () => {
   initializeMode()
   initializeDOM()
 
+  // A reload does not stop the backend session of the old page, and that session can wait for a code that nobody can type.
+  void cancelOrphanedPairing(() => commands.cancelTrezorPairing())
+
   DOM.buttons.broadcast.addEventListener('click', (e) => {
     e.preventDefault()
     broadcast()
@@ -820,7 +854,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
-    if (refuseWhileBitbox02SessionPending()) return
+    if (refuseWhileDeviceSessionPending()) return
 
     const userBubble = createConversationBubble({
       content: 'Sign this transaction (PSBT)',
@@ -909,6 +943,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Clear messages via button click
   DOM.buttons.clearMessages.addEventListener('click', () => {
+    // the code entry holds the only Cancel button, so it ends the pairing before the controls go
+    void cancelOpenPairingEntry()
     DOM.outputs.conversation.innerHTML = ''
     DOM.outputs.tempMessage.textContent = 'All messages cleared 🫡'
     DOM.buttons.clearMessages.classList.add('hidden')

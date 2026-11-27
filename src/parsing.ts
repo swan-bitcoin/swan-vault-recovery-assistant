@@ -1,6 +1,7 @@
 import { PsbtSigningStatus } from './bindings'
 import { Success } from './components'
 import { getBitbox02ModelName } from './utilities/devices/bitbox02Model'
+import { getSelfDrivenName, isSelfDrivenType } from './utilities/devices/selfDriven'
 
 export type Device = {
   type: string
@@ -32,9 +33,26 @@ export class DeviceError extends Error {
   }
 }
 
+// Lets the sign flow show this message and stop the spinner, as it does for a device error.
+export class MultipleDevicesError extends Error {
+  constructor() {
+    super('Multiple devices found. Please unplug all but one device.')
+    this.name = 'MultipleDevicesError'
+  }
+}
+
 const FINGERPRINT = /^[0-9a-fA-F]{8}$/
 
-const isBitbox02 = (device: Device) => device.type === 'bitbox02'
+// the other Trezor models have type 'trezor' and go through HWI, so they are not here
+const getSelfDrivenDeviceName = (device: Device) => (isSelfDrivenType(device.type) ? getSelfDrivenName(device.type) : null)
+const isSelfDriven = (device: Device) => getSelfDrivenDeviceName(device) !== null
+
+function getModelName(device: Device) {
+  if (device.type === 'bitbox02') return getBitbox02ModelName(device.model)
+  // there is one Safe 7 model, so its name does not depend on what the backend sends
+  // Sanitize device.model to prevent XSS
+  return getSelfDrivenDeviceName(device) ?? sanitize(device.model)
+}
 
 export function getDevice(val: unknown): Device {
   const devices = parseDeviceResponse(val)
@@ -42,7 +60,7 @@ export function getDevice(val: unknown): Device {
     throw new Error('No devices found')
   }
   if (devices.length > 1) {
-    throw new Error('Multiple devices found. Please unplug all but one device.')
+    throw new MultipleDevicesError()
   }
   const device = devices[0]
   if (device.error) {
@@ -60,16 +78,15 @@ export function getDeviceMessage(val: unknown): string {
   let message = devices.length === 1 ? `Found a ` : `Found ${devices.length} devices: [`
 
   devices.forEach((device, index, arr) => {
-    // Sanitize device.model to prevent XSS
-    message = message.concat(`${isBitbox02(device) ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
+    message = message.concat(`${getModelName(device)} device `)
     if (device.error) {
       // Sanitize device.error to prevent XSS
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       // Sanitize device.fingerprint to prevent XSS
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
-    } else if (isBitbox02(device)) {
-      // enumeration does not open a BitBox02, so its fingerprint is known only after it has signed
+    } else if (isSelfDriven(device)) {
+      // enumeration does not open these devices, so their fingerprint is known only after they have signed
       message = message.concat('(SVRA reads its fingerprint when you sign)')
     } else {
       message = message.concat('with no fingerprint')
@@ -82,11 +99,13 @@ export function getDeviceMessage(val: unknown): string {
   if (devices.length > 1) {
     message = message.concat(']')
   }
-  if (devices.some(isBitbox02)) {
-    // the backend does not ask HWI while a BitBox02 is on USB, so another device stays hidden
-    message = message.concat(
-      '. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
-    )
+  // the backend does not ask HWI while one of these devices is on USB, so another device stays hidden
+  const selfDrivenNames = [...new Set(devices.map(getSelfDrivenDeviceName).filter((name) => name !== null))]
+  if (selfDrivenNames.length === 1) {
+    const [name] = selfDrivenNames
+    message = message.concat(`. While a ${name} is connected, SVRA lists only the ${name}. Unplug it to use another device.`)
+  } else if (selfDrivenNames.length > 1) {
+    message = message.concat(`. While a ${selfDrivenNames.join(' or a ')} is connected, SVRA lists only those devices.`)
   }
   return message
 }
@@ -97,9 +116,9 @@ export function getDevicePrompt(val: unknown): string {
     return 'Make sure your device is connected. Perhaps try a different cable.'
   }
   if (devices.length === 1) {
-    // a BitBox02 in bootloader mode cannot sign, so the usual hint would mislead
-    if (isBitbox02(devices[0]) && devices[0].error) {
-      return 'This BitBox02 cannot sign yet. Read the error above first.'
+    // a device in bootloader mode cannot sign, so the usual hint would mislead
+    if (isSelfDriven(devices[0]) && devices[0].error) {
+      return `This ${getSelfDrivenDeviceName(devices[0])} cannot sign yet. Read the error above first.`
     }
     return 'You may want to sign with this device next...'
   }
