@@ -14,14 +14,104 @@ import {
   j as getDevice,
   k as getSignResultAndPsbt,
   l as getPsbtStatusMessage,
+  m as DeviceError,
   C as CircularTickIcon,
 } from './layout.js'
+function __classPrivateFieldGet(receiver, state, kind, f) {
+  if (kind === 'a' && !f) throw new TypeError('Private accessor was defined without a getter')
+  if (typeof state === 'function' ? receiver !== state || !f : !state.has(receiver))
+    throw new TypeError('Cannot read private member from an object whose class did not declare it')
+  return kind === 'm' ? f : kind === 'a' ? f.call(receiver) : f ? f.value : state.get(receiver)
+}
+function __classPrivateFieldSet(receiver, state, value, kind, f) {
+  if (typeof state === 'function' ? receiver !== state || !f : !state.has(receiver))
+    throw new TypeError('Cannot write private member to an object whose class did not declare it')
+  return (state.set(receiver, value), value)
+}
 typeof SuppressedError === 'function'
   ? SuppressedError
   : function (error, suppressed, message) {
       var e = new Error(message)
       return ((e.name = 'SuppressedError'), (e.error = error), (e.suppressed = suppressed), e)
     }
+var _Channel_onmessage, _Channel_nextMessageIndex, _Channel_pendingMessages, _Channel_messageEndIndex
+const SERIALIZE_TO_IPC_FN = '__TAURI_TO_IPC_KEY__'
+function transformCallback(callback, once = false) {
+  return window.__TAURI_INTERNALS__.transformCallback(callback, once)
+}
+class Channel {
+  constructor(onmessage) {
+    _Channel_onmessage.set(this, void 0)
+    _Channel_nextMessageIndex.set(this, 0)
+    _Channel_pendingMessages.set(this, [])
+    _Channel_messageEndIndex.set(this, void 0)
+    __classPrivateFieldSet(this, _Channel_onmessage, onmessage || (() => {}))
+    this.id = transformCallback((rawMessage) => {
+      const index = rawMessage.index
+      if ('end' in rawMessage) {
+        if (index == __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f')) {
+          this.cleanupCallback()
+        } else {
+          __classPrivateFieldSet(this, _Channel_messageEndIndex, index)
+        }
+        return
+      }
+      const message = rawMessage.message
+      if (index == __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f')) {
+        __classPrivateFieldGet(this, _Channel_onmessage, 'f').call(this, message)
+        __classPrivateFieldSet(
+          this,
+          _Channel_nextMessageIndex,
+          __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f') + 1
+        )
+        while (
+          __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f') in
+          __classPrivateFieldGet(this, _Channel_pendingMessages, 'f')
+        ) {
+          const message2 = __classPrivateFieldGet(this, _Channel_pendingMessages, 'f')[
+            __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f')
+          ]
+          __classPrivateFieldGet(this, _Channel_onmessage, 'f').call(this, message2)
+          delete __classPrivateFieldGet(this, _Channel_pendingMessages, 'f')[
+            __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f')
+          ]
+          __classPrivateFieldSet(
+            this,
+            _Channel_nextMessageIndex,
+            __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f') + 1
+          )
+        }
+        if (
+          __classPrivateFieldGet(this, _Channel_nextMessageIndex, 'f') ===
+          __classPrivateFieldGet(this, _Channel_messageEndIndex, 'f')
+        ) {
+          this.cleanupCallback()
+        }
+      } else {
+        __classPrivateFieldGet(this, _Channel_pendingMessages, 'f')[index] = message
+      }
+    })
+  }
+  cleanupCallback() {
+    window.__TAURI_INTERNALS__.unregisterCallback(this.id)
+  }
+  set onmessage(handler) {
+    __classPrivateFieldSet(this, _Channel_onmessage, handler)
+  }
+  get onmessage() {
+    return __classPrivateFieldGet(this, _Channel_onmessage, 'f')
+  }
+  [((_Channel_onmessage = /* @__PURE__ */ new WeakMap()),
+  (_Channel_nextMessageIndex = /* @__PURE__ */ new WeakMap()),
+  (_Channel_pendingMessages = /* @__PURE__ */ new WeakMap()),
+  (_Channel_messageEndIndex = /* @__PURE__ */ new WeakMap()),
+  SERIALIZE_TO_IPC_FN)]() {
+    return `__CHANNEL__:${this.id}`
+  }
+  toJSON() {
+    return this[SERIALIZE_TO_IPC_FN]()
+  }
+}
 async function invoke(cmd, args = {}, options) {
   return window.__TAURI_INTERNALS__.invoke(cmd, args, options)
 }
@@ -98,6 +188,9 @@ const commands = {
   },
   async sign(psbt, network, deviceType) {
     return await invoke('sign', { psbt, network, deviceType })
+  },
+  async signBitbox02(psbt, network, descriptors, onProgress) {
+    return await invoke('sign_bitbox02', { psbt, network, descriptors, onProgress })
   },
   async sweep(address, feeRate, network, descriptors, electrum) {
     return await invoke('sweep', { address, feeRate, network, descriptors, electrum })
@@ -564,10 +657,112 @@ function getTransactionCreatedBubbles({ address, sent, outbound, hasUserFeeRate,
     ],
   }
 }
+function getBitbox02Device() {
+  return `<svg viewBox="0 0 309 138" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 100%; height: auto" role="img" aria-label="BitBox02">
+<g>
+<rect x="4" y="34" width="268" height="70" rx="10" fill="#1D1D1D"/>
+<rect x="4" y="34" width="268" height="70" rx="10" fill="url(#bitbox02-sheen)"/>
+<rect x="272" y="50" width="30" height="38" rx="4" fill="#9A9A9A"/>
+<rect x="276" y="60" width="26" height="18" rx="3" fill="#2D2D2D"/>
+<rect x="20" y="48" width="96" height="42" rx="4" fill="#2D2D2D" stroke="#000000" stroke-width="1.5"/>
+<circle cx="238" cy="69" r="4" fill="#90E3B1"/>
+</g>
+<defs>
+<linearGradient id="bitbox02-sheen" x1="20" y1="34" x2="230" y2="104" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0"/>
+<stop offset="0.82" stop-color="white" stop-opacity="0.07"/>
+<stop offset="1" stop-color="white" stop-opacity="0"/>
+</linearGradient>
+</defs>
+</svg>
+`
+}
+function parseBitbox02Error(e) {
+  if (typeof e !== 'object' || e === null) return null
+  const { error_type: errorType, message } = e
+  if (errorType !== 'Bitbox02Error' || typeof message !== 'string' || message === '') return null
+  return { message }
+}
+const WAITING = 'Waiting for your BitBox02…'
+const WALLET_NAME = 'swan_vault'
+function getBitbox02StepMessage(update) {
+  switch (update.step) {
+    case 'connecting':
+      return { loading: 'Connecting to your BitBox02…' }
+    case 'unlock':
+      return {
+        loading: WAITING,
+        bubble: 'Unlock your BitBox02. Enter your password on the device if it asks. To stop, unplug the BitBox02.',
+      }
+    case 'confirm-pairing':
+      return {
+        loading: WAITING,
+        bubble:
+          'Check that the code below is the same as the code on your BitBox02. If the codes are different, do not confirm. Unplug the BitBox02. If they are the same, confirm on the device.',
+        code: update.code,
+      }
+    case 'checking-registration':
+      return { loading: 'Checking that your BitBox02 knows this vault…' }
+    case 'register':
+      return {
+        loading: WAITING,
+        // an unexpected registration can mean that the pasted wallet configuration is not the customer's vault, so both texts say when to stop
+        bubble:
+          update.name === WALLET_NAME
+            ? 'Your BitBox02 does not know this vault yet. This is normal if the BitBox02 was reset or is new. The BitBox02 now shows each key of the vault. Check each key against the wallet configuration on your Swan Vault Recovery Sheet, then confirm on the BitBox02. If your BitBox02 was not reset and you signed with it before, stop and unplug it: the wallet configuration you pasted may not be your vault.'
+            : `Your BitBox02 already has a different wallet named ${WALLET_NAME}. This is normal only if you used this BitBox02 for another Swan vault. If you did not, stop: unplug the BitBox02 and check the wallet configuration against your Swan Vault Recovery Sheet. To continue, check each key again, then confirm on the BitBox02. It shows this vault as ${update.name}.`,
+      }
+    case 'sign':
+      return { loading: WAITING, bubble: 'Check the address and the amount on your BitBox02, then confirm.' }
+  }
+}
+const BITBOX02_BUSY_MESSAGE =
+  'SVRA is still waiting for your BitBox02. Finish on the BitBox02, or unplug it to stop. Then try again.'
+let current = null
+const isBitbox02SessionPending = () => (current == null ? void 0 : current.bitbox02Pending) === true
+function startSignRun() {
+  if (current) return null
+  const state = { bitbox02Pending: false }
+  current = state
+  const release = () => {
+    if (current === state) current = null
+  }
+  return {
+    deviceFound: (deviceType) => {
+      if (deviceType === 'bitbox02') state.bitbox02Pending = true
+      else release()
+    },
+    sessionEnded: () => {
+      state.bitbox02Pending = false
+    },
+    release,
+  }
+}
+async function runBitbox02Session(run, start, show) {
+  let isSettled = false
+  const shown = /* @__PURE__ */ new Set()
+  const onProgress = new Channel()
+  onProgress.onmessage = (update) => {
+    if (isSettled) return
+    const key = update.step === 'register' ? `register:${update.name}` : update.step
+    if (shown.has(key)) return
+    shown.add(key)
+    show(update)
+  }
+  try {
+    return await start(onProgress)
+  } finally {
+    isSettled = true
+    run.sessionEnded()
+  }
+}
 function getDeviceName(device) {
   switch (device.type) {
     case 'jade': {
       return 'Jade'
+    }
+    case 'bitbox02': {
+      return 'BitBox02'
     }
     default: {
       return sanitize(device.type)
@@ -704,8 +899,8 @@ const addSignatureToSignHistory = (device) => {
   newSignature.appendChild(deviceInfo)
   return newSignature
 }
-const updateSignHistory = (device) => {
-  const newSignature = addSignatureToSignHistory(device)
+const updateSignHistory = (device, fingerprint) => {
+  const newSignature = addSignatureToSignHistory(fingerprint ? { ...device, fingerprint } : device)
   const stepsList = DOM.outputs.psbtSignHistory
   const missingSignature = stepsList.querySelector('#missing-signature')
   if (missingSignature) {
@@ -757,6 +952,7 @@ async function broadcast() {
   }
 }
 async function enumerate() {
+  if (refuseWhileBitbox02SessionPending()) return
   const { network } = getUserInputs()
   DOM.outputs.tempMessage.textContent = 'Please wait... (be sure to check attached device for prompts)'
   try {
@@ -921,7 +1117,54 @@ const toggleChangeInput = () => DOM.containers.change.classList.toggle('hidden',
 const toggleElectrumInput = () => DOM.containers.electrum.classList.toggle('hidden', DOM.checkboxes.electrum.checked)
 const toggleFeeRateInput = () => DOM.containers.feeRate.classList.toggle('hidden', DOM.checkboxes.feeRate.checked)
 const toggleNetworkInput = () => DOM.containers.network.classList.toggle('hidden', DOM.checkboxes.network.checked)
+function showBitbox02Step(update) {
+  const { loading, bubble, code } = getBitbox02StepMessage(update)
+  if (bubble) {
+    const content = document.createElement('div')
+    const text = document.createElement('p')
+    text.textContent = bubble
+    content.appendChild(text)
+    if (code) {
+      const codeBlock = document.createElement('pre')
+      codeBlock.className = 'mt-2 font-mono whitespace-pre'
+      codeBlock.textContent = code
+      content.appendChild(codeBlock)
+    }
+    addToConversation(createConversationBubble({ content, dangerouslySetInnerHTML: true }))
+  }
+  showTempLoadingMessage(loading)
+}
+function refuseWhileBitbox02SessionPending() {
+  if (!isBitbox02SessionPending()) return false
+  addToConversation(
+    createConversationBubble({ content: BITBOX02_BUSY_MESSAGE, footer: /* @__PURE__ */ new Date().toLocaleString() })
+  )
+  return true
+}
+const createTryAgainActions = (retryCount) =>
+  createConversationActions({
+    content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
+    dangerouslySetInnerHTML: true,
+    onAppended: (parent) => {
+      var _a
+      ;(_a = parent.querySelector('#get-device-and-sign-again-btn')) == null
+        ? void 0
+        : _a.addEventListener('click', () => {
+            if (refuseWhileBitbox02SessionPending()) return
+            sign({ retryCount: retryCount + 1 })
+          })
+    },
+  })
 async function sign({ retryCount = 0 } = {}) {
+  const run = startSignRun()
+  if (!run) return
+  try {
+    await signWithDevice(run, retryCount)
+  } finally {
+    run.release()
+  }
+}
+async function signWithDevice(run, retryCount) {
   const { psbt, descriptors, network } = getUserInputs()
   require2(psbt, 'PSBT is required', DOM.feedback.psbtInputValidationMessage)
   try {
@@ -929,45 +1172,68 @@ async function sign({ retryCount = 0 } = {}) {
     await sleep(400)
     const enumeration = await commands.enumerate(network)
     const device = getDevice(enumeration)
+    run.deviceFound(device.type)
     hideTempMessage()
+    const isBitbox02 = device.type === 'bitbox02'
     const deviceInstructionBubbles = [
-      ...(device.type === 'jade'
+      ...(isBitbox02
         ? [
             {
-              // Sanitize fingerprint before passing to getJadeDevice
-              content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
+              content: getBitbox02Device(),
               type: 'image',
             },
             {
-              // getDeviceName already returns sanitized value
-              content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+              content: 'Found your BitBox02. Keep this window open: it tells you when to look at the BitBox02.',
               footer: /* @__PURE__ */ new Date().toLocaleString(),
               type: 'bubble',
             },
           ]
-        : [
-            {
-              // Sanitize device.type and device.fingerprint to prevent XSS
-              content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
-              type: 'bubble',
-            },
-            {
-              // getDeviceName already returns sanitized value
-              content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
-              type: 'bubble',
-            },
-          ]),
+        : device.type === 'jade'
+          ? [
+              {
+                // Sanitize fingerprint before passing to getJadeDevice
+                content: getJadeDevice({ fingerprint: sanitize(device.fingerprint ?? '') }),
+                type: 'image',
+              },
+              {
+                // getDeviceName already returns sanitized value
+                content: `Found your ${getDeviceName(device)}. Verify the transaction on the screen, it may take a few seconds to appear.`,
+                footer: /* @__PURE__ */ new Date().toLocaleString(),
+                type: 'bubble',
+              },
+            ]
+          : [
+              {
+                // Sanitize device.type and device.fingerprint to prevent XSS
+                content: `Found a ${sanitize(device.type)} with fingerprint ${sanitize(device.fingerprint ?? '')}.`,
+                type: 'bubble',
+              },
+              {
+                // getDeviceName already returns sanitized value
+                content: `Follow the instructions on your ${getDeviceName(device)}. It may take a few seconds for them to appear.`,
+                type: 'bubble',
+              },
+            ]),
     ]
     for (const { type, ...bubble } of deviceInstructionBubbles) {
       const item = type === 'image' ? createConversationImage(bubble) : createConversationBubble(bubble)
       addToConversation(item)
       await sleep(400)
     }
-    await sleep(9e3)
-    showTempLoadingMessage('Waiting for you to sign the transaction')
-    const response = await commands.sign(psbt, network, device.type)
+    let response
+    if (isBitbox02) {
+      response = await runBitbox02Session(
+        run,
+        (onProgress) => commands.signBitbox02(psbt, network, descriptors, onProgress),
+        showBitbox02Step
+      )
+    } else {
+      await sleep(9e3)
+      showTempLoadingMessage('Waiting for you to sign the transaction')
+      response = await commands.sign(psbt, network, device.type)
+    }
     hideTempMessage()
-    const { psbt: responsePsbt, message, signed } = getSignResultAndPsbt(response)
+    const { psbt: responsePsbt, message, signed, fingerprint } = getSignResultAndPsbt(response)
     DOM.outputs.psbtTextArea.value = responsePsbt
     const tempuraBubble = createConversationBubble({
       content: message,
@@ -977,7 +1243,7 @@ async function sign({ retryCount = 0 } = {}) {
     addToConversation(tempuraBubble)
     validatePsbt()
     if (signed) {
-      updateSignHistory(device)
+      updateSignHistory(device, isBitbox02 ? fingerprint : void 0)
     }
     const psbtStatus = await commands.psbtStatus(responsePsbt, network, descriptors)
     await sleep(600)
@@ -991,7 +1257,9 @@ async function sign({ retryCount = 0 } = {}) {
       await sleep(4e3)
       addToConversation(
         createConversationBubble({
-          content: 'Connect another device to continue signing the transaction.',
+          content: isBitbox02
+            ? 'Unplug the BitBox02 first, because SVRA lists only the BitBox02 while it is connected. Then connect another device to continue signing the transaction.'
+            : 'Connect another device to continue signing the transaction.',
         })
       )
       const actions = createConversationActions({
@@ -1002,6 +1270,7 @@ async function sign({ retryCount = 0 } = {}) {
           ;(_a = parent.querySelector('button')) == null
             ? void 0
             : _a.addEventListener('click', () => {
+                if (refuseWhileBitbox02SessionPending()) return
                 sign()
               })
         },
@@ -1011,19 +1280,31 @@ async function sign({ retryCount = 0 } = {}) {
       }
     }
   } catch (e) {
+    const bitbox02Error = parseBitbox02Error(e)
+    const bitbox02Text = bitbox02Error
+      ? bitbox02Error.message
+      : e instanceof DeviceError && e.deviceType === 'bitbox02'
+        ? e.message
+        : null
+    if (bitbox02Text) {
+      const tryAgainActions = createTryAgainActions(retryCount)
+      hideTempMessage()
+      addToConversation(
+        createConversationBubble({ content: bitbox02Text, footer: /* @__PURE__ */ new Date().toLocaleString() }),
+        {
+          shouldScrollToLastMessage: !tryAgainActions,
+        }
+      )
+      await sleep(400)
+      if (tryAgainActions) {
+        addToConversation(tryAgainActions, {
+          shouldScrollToLastMessage: true,
+        })
+      }
+      return
+    }
     if (e instanceof Error) {
-      const tryAgainActions = createConversationActions({
-        content: `<button class="btn btn-outline btn-sm" id="get-device-and-sign-again-btn">Try again</button>`,
-        dangerouslySetInnerHTML: true,
-        onAppended: (parent) => {
-          var _a
-          ;(_a = parent.querySelector('#get-device-and-sign-again-btn')) == null
-            ? void 0
-            : _a.addEventListener('click', () => {
-                sign({ retryCount: retryCount + 1 })
-              })
-        },
-      })
+      const tryAgainActions = createTryAgainActions(retryCount)
       if (e.message.toLowerCase() === 'no devices found') {
         hideTempMessage()
         addToConversation(
@@ -1180,6 +1461,7 @@ window.addEventListener('DOMContentLoaded', () => {
   })
   DOM.buttons.sign.addEventListener('click', async (e) => {
     e.preventDefault()
+    if (refuseWhileBitbox02SessionPending()) return
     const userBubble = createConversationBubble({
       content: 'Sign this transaction (PSBT)',
       isUserSpeaking: true,

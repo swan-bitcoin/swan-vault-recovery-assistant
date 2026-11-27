@@ -52,6 +52,9 @@ async psbtStatus(psbt: string, network: string, descriptors: Descriptors) : Prom
 async sign(psbt: string, network: string, deviceType: string) : Promise<string> {
     return await TAURI_INVOKE("sign", { psbt, network, deviceType });
 },
+async signBitbox02(psbt: string, network: string, descriptors: Descriptors, onProgress: TAURI_CHANNEL<Bitbox02Progress>) : Promise<string> {
+    return await TAURI_INVOKE("sign_bitbox02", { psbt, network, descriptors, onProgress });
+},
 async sweep(address: string, feeRate: number, network: string, descriptors: Descriptors, electrum: string | null) : Promise<PsbtDetails> {
     return await TAURI_INVOKE("sweep", { address, feeRate, network, descriptors, electrum });
 },
@@ -93,6 +96,7 @@ untrusted_pending: string;
  * Confirmed and immediately spendable balance
  */
 confirmed: string }
+export type Bitbox02Progress = { step: "connecting" } | { step: "unlock" } | { step: "confirm-pairing"; code: string } | { step: "checking-registration" } | { step: "register"; name: string } | { step: "sign" }
 export type Descriptors = { receive: string; change: string | null; auto_change: boolean }
 export type PsbtDetails = { psbt: string; txid: string; received: string; sent: string; fee: string | null; outbound: string; sent_to_self: boolean }
 export type PsbtSigningStatus = "Unsigned" | "PartiallySigned" | "FullySigned"

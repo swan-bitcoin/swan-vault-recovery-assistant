@@ -14,6 +14,10 @@ edition = "2021"
 name = "swan_vault_recovery_assistant_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# The BitBox02 device code is its own crate so that it builds and tests without the Tauri shell.
+[workspace]
+members = ["bitbox02"]
+
 [build-dependencies]
 tauri-build = { version = "2.4.0", features = [] }
 
@@ -25,6 +29,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 specta = "=2.0.0-rc.20"
 specta-typescript = "0.0.7"
+svra_bitbox02 = { path = "bitbox02", features = ["usb"] }
 tauri = { version = "2.8.2", features = [] }
 tauri-plugin-clipboard-manager = "2.3.0"
 tauri-plugin-shell = "2"

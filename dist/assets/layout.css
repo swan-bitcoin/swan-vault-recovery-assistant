@@ -3663,6 +3663,9 @@ details.collapse summary::-webkit-details-marker {
 .overflow-y-scroll {
   overflow-y: scroll;
 }
+.whitespace-pre {
+  white-space: pre;
+}
 .text-balance {
   text-wrap: balance;
 }

@@ -119,6 +119,7 @@ impl std::fmt::Display for HwiErrorType {
 pub enum SvraErrorType {
   AddressError,
   BalanceError,
+  Bitbox02Error,
   BlockchainError,
   ClientError,
   CommandError,
@@ -143,6 +144,7 @@ impl std::fmt::Display for SvraErrorType {
     match self {
       SvraErrorType::AddressError => write!(f, "AddressError"),
       SvraErrorType::BalanceError => write!(f, "BalanceError"),
+      SvraErrorType::Bitbox02Error => write!(f, "Bitbox02Error"),
       SvraErrorType::BlockchainError => write!(f, "BlockchainError"),
       SvraErrorType::ClientError => write!(f, "ClientError"),
       SvraErrorType::CommandError => write!(f, "CommandError"),
@@ -178,6 +180,10 @@ impl SvraError {
       error_type: error_type.to_string(),
       message: message.to_string(),
     }
+  }
+
+  pub fn from_bitbox02(error: svra_bitbox02::Error) -> Self {
+    SvraError::new(SvraErrorType::Bitbox02Error, &error.message)
   }
 
   pub fn from_hwi_error_code(code: Option<i32>) -> Self {

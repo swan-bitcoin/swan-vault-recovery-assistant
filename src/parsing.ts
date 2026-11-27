@@ -1,5 +1,6 @@
 import { PsbtSigningStatus } from './bindings'
 import { Success } from './components'
+import { getBitbox02ModelName } from './utilities/devices/bitbox02Model'
 
 export type Device = {
   type: string
@@ -16,8 +17,24 @@ type DeviceResponse = Device[]
 type SignResponse = {
   psbt: string
   signed: boolean
+  fingerprint?: unknown
   error: string | null | undefined
 }
+
+// Lets the sign flow tell a device problem from other errors without matching on message text.
+export class DeviceError extends Error {
+  constructor(
+    readonly deviceType: string,
+    message: string
+  ) {
+    super(message)
+    this.name = 'DeviceError'
+  }
+}
+
+const FINGERPRINT = /^[0-9a-fA-F]{8}$/
+
+const isBitbox02 = (device: Device) => device.type === 'bitbox02'
 
 export function getDevice(val: unknown): Device {
   const devices = parseDeviceResponse(val)
@@ -29,7 +46,7 @@ export function getDevice(val: unknown): Device {
   }
   const device = devices[0]
   if (device.error) {
-    throw new Error(`Device error: ${device.error}`)
+    throw new DeviceError(device.type, `Device error: ${device.error}`)
   }
   return device
 }
@@ -44,13 +61,16 @@ export function getDeviceMessage(val: unknown): string {
 
   devices.forEach((device, index, arr) => {
     // Sanitize device.model to prevent XSS
-    message = message.concat(`${sanitize(device.model)} device `)
+    message = message.concat(`${isBitbox02(device) ? getBitbox02ModelName(device.model) : sanitize(device.model)} device `)
     if (device.error) {
       // Sanitize device.error to prevent XSS
       message = message.concat(`which is reporting an error: '${sanitize(device.error)}'`)
     } else if (device.fingerprint) {
       // Sanitize device.fingerprint to prevent XSS
       message = message.concat(`with fingerprint '${sanitize(device.fingerprint)}'`)
+    } else if (isBitbox02(device)) {
+      // enumeration does not open a BitBox02, so its fingerprint is known only after it has signed
+      message = message.concat('(SVRA reads its fingerprint when you sign)')
     } else {
       message = message.concat('with no fingerprint')
     }
@@ -62,6 +82,12 @@ export function getDeviceMessage(val: unknown): string {
   if (devices.length > 1) {
     message = message.concat(']')
   }
+  if (devices.some(isBitbox02)) {
+    // the backend does not ask HWI while a BitBox02 is on USB, so another device stays hidden
+    message = message.concat(
+      '. While a BitBox02 is connected, SVRA lists only the BitBox02. Unplug it to use another device.'
+    )
+  }
   return message
 }
 
@@ -71,6 +97,10 @@ export function getDevicePrompt(val: unknown): string {
     return 'Make sure your device is connected. Perhaps try a different cable.'
   }
   if (devices.length === 1) {
+    // a BitBox02 in bootloader mode cannot sign, so the usual hint would mislead
+    if (isBitbox02(devices[0]) && devices[0].error) {
+      return 'This BitBox02 cannot sign yet. Read the error above first.'
+    }
     return 'You may want to sign with this device next...'
   }
   return 'Make sure only one device is connected.'
@@ -100,13 +130,20 @@ export function getSignResultAndPsbt(val: unknown): {
   message: string
   psbt: string
   signed: boolean
+  fingerprint?: string
 } {
   const signResponse = parseSignResponse(val)
 
   const message = signResponse.signed
     ? Success('Great! Added a signature to the transaction.')
     : 'A signature was not added, have you already signed with this device?'
-  return { message, psbt: signResponse.psbt, signed: signResponse.signed }
+  const fingerprint = signResponse.fingerprint
+  return {
+    message,
+    psbt: signResponse.psbt,
+    signed: signResponse.signed,
+    ...(typeof fingerprint === 'string' && FINGERPRINT.test(fingerprint) ? { fingerprint } : {}),
+  }
 }
 
 export function sanitize(input: string): string {

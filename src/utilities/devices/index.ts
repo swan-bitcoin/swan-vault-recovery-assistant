@@ -1,2 +1,7 @@
+export * from './bitbox02'
+export * from './bitbox02Error'
+export * from './bitbox02Model'
+export * from './bitbox02Progress'
+export * from './bitbox02Session'
 export * from './getDeviceName'
 export * from './jade'
